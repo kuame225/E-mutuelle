@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0D47A1" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+
+    <title>Mutuelle</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <style>
+      html, body {
+        max-width: 100%;
+        overflow-x: hidden;
+        margin: 0;
+        -webkit-text-size-adjust: 100%;
+      }
+      * { box-sizing: border-box; }
+
+      /* Panneau de diagnostic — visible uniquement en cas d'erreur */
+      #diagnostic {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        overflow: auto;
+        padding: 20px;
+        background: #FFF7F6;
+        color: #7F1D1D;
+        font-family: monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #diagnostic h1 {
+        font-family: system-ui, sans-serif;
+        font-size: 17px;
+        margin: 0 0 4px;
+      }
+      #diagnostic p {
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+        color: #92400E;
+        margin: 0 0 16px;
+      }
+      #diagnostic pre {
+        background: #fff;
+        border: 1px solid #FCA5A5;
+        border-radius: 6px;
+        padding: 12px;
+        margin: 0 0 12px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- Diagnostic mobile : sans console accessible sur téléphone, l'erreur
+         qui empêche l'application de démarrer s'affiche directement à l'écran.
+         À retirer une fois la cause identifiée. -->
+    <div id="diagnostic">
+      <h1>L'application n'a pas pu démarrer</h1>
+      <p>Transmettez cet écran au développeur.</p>
+      <div id="diagnostic-contenu"></div>
+    </div>
+
+    <script>
+      (function () {
+        var panneau = document.getElementById('diagnostic');
+        var contenu = document.getElementById('diagnostic-contenu');
+        var vu = false;
+
+        function afficher(titre, detail) {
+          vu = true;
+          panneau.style.display = 'block';
+          var bloc = document.createElement('pre');
+          bloc.textContent = titre + '\n\n' + detail;
+          contenu.appendChild(bloc);
+        }
+
+        window.addEventListener('error', function (e) {
+          if (e.message) {
+            afficher(
+              e.message,
+              (e.filename || '') + ' ligne ' + (e.lineno || '?') +
+              (e.error && e.error.stack ? '\n\n' + e.error.stack : '')
+            );
+          } else if (e.target && e.target.src) {
+            afficher('Fichier introuvable', e.target.src);
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          afficher(
+            'Promesse rejetée',
+            (r && r.message ? r.message : String(r)) +
+            (r && r.stack ? '\n\n' + r.stack : '')
+          );
+        });
+
+        // Si rien ne s'est affiché au bout de dix secondes, on donne
+        // au moins le contexte : version du navigateur et adresse.
+        setTimeout(function () {
+          var racine = document.getElementById('root');
+          if (!vu && racine && racine.children.length === 0) {
+            afficher(
+              'Aucune erreur remontée, mais la page est restée vide.',
+              'Adresse : ' + location.href +
+              '\n\nNavigateur : ' + navigator.userAgent
+            );
+          }
+        }, 10000);
+      })();
+    </script>
+
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

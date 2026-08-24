@@ -51,6 +51,13 @@ export default function ParametragePage() {
       setNbMembres(m.count || 0);
       setSlug(o.data?.slug || "");
       setLoading(false);
+
+      // Si le préfixe déjà enregistré ne correspond pas à ce que le sigle
+      // donnerait automatiquement, il a été choisi volontairement — on ne
+      // le resynchronisera jamais tout seul dans ce cas.
+      if (valeurs.prefixe_matricule && valeurs.prefixe_matricule !== deriverPrefixe(valeurs.nom_mutuelle)) {
+        prefixeToucheRef.current = true;
+      }
     });
   }, [orgId]);
 
@@ -183,6 +190,13 @@ export default function ParametragePage() {
   }
 
   const maj = (champ, valeur) => setParams((p) => ({ ...p, [champ]: valeur }));
+
+  // Le préfixe se déduit automatiquement du sigle tant que la personne ne
+  // l'a pas modifié elle-même — dès qu'elle y touche directement, on arrête
+  // de le resynchroniser, pour ne jamais écraser un choix volontaire.
+  const prefixeToucheRef = useRef(false);
+  const deriverPrefixe = (sigle) =>
+    (sigle || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "MUT";
   const basculer = (id) => maj(id, !moduleActif(params, id));
 
   const attenduMensuel = params.montant_cotisation * nbMembres;
@@ -255,7 +269,10 @@ export default function ParametragePage() {
         aide="Ces informations figurent sur les reçus, les rapports, la carte de membre et l'écran d'accueil.">
 
         <Champ label="Sigle" value={params.nom_mutuelle}
-          onChange={(v) => maj("nom_mutuelle", v)} placeholder="Ex : MAEPHDA"
+          onChange={(v) => {
+            maj("nom_mutuelle", v);
+            if (!prefixeToucheRef.current) maj("prefixe_matricule", deriverPrefixe(v));
+          }} placeholder="Ex : MAEPHDA"
           aide="Nom court, affiché en tête des documents et sur la carte de membre. Vingt caractères au maximum." />
 
         <Champ label="Dénomination complète" value={params.adresse}
@@ -350,11 +367,16 @@ export default function ParametragePage() {
           <label className="pm-label">Préfixe de matricule</label>
           <input
             value={params.prefixe_matricule || ""}
-            onChange={(e) =>
-              maj("prefixe_matricule", e.target.value.toUpperCase().slice(0, 10))}
+            onChange={(e) => {
+              prefixeToucheRef.current = true;
+              maj("prefixe_matricule", e.target.value.toUpperCase().slice(0, 10));
+            }}
             placeholder="Ex : MEPHDA"
             className="pm-input pm-input-mono"
           />
+          <span className="pm-aide">
+            Se déduit automatiquement du sigle, modifiable si besoin.
+          </span>
           <div className="pm-apercu">
             <ImageIcon size={13} /> Aperçu d'un matricule :{" "}
             <strong>{apercuMatricule}</strong>

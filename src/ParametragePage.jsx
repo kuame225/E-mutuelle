@@ -371,7 +371,7 @@ export default function ParametragePage() {
               prefixeToucheRef.current = true;
               maj("prefixe_matricule", e.target.value.toUpperCase().slice(0, 10));
             }}
-            placeholder="Ex : MEPHDA"
+            placeholder="Ex : MAEPHDA"
             className="pm-input pm-input-mono"
           />
           <span className="pm-aide">

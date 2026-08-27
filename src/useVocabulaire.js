@@ -1,71 +1,35 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { supabase } from "./supabaseClient";
+import { useCallback, useMemo } from "react";
 import { useParametrage } from "./useParametrage";
 import { motPourType, libelleType, capitaliser } from "./vocabulaire";
 
 /* ============================================================
    Vocabulaire de l'organisation actuellement affichée.
 
-   Le type vit sur organisations, pas sur parametrage — d'où cette
-   lecture séparée, mise en cache dans sessionStorage comme l'identité
-   pour éviter une requête à chaque écran monté.
+   Le type vient de useParametrage, qui le reçoit soit de la table
+   parametrage (personne connectée), soit de la fonction publique
+   organisation_publique_par_slug (visiteur non connecté).
+
+   Cette seconde voie est indispensable : les écrans publics — accueil,
+   adhésion, connexion — s'affichent avant toute session, et une lecture
+   directe de la table organisations y serait refusée par la RLS. Le
+   vocabulaire retomberait alors silencieusement sur celui d'une
+   mutuelle, quel que soit le type réel de l'organisation.
+
+   Aucune requête supplémentaire n'est donc émise ici : tout passe par
+   le cache partagé que useParametrage alimente déjà.
 
    Usage :
-     const { mot, type } = useVocabulaire();
+     const { mot, motMaj } = useVocabulaire();
      <h1>{mot("membres")}</h1>
+     <p>{motMaj("bureau_le")} examinera votre demande.</p>
    ============================================================ */
-
-const CLE_CACHE = "org_type";
-
-function lireCache(orgId) {
-  try {
-    const brut = sessionStorage.getItem(CLE_CACHE);
-    if (!brut) return null;
-    const { organisation_id, type } = JSON.parse(brut);
-    return organisation_id === orgId ? type : null;
-  } catch {
-    return null;
-  }
-}
-
-function ecrireCache(orgId, type) {
-  try {
-    sessionStorage.setItem(CLE_CACHE, JSON.stringify({ organisation_id: orgId, type }));
-  } catch {
-    // Stockage indisponible : le type sera relu au prochain écran, sans gravité.
-  }
-}
 
 export function useVocabulaire() {
   const { params } = useParametrage();
-  const orgId = params.organisation_id;
 
-  // « mutuelle » par défaut : c'est le vocabulaire de référence, et
-  // toutes les organisations créées avant l'ouverture multi-type en
-  // relèvent effectivement.
-  const [type, setType] = useState(() => lireCache(orgId) || "mutuelle");
-
-  useEffect(() => {
-    if (!orgId) return;
-
-    const enCache = lireCache(orgId);
-    if (enCache) { setType(enCache); return; }
-
-    let actif = true;
-    supabase
-      .from("organisations")
-      .select("type_organisation")
-      .eq("id", orgId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!actif) return;
-        const t = data?.type_organisation || "mutuelle";
-        setType(t);
-        ecrireCache(orgId, t);
-      });
-
-    return () => { actif = false; };
-  }, [orgId]);
+  // « mutuelle » par défaut : c'est le vocabulaire de référence, et les
+  // organisations créées avant l'ouverture multi-type en relèvent toutes.
+  const type = params.type_organisation || "mutuelle";
 
   // Fonctions mémorisées sur le type : sans cela, elles seraient recréées
   // à chaque rendu, et tout useEffect qui les liste en dépendance se

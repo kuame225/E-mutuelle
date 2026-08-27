@@ -60,6 +60,11 @@ export const PARAMS_DEFAUT = {
   logo_url: null,
   prefixe_matricule: "MUT",
   organisation_id: null,
+  // Détermine le vocabulaire affiché (voir vocabulaire.js). Renseigné par
+  // la fonction publique organisation_publique_par_slug pour un visiteur
+  // non connecté, et par la table parametrage jointe à organisations
+  // pour une personne connectée.
+  type_organisation: "mutuelle",
 
   // Cotisations et adhésion
   montant_cotisation: 1000,
@@ -236,7 +241,11 @@ async function interroger() {
   // organisations verrait plusieurs lignes, et maybeSingle() échoue dans
   // ce cas plutôt que d'en choisir une — c'est tout le sens de ce qui suit.
   const [complet, publique] = await Promise.all([
-    supabase.from("parametrage").select("*"),
+    // Le type d'organisation vit sur organisations, pas sur parametrage :
+    // la jointure le ramène ici pour que le vocabulaire soit correct aussi
+    // pour une personne connectée (la fonction publique ci-dessous ne sert
+    // qu'aux visiteurs non connectés).
+    supabase.from("parametrage").select("*, organisations(type_organisation)"),
     supabase.rpc("organisation_publique_par_slug", { p_slug: slugDepuisAdresse() }),
   ]);
 
@@ -279,7 +288,19 @@ async function interroger() {
     source = donneesPubliques;
   }
 
-  return source ? { ...PARAMS_DEFAUT, ...nettoyer(source) } : PARAMS_DEFAUT;
+  if (!source) return PARAMS_DEFAUT;
+
+  // La lecture authentifiée ramène le type sous forme imbriquée
+  // (organisations: { type_organisation }), la fonction publique le
+  // renvoie déjà à plat — on aplatit la première forme pour que les deux
+  // voies produisent exactement la même structure.
+  const aplati = { ...source };
+  if (aplati.organisations?.type_organisation) {
+    aplati.type_organisation = aplati.organisations.type_organisation;
+  }
+  delete aplati.organisations;
+
+  return { ...PARAMS_DEFAUT, ...nettoyer(aplati) };
 }
 
 function charger({ forcer = false } = {}) {

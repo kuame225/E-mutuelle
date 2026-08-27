@@ -6,6 +6,7 @@ import {
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import { useParametrage } from "./useParametrage";
+import { useVocabulaire } from "./useVocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 const ETAPES = [
@@ -17,6 +18,7 @@ const ETAPES = [
 export default function AdhesionFlow() {
   const { session } = useAuth();
   const { params } = useParametrage();
+  const { mot, motMaj } = useVocabulaire();
   const [etape, setEtape] = useState(0);
   const [form, setForm] = useState({
     nom: "", tel: "", email: "", poste: "", service: "", justificatif: false,
@@ -69,7 +71,7 @@ if (n === 0) {
     if (!params.organisation_id) {
       setEnvoi(false);
       setErreurGlobale(
-        "La mutuelle n'a pas pu être identifiée. Rechargez la page et réessayez."
+        "L'organisation n'a pas pu être identifiée. Rechargez la page et réessayez."
       );
       return;
     }
@@ -95,9 +97,9 @@ if (n === 0) {
       setErreurGlobale(
         email
           ? "Une demande est déjà en cours avec cette adresse e-mail. " +
-            "Le Bureau la traitera prochainement."
+            `${motMaj("bureau_le")} la traitera prochainement.`
           : "Une demande est déjà en cours avec ce numéro de téléphone. " +
-            "Le Bureau la traitera prochainement."
+            `${motMaj("bureau_le")} la traitera prochainement.`
       );
       return;
     }
@@ -130,7 +132,7 @@ if (n === 0) {
           <div className="af-done-icon"><Clock size={34} /></div>
           <h2 className="af-done-titre">Demande transmise</h2>
           <p className="af-done-texte">
-            Votre pré-inscription a bien été enregistrée. Le Bureau l'examinera
+            Votre pré-inscription a bien été enregistrée. {motMaj("bureau_le")} l'examinera
             dans les prochains jours.
           </p>
 
@@ -159,9 +161,9 @@ if (n === 0) {
       <style>{CSS}</style>
 
       <header className="af-head">
-        <h1 className="af-titre">Adhérer à la mutuelle</h1>
+        <h1 className="af-titre">{mot("adherer")}</h1>
         <p className="af-sous-titre">
-          Trois étapes suffisent. Votre demande sera ensuite validée par le Bureau.
+          Trois étapes suffisent. Votre demande sera ensuite validée par {mot("bureau_le")}.
         </p>
       </header>
 
@@ -191,7 +193,7 @@ if (n === 0) {
           <div className="af-form">
             <h2 className="af-card-titre">Vos informations</h2>
             <p className="af-card-sub">
-              Ces coordonnées permettront au Bureau de vous contacter et
+              Ces coordonnées permettront de vous contacter et
               de créer votre accès.
             </p>
 
@@ -259,7 +261,7 @@ if (n === 0) {
           <div className="af-form">
             <h2 className="af-card-titre">Vérifiez vos informations</h2>
             <p className="af-card-sub">
-              Une fois envoyée, votre demande sera examinée par le Bureau.
+              Une fois envoyée, votre demande sera examinée par {mot("bureau_le")}.
             </p>
 
             <div className="af-recap">

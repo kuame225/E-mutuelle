@@ -3,34 +3,81 @@ import {
   LogIn, UserPlus, HandHeart, Gift, ShieldCheck, KeyRound, Smartphone, Building2,
 } from "lucide-react";
 import { useParametrage, LOGO_DEFAUT } from "./useParametrage";
+import { useVocabulaire } from "./useVocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
-const ATOUTS = [
-  {
-    Icon: HandHeart,
-    titre: "Pourquoi adhérer ?",
-    texte: "Profitez d'aides sociales, de récompenses et d'une protection solidaire.",
-  },
-  {
+// Les arguments dépendent du type d'organisation : une ONG ne met pas en
+// avant la « protection solidaire », une coopérative parle de parts
+// sociales plutôt que d'aides. La fonction reçoit le traducteur pour
+// composer des phrases cohérentes avec le reste de l'écran.
+function atoutsPourType(type, mot) {
+  const commun = {
     Icon: ShieldCheck,
     titre: "Une gestion transparente",
-    texte: "Suivez vos cotisations et l'usage des fonds à tout moment.",
-  },
-  {
-    Icon: Gift,
-    titre: "Une entraide organisée",
-    texte: "Chaque cotisation alimente le fonds qui soutient les membres.",
-  },
-];
+    texte: `Suivez vos ${mot("cotisations").toLowerCase()} et l'usage des fonds à tout moment.`,
+  };
+
+  if (type === "ong" || type === "federation" || type === "reseau") {
+    return [
+      { Icon: HandHeart, titre: "Pourquoi nous rejoindre ?",
+        texte: "Prenez part aux projets et suivez leur avancement." },
+      commun,
+      { Icon: Gift, titre: "Une action coordonnée",
+        texte: "Chaque contribution soutient les actions menées sur le terrain." },
+    ];
+  }
+
+  if (type === "cooperative") {
+    return [
+      { Icon: HandHeart, titre: "Pourquoi nous rejoindre ?",
+        texte: "Participez aux activités économiques et au partage des bénéfices." },
+      commun,
+      { Icon: Gift, titre: "Une force collective",
+        texte: "Chaque part sociale renforce la capacité du groupe." },
+    ];
+  }
+
+  if (type === "avec") {
+    return [
+      { Icon: HandHeart, titre: "Pourquoi nous rejoindre ?",
+        texte: "Épargnez ensemble et accédez aux prêts du groupe." },
+      commun,
+      { Icon: Gift, titre: "Une épargne organisée",
+        texte: "Chaque versement alimente la caisse et le fonds social." },
+    ];
+  }
+
+  if (type === "association" || type === "professionnelle") {
+    return [
+      { Icon: HandHeart, titre: "Pourquoi nous rejoindre ?",
+        texte: "Participez aux activités et bénéficiez des services proposés." },
+      commun,
+      { Icon: Gift, titre: "Une dynamique collective",
+        texte: `Chaque ${mot("cotisation").toLowerCase()} soutient la vie de ${mot("organisation_la")}.` },
+    ];
+  }
+
+  // Mutuelle et « autre » : le discours d'origine, entraide et solidarité.
+  return [
+    { Icon: HandHeart, titre: "Pourquoi adhérer ?",
+      texte: "Profitez d'aides sociales, de récompenses et d'une protection solidaire." },
+    commun,
+    { Icon: Gift, titre: "Une entraide organisée",
+      texte: "Chaque cotisation alimente le fonds qui soutient les membres." },
+  ];
+}
 
 export default function WelcomeScreen({ onLogin, onAdhesion, onActivation, onRecuperation, onCreationMutuelle }) {
   const { params } = useParametrage();
+  const { type, mot } = useVocabulaire();
   const [slide, setSlide] = useState(0);
+
+  const ATOUTS = atoutsPourType(type, mot);
 
   useEffect(() => {
     const t = setInterval(() => setSlide((s) => (s + 1) % ATOUTS.length), 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [ATOUTS.length]);
 
   const atout = ATOUTS[slide];
   const sigle = params.nom_mutuelle;
@@ -52,7 +99,7 @@ export default function WelcomeScreen({ onLogin, onAdhesion, onActivation, onRec
         {denomination && <div className="wl-org">{denomination}</div>}
 
         <h1 className="wl-title">
-          Bienvenue à la<br />
+          Bienvenue<br />
           <span>{sigle}</span>
         </h1>
         <p className="wl-lead">
@@ -76,7 +123,7 @@ export default function WelcomeScreen({ onLogin, onAdhesion, onActivation, onRec
         </button>
 
         <button className="wl-btn wl-btn-outline" onClick={onAdhesion}>
-          <UserPlus size={19} /> Adhérer à la mutuelle
+          <UserPlus size={19} /> {mot("adherer")}
         </button>
 
         <div className="wl-liens">
@@ -93,7 +140,7 @@ export default function WelcomeScreen({ onLogin, onAdhesion, onActivation, onRec
 
         {onCreationMutuelle && (
           <button className="wl-btn-creation" onClick={onCreationMutuelle}>
-            <Building2 size={16} /> Représenter une autre mutuelle
+            <Building2 size={16} /> Représenter une autre organisation
           </button>
         )}
 

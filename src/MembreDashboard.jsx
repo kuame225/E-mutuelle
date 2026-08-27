@@ -10,6 +10,7 @@ import CarteMembreModal from "./CarteMembreModal";
 import {
   useParametrage, moduleActif, construireMatricule, LOGO_DEFAUT,
 } from "./useParametrage";
+import { useVocabulaire } from "./useVocabulaire";
 import { pushDisponible, pushAutorise, pushRefuse, activerNotifications } from "./push";
 
 const STATUT = {
@@ -21,23 +22,28 @@ const STATUT = {
 };
 
 // Comme pour le menu d'administration, une entrée rattachée à un module
-// disparaît lorsque celui-ci est désactivé.
-const RACCOURCIS = [
-  { id: "cotisations",   icon: CreditCard,  l1: "Mes",      l2: "cotisations",   color: C.primary },
-  { id: "aides",         icon: HandHeart,   l1: "Demander", l2: "une aide",      color: C.success },
-  { id: "tombola",       icon: Gift,        l1: "Tombola",  l2: "& récompenses", color: C.warning,
-    module: "module_tombola" },
-  { id: "assemblees",    icon: Users2,      l1: "Assemblées", l2: "générales",   color: C.primaryLight,
-    module: "module_assemblees" },
-  { id: "tontine",       icon: RefreshCw,   l1: "Tontine",  l2: "en cours",      color: C.primary,
-    module: "module_tontine" },
-  { id: "prets",         icon: Banknote,    l1: "Prêts",    l2: "& avances",     color: C.success,
-    module: "module_prets" },
-  { id: "beneficiaires", icon: Users,       l1: "Mes",      l2: "bénéficiaires", color: C.primaryLight },
-];
+// disparaît lorsque celui-ci est désactivé. Les libellés dépendent du
+// type d'organisation : une coopérative parle de parts sociales, une ONG
+// de contributions — d'où une fonction plutôt qu'une liste figée.
+function raccourcisPourType(mot) {
+  return [
+    { id: "cotisations",   icon: CreditCard,  l1: "Mes",      l2: mot("cotisations").toLowerCase(), color: C.primary },
+    { id: "aides",         icon: HandHeart,   l1: "Demander", l2: `${mot("aide").toLowerCase()}`,   color: C.success },
+    { id: "tombola",       icon: Gift,        l1: "Tombola",  l2: "& récompenses", color: C.warning,
+      module: "module_tombola" },
+    { id: "assemblees",    icon: Users2,      l1: "Assemblées", l2: "générales",   color: C.primaryLight,
+      module: "module_assemblees" },
+    { id: "tontine",       icon: RefreshCw,   l1: "Tontine",  l2: "en cours",      color: C.primary,
+      module: "module_tontine" },
+    { id: "prets",         icon: Banknote,    l1: "Prêts",    l2: "& avances",     color: C.success,
+      module: "module_prets" },
+    { id: "beneficiaires", icon: Users,       l1: "Mes",      l2: "bénéficiaires", color: C.primaryLight },
+  ];
+}
 
 export default function MembreDashboard({ membre, onPage, onSignOut }) {
   const { params } = useParametrage();
+  const { mot } = useVocabulaire();
   const [annuel, setAnnuel] = useState({ du: 0, paye: 0 });
   const [echeance, setEcheance] = useState(null);
   const [notifs, setNotifs] = useState([]);
@@ -120,7 +126,7 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
         ...paiements.map((p) => ({
           id: "p" + p.id,
           type: "paiement",
-          titre: "Cotisation reçue",
+          titre: mot("cotisation") + " reçue",
           texte: `Votre paiement de ${montant(p.montant)} FCFA a été enregistré avec succès.`,
           date: p.created_at,
         })),
@@ -136,7 +142,7 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
         ...(aideRes.data || []).map((a) => ({
           id: "a" + a.id,
           type: "aide",
-          titre: "Demande d'aide " + libelleStatutAide(a.statut),
+          titre: mot("demande_aide") + " " + libelleStatutAide(a.statut),
           texte: `${libellesAide[a.type_aide] || a.type_aide}${a.montant_valide ? ` — ${montant(a.montant_valide)} FCFA` : ""}`,
           date: a.decide_le || a.created_at,
         })),
@@ -160,7 +166,11 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
       setLoading(false);
     }
     charger();
-  }, [membre.id, membre.statut_cotisation, annee, tombolaActive]);
+  // « mot » figure dans les dépendances : le type d'organisation se résout
+  // parfois après le premier rendu, et le flux d'activité doit alors être
+  // reconstruit avec le bon vocabulaire plutôt que de rester figé sur
+  // celui de la mutuelle.
+  }, [membre.id, membre.statut_cotisation, annee, tombolaActive, mot]);
 
   const st = STATUT[membre.statut_cotisation] || STATUT.a_jour;
   const progression = annuel.du ? Math.min((annuel.paye / annuel.du) * 100, 100) : 0;
@@ -170,7 +180,7 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
   const logo = params.logo_url || LOGO_DEFAUT;
   const qrActif = moduleActif(params, "module_qr_carte");
 
-  const raccourcis = RACCOURCIS.filter(
+  const raccourcis = raccourcisPourType(mot).filter(
     (r) => !r.module || moduleActif(params, r.module)
   );
 
@@ -244,7 +254,7 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
         {/* ---- Bloc statut / échéance ---- */}
         <div className="md-info-card">
           <div className="md-info-col">
-            <div className="md-info-label">Statut d'adhésion</div>
+            <div className="md-info-label">Statut d'{mot("adhesion").toLowerCase()}</div>
             <span className="md-chip" style={{ background: st.soft, color: st.color }}>
               <st.Icon size={13} /> {st.label.toUpperCase()}
             </span>
@@ -289,7 +299,7 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
           <div className="md-cotis-glow" />
           <div className="md-cotis-top">
             <div>
-              <div className="md-cotis-title">Ma cotisation</div>
+              <div className="md-cotis-title">{mot("cotisation_ma")}</div>
               <div className="md-cotis-year">Année {annee}</div>
             </div>
             <div className="md-cotis-amount">
@@ -330,7 +340,7 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
             <span className="md-push-icon"><Bell size={19} /></span>
             <span className="md-push-text">
               <strong>Activer les alertes</strong>
-              <em>Soyez prévenu de vos échéances et des nouvelles de la mutuelle.</em>
+              <em>Soyez prévenu de vos échéances et des nouvelles de {mot("organisation_la")}.</em>
             </span>
             <ChevronRight size={18} className="md-cta-arrow" />
           </button>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   LayoutGrid, FilePlus2, Users, Receipt, Wallet, HandHeart,
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
@@ -10,10 +10,23 @@ import {
   mesOrganisationsAdministrees, changerOrganisationActive,
 } from "./useParametrage";
 import { usePermissions } from "./usePermissions";
+import { useVocabulaire } from "./useVocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
-// Chaque entrée peut être rattachée à un module. Sans « module », elle
-// appartient au socle et reste présente dans toute organisation.
+/* ============================================================
+   Structure du menu
+
+   Un libellé peut être une chaîne fixe (« Comptabilité » se dit
+   pareil partout) ou une fonction du vocabulaire de l'organisation
+   (« Membres » devient « Bénéficiaires » pour une ONG). Les
+   identifiants et les modules, eux, ne varient jamais : c'est sur eux
+   seuls que reposent ADMIN_PAGES et PAGES_MODULES, qui restent donc
+   calculables une fois pour toutes, hors de tout composant.
+
+   Une entrée sans « module » appartient au socle et reste présente
+   dans toute organisation.
+   ============================================================ */
+
 export const NAV_GROUPS = [
   {
     titre: "Pilotage",
@@ -23,45 +36,48 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    titre: "Membres",
+    titre: (mot) => mot("membres"),
     items: [
-      { id: "adhesions", label: "Adhésions", icon: FilePlus2 },
-      { id: "membres",   label: "Membres",   icon: Users },
+      { id: "adhesions", label: (mot) => mot("adhesions"), icon: FilePlus2 },
+      { id: "membres",   label: (mot) => mot("membres"),   icon: Users },
     ],
   },
   {
     titre: "Finances",
     items: [
-      { id: "cotisations",  label: "Cotisations",         icon: Receipt },
-      { id: "operations",   label: "Opérations diverses", icon: ArrowLeftRight },
-      { id: "comptabilite", label: "Comptabilité",        icon: Wallet },
+      { id: "cotisations",  label: (mot) => mot("cotisations"), icon: Receipt },
+      { id: "operations",   label: "Opérations diverses",       icon: ArrowLeftRight },
+      { id: "comptabilite", label: "Comptabilité",              icon: Wallet },
     ],
   },
   {
     titre: "Activités",
     items: [
-      { id: "aides_admin", label: "Aides sociales", icon: HandHeart },
-      { id: "bareme",      label: "Barème des aides", icon: Scale },
-      { id: "tombola",     label: "Tombola",        icon: Gift,        module: "module_tombola" },
-      { id: "tontine",     label: "Tontine",        icon: RefreshCw,   module: "module_tontine" },
-      { id: "prets",       label: "Prêts et avances", icon: Banknote,  module: "module_prets" },
-      { id: "sanctions",   label: "Sanctions",      icon: ShieldAlert, module: "module_sanctions" },
+      // Les aides ne font plus partie du socle : une ONG ou une
+      // fédération qui n'en distribue pas ne voit ni l'instruction des
+      // demandes, ni le barème.
+      { id: "aides_admin", label: (mot) => mot("aides"),  icon: HandHeart, module: "module_aides" },
+      { id: "bareme",      label: (mot) => mot("bareme"), icon: Scale,     module: "module_aides" },
+      { id: "tombola",     label: "Tombola",          icon: Gift,        module: "module_tombola" },
+      { id: "tontine",     label: "Tontine",          icon: RefreshCw,   module: "module_tontine" },
+      { id: "prets",       label: "Prêts et avances", icon: Banknote,    module: "module_prets" },
+      { id: "sanctions",   label: "Sanctions",        icon: ShieldAlert, module: "module_sanctions" },
     ],
   },
   {
-    titre: "Vie de la mutuelle",
+    titre: (mot) => `Vie ${mot("organisation_de")}`,
     items: [
       { id: "communication", label: "Communications", icon: Megaphone },
       { id: "agenda",        label: "Agenda",         icon: Calendar },
-      { id: "assemblees",    label: "Assemblées générales", icon: Users2, module: "module_assemblees" },
+      { id: "assemblees",    label: (mot) => mot("assemblees"), icon: Users2, module: "module_assemblees" },
     ],
   },
   {
     titre: "Système",
     items: [
-      { id: "journal",     label: "Journal d'activité", icon: ScrollText },
-      { id: "roles",       label: "Rôles du Bureau",    icon: KeyRound },
-      { id: "parametrage", label: "Paramètres",         icon: Settings },
+      { id: "journal",     label: "Journal d'activité",             icon: ScrollText },
+      { id: "roles",       label: (mot) => `Rôles ${mot("bureau_du")}`, icon: KeyRound },
+      { id: "parametrage", label: "Paramètres",                     icon: Settings },
     ],
   },
 ];
@@ -77,34 +93,42 @@ export const PAGES_MODULES = Object.fromEntries(
   )
 );
 
-const TITRES = Object.fromEntries(
-  NAV_GROUPS.flatMap((g) => g.items.map((i) => [i.id, i.label]))
-);
+// Un libellé de menu est soit une chaîne, soit une fonction du
+// vocabulaire. Cette fonction résout l'un comme l'autre.
+function resoudre(valeur, mot) {
+  return typeof valeur === "function" ? valeur(mot) : valeur;
+}
 
-const SOUS_TITRES = {
-  dashboard:     "Vue d'ensemble de la mutuelle",
-  rapports:      "Générer et télécharger les rapports",
-  adhesions:     "Demandes en attente de validation",
-  membres:       "Annuaire et fiches individuelles",
-  cotisations:   "Suivi des échéances et paiements",
-  operations:    "Dons, subventions et frais de la mutuelle",
-  operations:    "Dons, subventions et frais de la mutuelle",
-  operations:    "Dons, subventions et frais de la mutuelle",
-  comptabilite:  "Entrées, sorties et balance",
-  aides_admin:   "Instruction des demandes d'aide",
-  bareme:        "Montants prévus par vos textes",
-  tombola:       "Tickets et tirages trimestriels",
-  communication: "Communiqués aux membres",
-  agenda:        "Échéances et événements",
-  parametrage:   "Configuration de la plateforme",
-  journal:       "Connexions et actions sensibles",
-  roles:         "Qui fait quoi dans le Bureau",
-  sanctions:     "Suivi des sanctions d'accès",
-};
+// Sous-titre affiché sous le titre de chaque écran. Construit à partir
+// du vocabulaire, donc recalculé quand le type d'organisation change.
+function sousTitresPour(mot) {
+  return {
+    dashboard:     `Vue d'ensemble ${mot("organisation_de")}`,
+    rapports:      "Générer et télécharger les rapports",
+    adhesions:     "Demandes en attente de validation",
+    membres:       "Annuaire et fiches individuelles",
+    cotisations:   "Suivi des échéances et paiements",
+    operations:    `Dons, subventions et frais ${mot("organisation_de")}`,
+    comptabilite:  "Entrées, sorties et balance",
+    aides_admin:   `Instruction des demandes (${mot("aides").toLowerCase()})`,
+    bareme:        "Montants prévus par vos textes",
+    tombola:       "Tickets et tirages trimestriels",
+    tontine:       "Cycles, ordre de passage et versements",
+    prets:         "Demandes, échéances et remboursements",
+    assemblees:    "Convocations, émargement et procès-verbaux",
+    communication: `Communiqués aux ${mot("membres").toLowerCase()}`,
+    agenda:        "Échéances et événements",
+    parametrage:   "Configuration de la plateforme",
+    journal:       "Connexions et actions sensibles",
+    roles:         `Qui fait quoi dans ${mot("bureau_le")}`,
+    sanctions:     "Suivi des sanctions d'accès",
+  };
+}
 
 export default function AdminLayout({ page, onPage, onSignOut, onEspaceMembre, children }) {
   const { params } = useParametrage();
   const { peut, loading: permissionsEnCours } = usePermissions();
+  const { mot } = useVocabulaire();
   const [open, setOpen] = useState(false);
   const [mesOrgs, setMesOrgs] = useState([]);
   const [selecteurOuvert, setSelecteurOuvert] = useState(false);
@@ -133,16 +157,29 @@ export default function AdminLayout({ page, onPage, onSignOut, onEspaceMembre, c
   // Une entrée disparaît si son module est désactivé, ou si la personne
   // n'a pas la permission correspondante. Le temps du chargement, on
   // n'affiche rien plutôt qu'un menu complet qui se réduirait ensuite.
-  const groupesVisibles = permissionsEnCours ? [] : NAV_GROUPS
-    .map((groupe) => ({
-      ...groupe,
-      items: groupe.items.filter(
-        (item) =>
-          (!item.module || moduleActif(params, item.module)) &&
-          peut(item.id)
-      ),
-    }))
-    .filter((groupe) => groupe.items.length > 0);
+  // Les libellés sont résolus ici, une fois le vocabulaire connu.
+  const groupesVisibles = useMemo(() => (
+    permissionsEnCours ? [] : NAV_GROUPS
+      .map((groupe) => ({
+        titre: resoudre(groupe.titre, mot),
+        items: groupe.items
+          .filter(
+            (item) =>
+              (!item.module || moduleActif(params, item.module)) &&
+              peut(item.id)
+          )
+          .map((item) => ({ ...item, label: resoudre(item.label, mot) })),
+      }))
+      .filter((groupe) => groupe.items.length > 0)
+  ), [permissionsEnCours, params, peut, mot]);
+
+  // Titre de l'écran courant : même source que le menu, pour qu'un
+  // libellé ne puisse jamais différer entre la barre latérale et l'en-tête.
+  const titres = useMemo(() => Object.fromEntries(
+    NAV_GROUPS.flatMap((g) => g.items.map((i) => [i.id, resoudre(i.label, mot)]))
+  ), [mot]);
+
+  const sousTitres = useMemo(() => sousTitresPour(mot), [mot]);
 
   return (
     <div className="admin-shell">
@@ -169,7 +206,7 @@ export default function AdminLayout({ page, onPage, onSignOut, onEspaceMembre, c
           </button>
         </div>
 
-        {/* Un compte qui administre plusieurs mutuelles doit pouvoir
+        {/* Un compte qui administre plusieurs organisations doit pouvoir
             choisir laquelle il regarde — invisible pour les autres. */}
         {mesOrgs.length > 1 && (
           <div className="side-selecteur-zone">
@@ -177,7 +214,7 @@ export default function AdminLayout({ page, onPage, onSignOut, onEspaceMembre, c
               className="side-selecteur"
               onClick={() => setSelecteurOuvert((v) => !v)}
             >
-              <span>Changer de mutuelle</span>
+              <span>{mot("changer_organisation")}</span>
               <ChevronsUpDown size={14} />
             </button>
 
@@ -229,7 +266,7 @@ export default function AdminLayout({ page, onPage, onSignOut, onEspaceMembre, c
               rejoindre leur espace personnel sans se déconnecter. */}
           {onEspaceMembre && (
             <button className="side-espace" onClick={ouvrirEspaceMembre}>
-              <UserCircle2 size={17} /> Mon espace membre
+              <UserCircle2 size={17} /> {mot("espace_membre")}
             </button>
           )}
 
@@ -246,8 +283,8 @@ export default function AdminLayout({ page, onPage, onSignOut, onEspaceMembre, c
             <Menu size={22} />
           </button>
           <div className="head-text">
-            <h1 className="head-title">{TITRES[page] || "Administration"}</h1>
-            <p className="head-sub">{SOUS_TITRES[page] || ""}</p>
+            <h1 className="head-title">{titres[page] || "Administration"}</h1>
+            <p className="head-sub">{sousTitres[page] || ""}</p>
           </div>
         </header>
 

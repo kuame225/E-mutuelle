@@ -46,6 +46,11 @@ export const MODULES = [
     label: "Prêts et avances",
     aide: "Avance sur cotisation et crédit social remboursable.",
   },
+  {
+    id: "module_aides",
+    label: "Aides sociales",
+    aide: "Demandes d'aide, barème des prestations et versements.",
+  },
 ];
 
 // Valeurs de repli, utilisées tant qu'aucun paramétrage n'a été enregistré.
@@ -95,6 +100,10 @@ export const PARAMS_DEFAUT = {
   module_assemblees: false,
   module_tontine: false,
   module_prets: false,
+  // Le défaut « true » vaut pour une base pas encore migrée : les aides
+  // faisaient partie du socle avant de devenir un module, mieux vaut les
+  // laisser visibles que les faire disparaître sans prévenir.
+  module_aides: true,
 };
 
 // Emblème neutre, affiché pendant le chargement et lorsqu'aucun logo n'a été

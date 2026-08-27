@@ -73,9 +73,16 @@ export const TYPES_ORGANISATION = [
 
 // « mutuelle » sert de référence : elle contient toutes les clés, les
 // autres types ne redéfinissent que ce qui diffère réellement.
+//
+// Les clés existent en plusieurs formes grammaticales (organisation,
+// organisation_la, organisation_de…) parce que le français ne se
+// recompose pas par concaténation : « Vie de » + « le groupe » donnerait
+// « Vie de le groupe ». Chaque forme dont un écran a besoin est donc
+// déclarée explicitement, plutôt que fabriquée à la volée.
 const MUTUELLE = {
   organisation: "mutuelle",
   organisation_la: "la mutuelle",
+  organisation_de: "de la mutuelle",   // « Vie de la mutuelle »
   organisation_notre: "notre mutuelle",
   organisation_votre: "votre mutuelle",
 
@@ -97,15 +104,21 @@ const MUTUELLE = {
   aide: "Aide sociale",
   aides: "Aides sociales",
   demande_aide: "Demande d'aide",
+  bareme: "Barème des aides",
 
   bureau: "Bureau",
   bureau_le: "le Bureau",
+  bureau_du: "du Bureau",              // « Rôles du Bureau »
 
   assemblee: "Assemblée générale",
   assemblees: "Assemblées générales",
 
   carte: "Carte de membre",
   matricule: "Matricule",
+
+  // Libellés d'interface qui ne se déduisent d'aucune autre clé
+  changer_organisation: "Changer de mutuelle",
+  espace_membre: "Mon espace membre",
 };
 
 // Chaque type ne déclare que ses différences avec la référence ci-dessus.
@@ -115,18 +128,22 @@ const DIFFERENCES = {
   association: {
     organisation: "association",
     organisation_la: "l'association",
+    organisation_de: "de l'association",
     organisation_notre: "notre association",
     organisation_votre: "votre association",
     adherer: "Adhérer à l'association",
     aide: "Soutien",
     aides: "Soutiens",
     demande_aide: "Demande de soutien",
+    bareme: "Barème des soutiens",
     carte: "Carte de membre",
+    changer_organisation: "Changer d'association",
   },
 
   cooperative: {
     organisation: "coopérative",
     organisation_la: "la coopérative",
+    organisation_de: "de la coopérative",
     organisation_notre: "notre coopérative",
     organisation_votre: "votre coopérative",
     membres: "Coopérateurs",
@@ -141,14 +158,19 @@ const DIFFERENCES = {
     aide: "Ristourne",
     aides: "Ristournes",
     demande_aide: "Demande de ristourne",
+    bareme: "Barème des ristournes",
     bureau: "Conseil d'administration",
     bureau_le: "le Conseil d'administration",
+    bureau_du: "du Conseil d'administration",
     carte: "Carte de coopérateur",
+    changer_organisation: "Changer de coopérative",
+    espace_membre: "Mon espace coopérateur",
   },
 
   ong: {
     organisation: "organisation",
     organisation_la: "l'organisation",
+    organisation_de: "de l'organisation",
     organisation_notre: "notre organisation",
     organisation_votre: "votre organisation",
     membres: "Bénéficiaires",
@@ -166,15 +188,20 @@ const DIFFERENCES = {
     aide: "Appui",
     aides: "Appuis",
     demande_aide: "Demande d'appui",
+    bareme: "Barème des appuis",
     bureau: "Coordination",
     bureau_le: "la Coordination",
+    bureau_du: "de la Coordination",
     carte: "Carte de bénéficiaire",
     matricule: "Référence",
+    changer_organisation: "Changer d'organisation",
+    espace_membre: "Mon espace bénéficiaire",
   },
 
   avec: {
     organisation: "groupe",
     organisation_la: "le groupe",
+    organisation_de: "du groupe",
     organisation_notre: "notre groupe",
     organisation_votre: "votre groupe",
     membres: "Membres du groupe",
@@ -186,14 +213,18 @@ const DIFFERENCES = {
     aide: "Aide du fonds social",
     aides: "Aides du fonds social",
     demande_aide: "Demande au fonds social",
+    bareme: "Barème du fonds social",
     bureau: "Comité de gestion",
     bureau_le: "le Comité de gestion",
+    bureau_du: "du Comité de gestion",
     carte: "Carte de membre",
+    changer_organisation: "Changer de groupe",
   },
 
   professionnelle: {
     organisation: "organisation",
     organisation_la: "l'organisation",
+    organisation_de: "de l'organisation",
     organisation_notre: "notre organisation",
     organisation_votre: "votre organisation",
     membres: "Adhérents",
@@ -207,13 +238,17 @@ const DIFFERENCES = {
     aide: "Service",
     aides: "Services",
     demande_aide: "Demande de service",
+    bareme: "Barème des services",
     bureau: "Bureau",
     carte: "Carte professionnelle",
+    changer_organisation: "Changer d'organisation",
+    espace_membre: "Mon espace adhérent",
   },
 
   federation: {
     organisation: "fédération",
     organisation_la: "la fédération",
+    organisation_de: "de la fédération",
     organisation_notre: "notre fédération",
     organisation_votre: "votre fédération",
     membres: "Structures membres",
@@ -230,12 +265,16 @@ const DIFFERENCES = {
     cotisation_ma: "Ma contribution",
     bureau: "Instance dirigeante",
     bureau_le: "l'Instance dirigeante",
+    bureau_du: "de l'Instance dirigeante",
     carte: "Attestation d'affiliation",
+    changer_organisation: "Changer de fédération",
+    espace_membre: "Mon espace",
   },
 
   reseau: {
     organisation: "réseau",
     organisation_la: "le réseau",
+    organisation_de: "du réseau",
     organisation_notre: "notre réseau",
     organisation_votre: "votre réseau",
     membres: "Membres du réseau",
@@ -249,15 +288,19 @@ const DIFFERENCES = {
     cotisation_ma: "Ma contribution",
     bureau: "Coordination",
     bureau_le: "la Coordination",
+    bureau_du: "de la Coordination",
     carte: "Carte de membre",
+    changer_organisation: "Changer de réseau",
   },
 
   autre: {
     organisation: "organisation",
     organisation_la: "l'organisation",
+    organisation_de: "de l'organisation",
     organisation_notre: "notre organisation",
     organisation_votre: "votre organisation",
     adherer: "Rejoindre l'organisation",
+    changer_organisation: "Changer d'organisation",
   },
 };
 

@@ -4,10 +4,11 @@ import {
   CheckCircle2, Mail, Lock, MapPin, Briefcase, ShieldCheck,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import { TYPES_ORGANISATION, motPourType } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 /**
- * Inscription d'une nouvelle mutuelle.
+ * Inscription d'une nouvelle organisation.
  *
  * Deux temps : le compte de la personne se crée d'abord (signUp), puis une
  * fonction serveur crée l'organisation, son paramétrage et le rattachement
@@ -18,8 +19,12 @@ import { C, R, S, SHADOW, PALETTE } from "./theme";
  * on lui redemande seulement un sigle, sans repasser par le mot de passe.
  */
 export default function InscriptionOrganisationScreen({ onBack }) {
-  const [etape, setEtape] = useState("formulaire"); // formulaire | sigle_seul | succes
+  // Le choix du type vient en premier : il détermine le vocabulaire et les
+  // modules de toute l'organisation, et donne au formulaire suivant des
+  // libellés déjà adaptés (« Sigle de l'association », etc.).
+  const [etape, setEtape] = useState("type"); // type | formulaire | sigle_seul | succes
 
+  const [type, setType] = useState(null);
   const [nom, setNom] = useState("");
   const [sigle, setSigle] = useState("");
   const [secteur, setSecteur] = useState("");
@@ -43,7 +48,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
   }
 
   function validerFormulaire() {
-    if (!nom.trim()) return "Indiquez la dénomination complète de la mutuelle.";
+    if (!nom.trim()) return "Indiquez la dénomination complète de l'organisation.";
     if (!sigle.trim()) return "Indiquez un sigle.";
     if (sigle.trim().length > 20) return "Le sigle doit rester court : 20 caractères au maximum.";
     if (!email.trim()) return "Indiquez une adresse e-mail.";
@@ -60,6 +65,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
       p_secteur: secteur || null,
       p_localite: localite || null,
       p_contact: contact || null,
+      p_type: type || "mutuelle",
     });
 
     if (error) {
@@ -128,7 +134,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
 
       // Tous les comptes de la plateforme partagent la même base : cette
       // adresse appartient sans doute déjà à quelqu'un qui administre ou
-      // est membre d'une autre mutuelle. Plutôt que de bloquer, on tente
+      // est membre d'une autre organisation. Plutôt que de bloquer, on tente
       // de se connecter avec le mot de passe saisi — la même personne
       // peut ainsi rattacher une seconde organisation à son compte.
       const { error: erreurConnexion } = await supabase.auth.signInWithPassword({
@@ -142,7 +148,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
           "Un compte existe déjà avec cette adresse, et ce mot de passe ne " +
           "correspond pas à ce compte. Connectez-vous d'abord avec votre " +
           "mot de passe habituel, puis revenez créer l'espace de votre " +
-          "nouvelle mutuelle."
+          "nouvelle organisation."
         );
         return;
       }
@@ -166,6 +172,50 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     setErreur("");
     await creerOrganisation();
     setEnvoi(false);
+  }
+
+  /* ---------------- Choix du type ---------------- */
+  if (etape === "type") {
+    return (
+      <div className="io-shell">
+        <style>{CSS}</style>
+        <div className="io-carte io-carte-large">
+          {onBack && (
+            <button className="io-retour" onClick={onBack}>
+              <ArrowLeft size={15} /> Retour
+            </button>
+          )}
+
+          <div className="io-icone"><Building2 size={26} /></div>
+          <h1 className="io-titre">Quel type d'organisation ?</h1>
+          <p className="io-sous">
+            Ce choix adapte le vocabulaire et les fonctions proposées.
+            Il reste modifiable plus tard depuis les paramètres.
+          </p>
+
+          <div className="io-types">
+            {TYPES_ORGANISATION.map((t) => (
+              <button
+                key={t.id}
+                className={`io-type ${type === t.id ? "is-on" : ""}`}
+                onClick={() => setType(t.id)}
+              >
+                <span className="io-type-nom">{t.label}</span>
+                <span className="io-type-desc">{t.description}</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            className="io-btn"
+            onClick={() => setEtape("formulaire")}
+            disabled={!type}
+          >
+            Continuer <ArrowRight size={17} />
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (etape === "succes") {
@@ -203,7 +253,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
           <h1 className="io-titre">Un autre sigle</h1>
           <p className="io-sous">
             Votre compte est créé. Il ne manque qu'un sigle disponible pour
-            ouvrir l'espace de votre mutuelle.
+            ouvrir l'espace de votre organisation.
           </p>
 
           <form onSubmit={reessayerAvecAutreSigle} className="io-form">
@@ -229,24 +279,26 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     <div className="io-shell">
       <style>{CSS}</style>
       <div className="io-carte">
-        {onBack && (
-          <button className="io-retour" onClick={onBack}>
-            <ArrowLeft size={15} /> Retour
-          </button>
-        )}
+        <button className="io-retour" onClick={() => setEtape("type")}>
+          <ArrowLeft size={15} /> Changer de type
+        </button>
 
         <div className="io-icone"><Building2 size={26} /></div>
-        <h1 className="io-titre">Ouvrir l'espace de votre mutuelle</h1>
+        <h1 className="io-titre">
+          Ouvrir l'espace de {motPourType(type, "organisation_votre")}
+        </h1>
         <p className="io-sous">
           Créez l'espace de votre organisation et votre propre accès administrateur.
         </p>
 
         <form onSubmit={soumettre} className="io-form">
-          <div className="io-section-titre">La mutuelle</div>
+          <div className="io-section-titre">
+            {motPourType(type, "organisation").toUpperCase()}
+          </div>
 
           <Champ label="Sigle" value={sigle} onChange={setSigle}
             placeholder="Ex : MUGEFCI" maxLength={20}
-            aide="Nom court, affiché aux membres. Sert aussi d'adresse propre à votre mutuelle." />
+            aide={`Nom court, affiché aux membres. Sert aussi d'adresse propre à ${motPourType(type, "organisation_votre")}.`} />
 
           <Champ label="Dénomination complète" value={nom} onChange={setNom}
             placeholder="Ex : Mutuelle Générale des Fonctionnaires..." />
@@ -292,11 +344,11 @@ export default function InscriptionOrganisationScreen({ onBack }) {
           <button type="submit" className="io-btn" disabled={envoi}>
             {envoi
               ? <><Loader2 size={17} className="io-spin" /> Création…</>
-              : <>Créer l'espace de ma mutuelle <ArrowRight size={17} /></>}
+              : <>Créer l'espace <ArrowRight size={17} /></>}
           </button>
 
           <p className="io-legal">
-            Vous devenez administrateur de cette mutuelle. Vous pourrez ensuite
+            Vous devenez administrateur de cette organisation. Vous pourrez ensuite
             régler ses cotisations, son barème d'aides et les fonctions
             activées depuis les paramètres.
           </p>
@@ -353,6 +405,28 @@ const CSS = `
   animation:ioIn .3s ease;
 }
 .io-carte-centree{ text-align:center; }
+.io-carte-large{ max-width:620px; }
+
+/* ---- Choix du type d'organisation ---- */
+.io-types{
+  display:grid; grid-template-columns:1fr 1fr; gap:${S.md}px;
+  margin-bottom:${S.xl}px;
+}
+@media (max-width:520px){ .io-types{ grid-template-columns:1fr; } }
+.io-type{
+  display:flex; flex-direction:column; gap:4px; text-align:left;
+  padding:${S.md}px ${S.lg}px; cursor:pointer;
+  background:${C.surface}; border:1.5px solid ${C.border};
+  border-radius:${R.lg}px; font-family:inherit;
+  transition:border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.io-type:hover{ border-color:${PALETTE.grey300}; background:${C.bg}; }
+.io-type.is-on{
+  border-color:${C.primary}; background:${PALETTE.blue50};
+  box-shadow:${SHADOW.focus};
+}
+.io-type-nom{ font-size:14.5px; font-weight:600; color:${C.text}; }
+.io-type-desc{ font-size:12px; color:${C.textSubtle}; line-height:1.45; }
 
 .io-retour{
   display:flex; align-items:center; gap:6px;

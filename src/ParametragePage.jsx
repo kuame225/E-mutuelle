@@ -103,10 +103,17 @@ export default function ParametragePage() {
     const { data: existant } = await supabase.from("parametrage")
       .select("id").eq("organisation_id", orgId).maybeSingle();
 
+    // type_organisation vit sur organisations, jamais sur parametrage — il
+    // n'existe dans params que parce que PARAMS_DEFAUT le porte pour les
+    // besoins du vocabulaire ailleurs dans l'appli. L'envoyer tel quel à
+    // parametrage.update()/.insert() échoue : PostgREST refuse une colonne
+    // qui n'existe pas sur cette table.
+    const { type_organisation, ...paramsAEnregistrer } = params;
+
     const { error } = existant
-      ? await supabase.from("parametrage").update(params)
+      ? await supabase.from("parametrage").update(paramsAEnregistrer)
           .eq("id", existant.id).eq("organisation_id", orgId)
-      : await supabase.from("parametrage").insert({ ...params, organisation_id: orgId });
+      : await supabase.from("parametrage").insert({ ...paramsAEnregistrer, organisation_id: orgId });
 
     setSaving(false);
     if (error) { setErreur(error.message); return; }

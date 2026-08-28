@@ -96,6 +96,7 @@ export default function ClotureAvecPage() {
       {creation && (
         <ModalNouveauCycle
           organisationId={params.organisation_id}
+          cyclesExistants={cycles}
           onCancel={() => setCreation(false)}
           onCree={(c) => { setCreation(false); charger(); setSelected(c); }}
         />
@@ -106,9 +107,19 @@ export default function ClotureAvecPage() {
 
 /* ---------------- Préparation d'un nouveau cycle ---------------- */
 
-function ModalNouveauCycle({ organisationId, onCancel, onCree }) {
+function ModalNouveauCycle({ organisationId, cyclesExistants, onCancel, onCree }) {
   const [libelle, setLibelle] = useState("");
-  const [dateDebut, setDateDebut] = useState("");
+  const [dateDebut, setDateDebut] = useState(() => {
+    // Reprend le lendemain de la fin du dernier cycle connu, pour éviter
+    // par défaut tout chevauchement avec ce qui a déjà été clôturé.
+    const dernier = [...(cyclesExistants || [])]
+      .filter((c) => c.date_fin)
+      .sort((a, b) => b.date_fin.localeCompare(a.date_fin))[0];
+    if (!dernier) return "";
+    const lendemain = new Date(dernier.date_fin);
+    lendemain.setDate(lendemain.getDate() + 1);
+    return lendemain.toISOString().slice(0, 10);
+  });
   const [dateFin, setDateFin] = useState("");
   const [montantARepartir, setMontantARepartir] = useState("");
   const [montantModifieAMain, setMontantModifieAMain] = useState(false);
@@ -168,6 +179,15 @@ function ModalNouveauCycle({ organisationId, onCancel, onCree }) {
       part: totalEpargne > 0 ? m * (e.epargne_total / totalEpargne) : 0,
     }));
   }, [epargnes, montantARepartir, totalEpargne]);
+
+  // Chevauchement avec un cycle déjà clôturé : deux périodes se recoupent
+  // dès que chacune commence avant la fin de l'autre.
+  const cycleChevauche = dateDebut && dateFin
+    ? (cyclesExistants || []).find((c) =>
+        c.date_debut && c.date_fin &&
+        dateDebut <= c.date_fin && c.date_debut <= dateFin
+      )
+    : null;
 
   async function valider() {
     if (!libelle.trim()) { setErr("Indiquez un libellé (ex : Cycle 2025)."); return; }
@@ -241,6 +261,17 @@ function ModalNouveauCycle({ organisationId, onCancel, onCree }) {
         <button className="cl-btn-calc" onClick={calculer} disabled={calculEnCours}>
           {calculEnCours ? <><Loader2 size={15} className="cl-spin" /> Calcul…</> : "Calculer la suggestion"}
         </button>
+
+        {cycleChevauche && (
+          <div className="cl-warn">
+            <AlertCircle size={15} />
+            <span>
+              Cette période recoupe « {cycleChevauche.libelle} »
+              {" "}({new Date(cycleChevauche.date_debut).toLocaleDateString("fr-FR")} → {new Date(cycleChevauche.date_fin).toLocaleDateString("fr-FR")}) :
+              l'épargne commune aux deux périodes serait comptée deux fois.
+            </span>
+          </div>
+        )}
 
         {calcule && (
           <>
@@ -575,6 +606,11 @@ const CSS = `
 .cl-err{
   display:flex; align-items:flex-start; gap:8px;
   background:#FEE2E2; color:${C.danger}; border:1px solid ${C.danger}33;
+  border-radius:${R.md}px; padding:11px 13px; font-size:13px; line-height:1.5; margin-bottom:${S.md}px;
+}
+.cl-warn{
+  display:flex; align-items:flex-start; gap:8px;
+  background:#FEF3C7; color:#92400E; border:1px solid ${C.warning}33;
   border-radius:${R.md}px; padding:11px 13px; font-size:13px; line-height:1.5; margin-bottom:${S.md}px;
 }
 

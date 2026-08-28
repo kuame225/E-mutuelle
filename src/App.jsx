@@ -30,6 +30,7 @@ import DocumentsPage from "./DocumentsPage";
 import ActiviteEconomiquePage from "./ActiviteEconomiquePage";
 import ProjetsPage from "./ProjetsPage";
 import PartageBeneficesPage from "./PartageBeneficesPage";
+import ClotureAvecPage from "./ClotureAvecPage";
 import AgendaPage from "./AgendaPage";
 import CommunicationPage from "./CommunicationPage";
 import AssembleesPage from "./AssembleesPage";
@@ -498,6 +499,7 @@ function Shell() {
           {page === "activite_eco"  && <ActiviteEconomiquePage />}
           {page === "projets"       && <ProjetsPage />}
           {page === "partage_benefices" && <PartageBeneficesPage />}
+          {page === "cloture_avec" && <ClotureAvecPage />}
           {page === "operations"    && <OperationsDiversesPage />}
           {page === "comptabilite"  && <ComptabilitePage />}
           {page === "agenda"        && <AgendaPage />}

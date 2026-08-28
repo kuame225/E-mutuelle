@@ -4,7 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
-  FileText, ShoppingCart, Briefcase, PieChart,
+  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -61,6 +61,7 @@ export const NAV_GROUPS = [
       { id: "bareme",      label: (mot) => mot("bareme"), icon: Scale,     module: "module_aides" },
       { id: "tombola",     label: "Tombola",          icon: Gift,        module: "module_tombola" },
       { id: "tontine",     label: "Tontine",          icon: RefreshCw,   module: "module_tontine" },
+      { id: "cloture_avec", label: "Clôture & Partage", icon: PiggyBank,  module: "module_tontine" },
       { id: "prets",       label: "Prêts et avances", icon: Banknote,    module: "module_prets" },
       { id: "sanctions",   label: "Sanctions",        icon: ShieldAlert, module: "module_sanctions" },
       { id: "activite_eco", label: "Activité économique", icon: ShoppingCart, module: "module_activites_economiques" },
@@ -122,6 +123,7 @@ function sousTitresPour(mot) {
     projets:       "Projets, budgets et dépenses",
     partage_benefices: "Intérêt sur les parts sociales, par exercice",
     tontine:       "Cycles, ordre de passage et versements",
+    cloture_avec:  "Épargne du cycle répartie entre les membres du groupe",
     prets:         "Demandes, échéances et remboursements",
     assemblees:    "Convocations, émargement et procès-verbaux",
     documents:     `Statuts, rapports et formulaires ${mot("organisation_de")}`,

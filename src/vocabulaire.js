@@ -157,10 +157,11 @@ const DIFFERENCES = {
     membre_le: "le coopérateur",
     membre_singulier: "Coopérateur",
     adherer: "Rejoindre la coopérative",
-    cotisation: "Part sociale",
-    cotisations: "Parts sociales",
-    cotisation_la: "la part sociale",
-    cotisation_ma: "Ma part sociale",
+    // Pas de renommage de "cotisation" ici : les Parts sociales sont un
+    // module à part (capital souscrit ponctuellement, cf. FicheMembre),
+    // pas une variante de la cotisation périodique. Une coopérative qui a
+    // aussi une cotisation de fonctionnement classique garde le mot
+    // générique "Cotisation" pour ne pas entrer en collision avec lui.
     aide: "Ristourne",
     aides: "Ristournes",
     demande_aide: "Demande de ristourne",

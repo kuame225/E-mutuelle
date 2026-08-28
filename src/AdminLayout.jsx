@@ -4,7 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
-  FileText,
+  FileText, ShoppingCart,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -63,6 +63,7 @@ export const NAV_GROUPS = [
       { id: "tontine",     label: "Tontine",          icon: RefreshCw,   module: "module_tontine" },
       { id: "prets",       label: "Prêts et avances", icon: Banknote,    module: "module_prets" },
       { id: "sanctions",   label: "Sanctions",        icon: ShieldAlert, module: "module_sanctions" },
+      { id: "activite_eco", label: "Activité économique", icon: ShoppingCart, module: "module_activites_economiques" },
     ],
   },
   {
@@ -115,6 +116,7 @@ function sousTitresPour(mot) {
     aides_admin:   `Instruction des demandes (${mot("aides").toLowerCase()})`,
     bareme:        "Montants prévus par vos textes",
     tombola:       "Tickets et tirages trimestriels",
+    activite_eco:  "Achats, ventes et suivi du stock",
     tontine:       "Cycles, ordre de passage et versements",
     prets:         "Demandes, échéances et remboursements",
     assemblees:    "Convocations, émargement et procès-verbaux",

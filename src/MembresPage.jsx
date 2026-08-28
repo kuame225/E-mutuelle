@@ -3,10 +3,10 @@ import {
   Search, ChevronRight, ArrowLeft, Phone, Mail, Briefcase,
   CalendarDays, Camera, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, Users, KeyRound, Copy, Check, ShieldCheck, UserPlus,
-  Smartphone, Receipt, CalendarCheck, LogOut, Undo2, Info,
+  Smartphone, Receipt, CalendarCheck, LogOut, Undo2, Info, Coins, Pencil,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { useParametrage, construireMatricule, dateEligibilite } from "./useParametrage";
+import { useParametrage, construireMatricule, dateEligibilite, moduleActif } from "./useParametrage";
 import { useVocabulaire } from "./useVocabulaire";
 import { de } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
@@ -255,7 +255,7 @@ export default function MembresPage() {
 /* ---------------- Fiche membre ---------------- */
 
 function FicheMembre({ membre, onBack, onUpdate }) {
-  const { params } = useParametrage();
+  const { params, recharger } = useParametrage();
   const { mot, motMaj } = useVocabulaire();
   const fileRef = useRef(null);
   const [upload, setUpload] = useState(false);
@@ -277,6 +277,32 @@ function FicheMembre({ membre, onBack, onUpdate }) {
   // Droit d'adhésion
   const [saisieDroit, setSaisieDroit] = useState(null);
   const [enregistreDroit, setEnregistreDroit] = useState(false);
+
+  // Parts sociales (coopérative) — historique des mouvements du membre
+  const partsActif = moduleActif(params, "module_parts_sociales");
+  const [partsMouvements, setPartsMouvements] = useState([]);
+  const [partsChargement, setPartsChargement] = useState(partsActif);
+  const [saisieParts, setSaisieParts] = useState(null);
+  const [enregistreParts, setEnregistreParts] = useState(false);
+  const [editValeurPart, setEditValeurPart] = useState(false);
+  const [nouvelleValeurPart, setNouvelleValeurPart] = useState("");
+  const [enregistreValeurPart, setEnregistreValeurPart] = useState(false);
+
+  useEffect(() => {
+    if (!partsActif) return;
+    let actif = true;
+    setPartsChargement(true);
+    supabase
+      .from("parts_sociales_mouvements")
+      .select("*")
+      .eq("membre_id", membre.id)
+      .order("date_mouvement", { ascending: false })
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (actif) { setPartsMouvements(data || []); setPartsChargement(false); }
+      });
+    return () => { actif = false; };
+  }, [membre.id, partsActif]);
 
   // Sortie de la mutuelle
   const [bareme, setBareme] = useState({});
@@ -479,6 +505,93 @@ function FicheMembre({ membre, onBack, onUpdate }) {
       droit_adhesion_paye_le: null,
       droit_adhesion_mode: null,
     });
+  }
+
+  /* ---- Parts sociales (coopérative) ---- */
+
+  function ouvrirSaisieParts(type) {
+    setErreur("");
+    const defaut = params.valeur_part_sociale;
+    setSaisieParts({
+      type,
+      nombreParts: "1",
+      montant: defaut ? String(defaut) : "",
+      date: new Date().toISOString().slice(0, 10),
+      note: "",
+    });
+  }
+
+  const totalParts = partsMouvements.reduce((s, m) =>
+    s + (m.type_mouvement === "souscription" ? m.nombre_parts : -m.nombre_parts), 0);
+  const totalCapital = partsMouvements.reduce((s, m) =>
+    s + (m.type_mouvement === "souscription" ? m.montant : -m.montant), 0);
+
+  async function enregistrerParts() {
+    const nb = parseInt(saisieParts.nombreParts, 10);
+    const mt = parseInt(saisieParts.montant, 10);
+
+    if (!nb || nb <= 0) { setErreur("Indiquez le nombre de parts."); return; }
+    if (!mt || mt <= 0) { setErreur("Indiquez le montant."); return; }
+    if (!saisieParts.date) { setErreur("Indiquez la date."); return; }
+    if (saisieParts.type === "remboursement" && nb > totalParts) {
+      setErreur(`Ce ${mot("membre_singulier").toLowerCase()} ne détient que ${totalParts} part(s).`);
+      return;
+    }
+
+    setEnregistreParts(true);
+    setErreur("");
+
+    const { data, error } = await supabase
+      .from("parts_sociales_mouvements")
+      .insert({
+        organisation_id: params.organisation_id,
+        membre_id: membre.id,
+        type_mouvement: saisieParts.type,
+        nombre_parts: nb,
+        valeur_part_unitaire: Math.round(mt / nb),
+        montant: mt,
+        date_mouvement: saisieParts.date,
+        note: saisieParts.note.trim() || null,
+      })
+      .select()
+      .single();
+
+    setEnregistreParts(false);
+
+    if (error) { setErreur(error.message); return; }
+
+    setPartsMouvements((liste) => [data, ...liste]);
+    setSaisieParts(null);
+  }
+
+  async function supprimerMouvementParts(mvt) {
+    const { error } = await supabase
+      .from("parts_sociales_mouvements")
+      .delete()
+      .eq("id", mvt.id);
+
+    if (error) { setErreur(error.message); return; }
+    setPartsMouvements((liste) => liste.filter((m) => m.id !== mvt.id));
+  }
+
+  async function enregistrerValeurPart() {
+    const v = parseInt(nouvelleValeurPart, 10);
+    if (!v || v <= 0) { setErreur("Indiquez une valeur."); return; }
+
+    setEnregistreValeurPart(true);
+    setErreur("");
+
+    const { error } = await supabase
+      .from("parametrage")
+      .update({ valeur_part_sociale: v })
+      .eq("organisation_id", params.organisation_id);
+
+    setEnregistreValeurPart(false);
+
+    if (error) { setErreur(error.message); return; }
+
+    setEditValeurPart(false);
+    recharger();
   }
 
   /* ---- Sortie de la mutuelle ---- */
@@ -915,6 +1028,203 @@ function FicheMembre({ membre, onBack, onUpdate }) {
                 <button className="mb-btn-code" onClick={ouvrirSaisieDroit}>
                   <Receipt size={16} /> Enregistrer le droit {de(mot("adhesion").toLowerCase())}
                 </button>
+              </>
+            )}
+          </section>
+        )}
+
+        {/* ---- Parts sociales (coopérative) ---- */}
+        {!sorti && partsActif && (
+          <section className="mb-acces">
+            <header className="mb-acces-head">
+              <span className="mb-acces-icon"><Coins size={18} /></span>
+              <div>
+                <h3 className="mb-acces-titre">Parts sociales</h3>
+                <p className="mb-acces-sub">
+                  Capital détenu par ce {mot("membre_singulier").toLowerCase()}, souscrit ou
+                  remboursé au fil du temps.
+                </p>
+              </div>
+            </header>
+
+            <div className="mb-parts-valeur">
+              {editValeurPart ? (
+                <div className="mb-parts-valeur-edit">
+                  <input
+                    type="number"
+                    value={nouvelleValeurPart}
+                    onChange={(e) => setNouvelleValeurPart(e.target.value)}
+                    placeholder="Valeur d'une part"
+                    className="mb-input"
+                    autoFocus
+                  />
+                  <span>FCFA</span>
+                  <button
+                    className="mb-code-new"
+                    onClick={() => { setEditValeurPart(false); setErreur(""); }}
+                    disabled={enregistreValeurPart}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    className="mb-btn-code mb-btn-code-sm"
+                    onClick={enregistrerValeurPart}
+                    disabled={enregistreValeurPart}
+                  >
+                    {enregistreValeurPart ? <Loader2 size={14} className="mb-spin" /> : "Valider"}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span>
+                    Valeur d'une part :{" "}
+                    {params.valeur_part_sociale
+                      ? <strong>{montant(params.valeur_part_sociale)} FCFA</strong>
+                      : <em>non définie</em>}
+                  </span>
+                  <button
+                    className="mb-parts-valeur-btn"
+                    onClick={() => {
+                      setNouvelleValeurPart(params.valeur_part_sociale ? String(params.valeur_part_sociale) : "");
+                      setEditValeurPart(true);
+                      setErreur("");
+                    }}
+                  >
+                    <Pencil size={12} /> {params.valeur_part_sociale ? "Modifier" : "Définir"}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {partsChargement ? (
+              <div className="mb-parts-skel" />
+            ) : (
+              <>
+                <dl className="mb-droit-infos">
+                  <div>
+                    <dt>Parts détenues</dt>
+                    <dd>{totalParts}</dd>
+                  </div>
+                  <div>
+                    <dt>Capital investi</dt>
+                    <dd>{montant(totalCapital)} FCFA</dd>
+                  </div>
+                </dl>
+
+                {partsMouvements.length > 0 && (
+                  <ul className="mb-parts-liste">
+                    {partsMouvements.map((m) => (
+                      <li key={m.id} className="mb-parts-ligne">
+                        <span className={`mb-parts-badge ${m.type_mouvement === "remboursement" ? "is-remb" : ""}`}>
+                          {m.type_mouvement === "souscription" ? "+" : "−"}{m.nombre_parts}
+                        </span>
+                        <div className="mb-parts-corps">
+                          <span>{montant(m.montant)} FCFA</span>
+                          <span className="mb-parts-date">
+                            {new Date(m.date_mouvement).toLocaleDateString("fr-FR")}
+                            {m.note ? ` · ${m.note}` : ""}
+                          </span>
+                        </div>
+                        <button
+                          className="mb-parts-suppr"
+                          onClick={() => supprimerMouvementParts(m)}
+                          title="Supprimer ce mouvement"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {saisieParts ? (
+                  <div className="mb-form">
+                    <div className="mb-champ">
+                      <label className="mb-label" htmlFor="parts-nombre">Nombre de parts</label>
+                      <input
+                        id="parts-nombre"
+                        type="number"
+                        min="1"
+                        value={saisieParts.nombreParts}
+                        onChange={(e) =>
+                          setSaisieParts((d) => ({ ...d, nombreParts: e.target.value }))}
+                        className="mb-input"
+                      />
+                    </div>
+
+                    <div className="mb-champ">
+                      <label className="mb-label" htmlFor="parts-montant">Montant</label>
+                      <div className="mb-input-devise">
+                        <input
+                          id="parts-montant"
+                          type="number"
+                          value={saisieParts.montant}
+                          onChange={(e) =>
+                            setSaisieParts((d) => ({ ...d, montant: e.target.value }))}
+                          className="mb-input"
+                        />
+                        <span>FCFA</span>
+                      </div>
+                    </div>
+
+                    <div className="mb-champ">
+                      <label className="mb-label" htmlFor="parts-date">Date</label>
+                      <input
+                        id="parts-date"
+                        type="date"
+                        value={saisieParts.date}
+                        max={new Date().toISOString().slice(0, 10)}
+                        onChange={(e) =>
+                          setSaisieParts((d) => ({ ...d, date: e.target.value }))}
+                        className="mb-input"
+                      />
+                    </div>
+
+                    <div className="mb-champ">
+                      <label className="mb-label" htmlFor="parts-note">
+                        Note <span className="mb-opt">— facultative</span>
+                      </label>
+                      <input
+                        id="parts-note"
+                        type="text"
+                        value={saisieParts.note}
+                        onChange={(e) =>
+                          setSaisieParts((d) => ({ ...d, note: e.target.value }))}
+                        className="mb-input"
+                      />
+                    </div>
+
+                    <div className="mb-form-actions">
+                      <button
+                        className="mb-code-new"
+                        onClick={() => { setSaisieParts(null); setErreur(""); }}
+                        disabled={enregistreParts}
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        className="mb-btn-code"
+                        onClick={enregistrerParts}
+                        disabled={enregistreParts}
+                      >
+                        {enregistreParts
+                          ? <><Loader2 size={16} className="mb-spin" /> Enregistrement…</>
+                          : <><Check size={16} /> Enregistrer</>}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-parts-actions">
+                    <button className="mb-btn-code" onClick={() => ouvrirSaisieParts("souscription")}>
+                      <Coins size={16} /> Nouvelle souscription
+                    </button>
+                    {totalParts > 0 && (
+                      <button className="mb-lien-danger" onClick={() => ouvrirSaisieParts("remboursement")}>
+                        <Undo2 size={13} /> Enregistrer un remboursement
+                      </button>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -1516,6 +1826,52 @@ const CSS = `
   border-radius:${R.md}px; padding:11px 13px;
   font-size:13px; line-height:1.5;
 }
+
+/* ---- Parts sociales ---- */
+.mb-parts-valeur{
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  background:${C.bg}; border-radius:${R.md}px; padding:10px 13px;
+  font-size:13px; color:${C.textMuted}; margin-bottom:${S.md}px;
+}
+.mb-parts-valeur strong{ color:${C.text}; }
+.mb-parts-valeur em{ font-style:normal; color:${C.textSubtle}; }
+.mb-parts-valeur-btn{
+  display:flex; align-items:center; gap:5px;
+  background:none; border:none; color:${C.primary}; cursor:pointer;
+  font-family:inherit; font-size:12.5px; font-weight:600; padding:0;
+}
+.mb-parts-valeur-edit{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; }
+.mb-parts-valeur-edit input{ max-width:140px; }
+.mb-btn-code-sm{ padding:8px 14px; font-size:13px; }
+
+.mb-parts-skel{
+  height:60px; border-radius:${R.md}px;
+  background:linear-gradient(90deg,#EDF1F6 25%,#F7F9FC 50%,#EDF1F6 75%);
+  background-size:200% 100%; animation:mbShim 1.4s infinite;
+}
+
+.mb-parts-liste{ list-style:none; margin:0 0 ${S.md}px; padding:0; display:flex; flex-direction:column; gap:6px; }
+.mb-parts-ligne{
+  display:flex; align-items:center; gap:10px;
+  background:${C.bg}; border-radius:${R.sm}px; padding:9px 11px;
+}
+.mb-parts-badge{
+  flex-shrink:0; min-width:34px; text-align:center;
+  background:${PALETTE.blue100}; color:${C.primary};
+  border-radius:${R.pill}px; padding:3px 8px;
+  font-size:12.5px; font-weight:700;
+}
+.mb-parts-badge.is-remb{ background:#FEE2E2; color:${C.danger}; }
+.mb-parts-corps{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.mb-parts-corps > span:first-child{ font-size:13.5px; font-weight:600; }
+.mb-parts-date{ font-size:11.5px; color:${C.textSubtle}; }
+.mb-parts-suppr{
+  flex-shrink:0; background:none; border:none; color:${C.textSubtle};
+  cursor:pointer; padding:4px; display:flex;
+}
+.mb-parts-suppr:hover{ color:${C.danger}; }
+.mb-parts-actions{ display:flex; align-items:center; gap:${S.md}px; flex-wrap:wrap; }
+
 .mb-note-sortie{
   background:${C.bg}; border-radius:${R.md}px;
   padding:11px 13px; font-size:13px; line-height:1.55; color:${C.textMuted};

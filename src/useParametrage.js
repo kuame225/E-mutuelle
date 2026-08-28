@@ -56,6 +56,16 @@ export const MODULES = [
     label: "Documents",
     aide: "Statuts, rapports et formulaires, partagés ou réservés au Bureau.",
   },
+  {
+    id: "module_parts_sociales",
+    label: "Parts sociales",
+    aide: "Capital détenu par chaque coopérateur, souscrit ou remboursé au fil du temps.",
+  },
+  {
+    id: "module_activites_economiques",
+    label: "Activité économique",
+    aide: "Achats, ventes et suivi du stock d'articles.",
+  },
 ];
 
 // Valeurs de repli, utilisées tant qu'aucun paramétrage n'a été enregistré.
@@ -112,6 +122,12 @@ export const PARAMS_DEFAUT = {
   // Documents, à l'inverse, n'a jamais fait partie du socle : le défaut
   // « false » est donc le bon repli pour une base pas encore migrée.
   module_documents: false,
+  module_parts_sociales: false,
+  module_activites_economiques: false,
+  // Valeur nominale d'une part sociale : pas de défaut chiffré arbitraire —
+  // tant qu'elle n'est pas définie par le Bureau, l'écran l'affiche comme
+  // non définie plutôt que de suggérer un montant inventé.
+  valeur_part_sociale: null,
 };
 
 // Emblème neutre, affiché pendant le chargement et lorsqu'aucun logo n'a été

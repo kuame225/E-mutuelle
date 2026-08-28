@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage, construireMatricule, dateEligibilite } from "./useParametrage";
+import { useVocabulaire } from "./useVocabulaire";
+import { de } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 const STATUT = {
@@ -74,6 +76,7 @@ const MOTIFS_SORTIE = [
 
 export default function MembresPage() {
   const { params } = useParametrage();
+  const { mot } = useVocabulaire();
   const [membres, setMembres] = useState([]);
   const [query, setQuery] = useState("");
   const [filtre, setFiltre] = useState("tous");
@@ -151,9 +154,11 @@ export default function MembresPage() {
         <div className="mb-rappel">
           <Receipt size={17} />
           <span>
-            <strong>{sansDroit} membre{sansDroit > 1 ? "s" : ""}</strong> sans droit
+            <strong>
+              {sansDroit} {sansDroit > 1 ? mot("membres").toLowerCase() : mot("membre_singulier").toLowerCase()}
+            </strong> sans droit
             d'adhésion enregistré. Le délai de carence court à compter de ce
-            versement : tant qu'il n'est pas saisi, l'éligibilité aux prestations
+            versement : tant qu'il n'est pas saisi, l'éligibilité aux {mot("aides").toLowerCase()}
             reste estimée.
           </span>
         </div>
@@ -166,7 +171,7 @@ export default function MembresPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un membre…"
+            placeholder={`Rechercher ${mot("membre_un")}…`}
             className="mb-input"
           />
         </div>
@@ -189,7 +194,7 @@ export default function MembresPage() {
         <div className="mb-empty">
           <Users size={36} color={PALETTE.grey300} />
           <div className="mb-empty-title">
-            {membres.length === 0 ? "Aucun membre enregistré" : "Aucun résultat"}
+            {membres.length === 0 ? `Aucun ${mot("membre_singulier").toLowerCase()} enregistré` : "Aucun résultat"}
           </div>
           <div className="mb-empty-sub">
             {membres.length === 0
@@ -251,6 +256,7 @@ export default function MembresPage() {
 
 function FicheMembre({ membre, onBack, onUpdate }) {
   const { params } = useParametrage();
+  const { mot, motMaj } = useVocabulaire();
   const fileRef = useRef(null);
   const [upload, setUpload] = useState(false);
   const [erreur, setErreur] = useState("");
@@ -501,7 +507,7 @@ function FicheMembre({ membre, onBack, onUpdate }) {
       if (dejaAssiste) {
         return {
           possible: false,
-          texte: "Ce membre a déjà été assisté : l'article 23 ne lui ouvre aucun droit.",
+          texte: `Ce ${mot("membre_singulier").toLowerCase()} a déjà été assisté : l'article 23 ne lui ouvre aucun droit.`,
         };
       }
       return {
@@ -655,7 +661,7 @@ function FicheMembre({ membre, onBack, onUpdate }) {
                 {new Date(membre.sortie_le).toLocaleDateString("fr-FR")}
               </strong>
               <p>
-                Ce membre ne fait plus partie de la mutuelle (article 32). Son accès
+                Ce {mot("membre_singulier").toLowerCase()} ne fait plus partie {mot("organisation_de")} (article 32). Son accès
                 à l'application reste ouvert tant qu'une prestation lui est due.
               </p>
             </div>
@@ -736,14 +742,14 @@ function FicheMembre({ membre, onBack, onUpdate }) {
               <ul>
                 <li>
                   {resultatSortie.cotisations_impayees > 0
-                    ? `${resultatSortie.cotisations_impayees} cotisation(s) impayée(s) au moment de la sortie`
-                    : "Aucune cotisation impayée"}
+                    ? `${resultatSortie.cotisations_impayees} ${resultatSortie.cotisations_impayees > 1 ? mot("cotisations").toLowerCase() : mot("cotisation").toLowerCase()} impayée${resultatSortie.cotisations_impayees > 1 ? "s" : ""} au moment de la sortie`
+                    : `Aucune ${mot("cotisation").toLowerCase()} impayée`}
                   {resultatSortie.cotisations_annulees > 0 &&
-                    ` — ${resultatSortie.cotisations_annulees} annulée(s) sur décision du Bureau`}
+                    ` — ${resultatSortie.cotisations_annulees} annulée(s) sur décision ${mot("bureau_du")}`}
                 </li>
                 <li>
                   {resultatSortie.prestation_creee
-                    ? `Demande de prestation créée pour ${montant(resultatSortie.montant_prestation)} FCFA — à instruire dans Aides sociales`
+                    ? `Demande de prestation créée pour ${montant(resultatSortie.montant_prestation)} FCFA — à instruire dans ${mot("aides")}`
                     : "Aucune prestation ouverte"}
                 </li>
               </ul>
@@ -756,14 +762,14 @@ function FicheMembre({ membre, onBack, onUpdate }) {
           <Info2 Icon={Briefcase}    label="Service"        value={membre.service || "—"} />
           <Info2 Icon={Phone}        label="Téléphone"      value={membre.telephone || "—"} />
           <Info2 Icon={Mail}         label="Adresse e-mail" value={membre.email || "Non renseignée"} />
-          <Info2 Icon={CalendarDays} label="Membre depuis"
+          <Info2 Icon={CalendarDays} label={`${mot("membre_singulier")} depuis`}
             value={membre.date_adhesion
               ? new Date(membre.date_adhesion).toLocaleDateString("fr-FR")
               : "—"} />
         </dl>
 
         <div className="mb-matricule">
-          <span>Matricule</span>
+          <span>{mot("matricule")}</span>
           <strong>{matricule}</strong>
         </div>
 
@@ -773,7 +779,7 @@ function FicheMembre({ membre, onBack, onUpdate }) {
             <header className="mb-acces-head">
               <span className="mb-acces-icon"><Receipt size={18} /></span>
               <div>
-                <h3 className="mb-acces-titre">Droit d'adhésion</h3>
+                <h3 className="mb-acces-titre">Droit {de(mot("adhesion").toLowerCase())}</h3>
                 <p className="mb-acces-sub">
                   {montant(montantReference)} francs, payable en une seule fois.
                   {params.depart_carence !== "date_adhesion" && (
@@ -901,12 +907,13 @@ function FicheMembre({ membre, onBack, onUpdate }) {
                 <div className="mb-warn mb-warn-serre">
                   <AlertTriangle size={15} />
                   <span>
-                    Aucun versement enregistré. L'éligibilité de ce membre aux prestations
-                    est calculée à titre provisoire depuis sa date d'adhésion.
+                    Aucun versement enregistré. L'éligibilité de ce {mot("membre_singulier").toLowerCase()}{" "}
+                    aux {mot("aides").toLowerCase()} est calculée à titre provisoire depuis
+                    sa date {de(mot("adhesion").toLowerCase())}.
                   </span>
                 </div>
                 <button className="mb-btn-code" onClick={ouvrirSaisieDroit}>
-                  <Receipt size={16} /> Enregistrer le droit d'adhésion
+                  <Receipt size={16} /> Enregistrer le droit {de(mot("adhesion").toLowerCase())}
                 </button>
               </>
             )}
@@ -1056,9 +1063,9 @@ function FicheMembre({ membre, onBack, onUpdate }) {
           <header className="mb-acces-head">
             <span className="mb-acces-icon mb-acces-icon-sortie"><LogOut size={18} /></span>
             <div>
-              <h3 className="mb-acces-titre">Sortie de la mutuelle</h3>
+              <h3 className="mb-acces-titre">Sortie {mot("organisation_de")}</h3>
               <p className="mb-acces-sub">
-                Article 32 : la qualité de membre se perd par démission, mutation,
+                Article 32 : la qualité {de(mot("membre_singulier").toLowerCase())} se perd par démission, mutation,
                 départ à la retraite ou décès.
               </p>
             </div>
@@ -1083,7 +1090,7 @@ function FicheMembre({ membre, onBack, onUpdate }) {
 
               {membre.sortie_note && (
                 <div className="mb-note-sortie">
-                  <strong>Note du Bureau : </strong>{membre.sortie_note}
+                  <strong>Note {mot("bureau_du")} : </strong>{membre.sortie_note}
                 </div>
               )}
 
@@ -1200,9 +1207,8 @@ function FicheMembre({ membre, onBack, onUpdate }) {
                           ` + ${montant(apercuPrestation.don)} FCFA de don`}
                       </button>
                       <div className="mb-note">
-                        <Info size={13} /> La demande sera créée dans « Aides sociales »
-                        avec le statut « en attente », pour instruction normale par le
-                        Bureau.
+                        <Info size={13} /> La demande sera créée dans « {mot("aides")} »
+                        avec le statut « en attente », pour instruction normale par {mot("bureau_le")}.
                       </div>
                     </>
                   ) : (

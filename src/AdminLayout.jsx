@@ -4,6 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
+  FileText,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -70,6 +71,7 @@ export const NAV_GROUPS = [
       { id: "communication", label: "Communications", icon: Megaphone },
       { id: "agenda",        label: "Agenda",         icon: Calendar },
       { id: "assemblees",    label: (mot) => mot("assemblees"), icon: Users2, module: "module_assemblees" },
+      { id: "documents",     label: "Documents", icon: FileText, module: "module_documents" },
     ],
   },
   {
@@ -116,6 +118,7 @@ function sousTitresPour(mot) {
     tontine:       "Cycles, ordre de passage et versements",
     prets:         "Demandes, échéances et remboursements",
     assemblees:    "Convocations, émargement et procès-verbaux",
+    documents:     `Statuts, rapports et formulaires ${mot("organisation_de")}`,
     communication: `Communiqués aux ${mot("membres").toLowerCase()}`,
     agenda:        "Échéances et événements",
     parametrage:   "Configuration de la plateforme",

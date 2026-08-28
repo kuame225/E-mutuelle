@@ -12,6 +12,17 @@ export const EVENEMENTS = {
   ADHESION_VALIDEE: "adhesion_validee",
   AIDE_DEMANDEE: "aide_demandee",
   PROFIL_MODIFIE: "profil_modifie",
+  // BaremePage.jsx utilisait déjà ces trois clés sans qu'elles existent
+  // ici : chaque modification du barème consignait silencieusement
+  // type_evenement: undefined. Ajoutées pour que ce qui était déjà écrit
+  // dans BaremePage devienne enfin exploitable.
+  BAREME_PRESTATION_AJOUTEE: "bareme_prestation_ajoutee",
+  BAREME_PRESTATION_MODIFIEE: "bareme_prestation_modifiee",
+  BAREME_PRESTATION_DESACTIVEE: "bareme_prestation_desactivee",
+  // Module Documents
+  DOCUMENT_AJOUTE: "document_ajoute",
+  DOCUMENT_SUPPRIME: "document_supprime",
+  DOCUMENT_VISIBILITE_MODIFIEE: "document_visibilite_modifiee",
 };
 
 /**

@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
+import { useVocabulaire } from "./useVocabulaire";
 import { consigner, EVENEMENTS } from "./journal";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
@@ -15,6 +16,7 @@ const CATEGORIES = [
 
 export default function BaremePage() {
   const { params } = useParametrage();
+  const { mot } = useVocabulaire();
   const [lignes, setLignes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [edition, setEdition] = useState(null);   // ligne en cours de modification
@@ -175,8 +177,9 @@ export default function BaremePage() {
       <div className="bp-intro">
         <Info size={16} />
         <span>
-          Ce barème détermine le montant proposé au Bureau lors de l'instruction
-          d'une demande. Le modifier n'a aucun effet sur les aides déjà accordées.
+          Ce barème détermine le montant proposé, examiné par {mot("bureau_le")}{" "}
+          lors de l'instruction d'une demande. Le modifier n'a aucun effet sur
+          ce qui a déjà été accordé.
         </span>
       </div>
 
@@ -272,8 +275,8 @@ export default function BaremePage() {
           <HeartHandshake size={36} color={PALETTE.grey300} />
           <div className="bp-vide-titre">Aucune prestation au barème</div>
           <div className="bp-vide-sub">
-            Ajoutez les événements ouvrant droit à une aide, tels que les
-            prévoient les textes de votre mutuelle.
+            Ajoutez les événements ouvrant droit à des {mot("aides").toLowerCase()},
+            tels que les prévoient les textes de {mot("organisation_votre")}.
           </div>
         </div>
       )}
@@ -330,6 +333,7 @@ export default function BaremePage() {
 /* ---------------- Formulaire ---------------- */
 
 function ModalPrestation({ ligne, enCours, onCancel, onConfirm }) {
+  const { mot, motMaj } = useVocabulaire();
   const [libelle, setLibelle] = useState(ligne?.libelle || "");
   const [categorie, setCategorie] = useState(ligne?.categorie || "heureux");
   const [montantMembre, setMontantMembre] = useState(String(ligne?.montant_membre ?? 0));
@@ -368,7 +372,7 @@ function ModalPrestation({ ligne, enCours, onCancel, onConfirm }) {
               {ligne ? "Modifier la prestation" : "Nouvelle prestation"}
             </h3>
             <p className="bp-modal-sub">
-              Reprenez les termes de vos textes : ce libellé sera lu par les membres.
+              Reprenez les termes de vos textes : ce libellé sera lu par les {mot("membres").toLowerCase()}.
             </p>
           </div>
           <button className="bp-close" onClick={onCancel} aria-label="Fermer">
@@ -468,7 +472,7 @@ function ModalPrestation({ ligne, enCours, onCancel, onConfirm }) {
             <span className="bp-case">{uneSeuleFois && <CheckCircle2 size={13} />}</span>
             <span>
               <strong>Accordée une seule fois</strong>
-              <em>Le membre ne peut en bénéficier qu'à une reprise</em>
+              <em>{motMaj("membre_le")} ne peut en bénéficier qu'à une reprise</em>
             </span>
           </button>
 
@@ -478,7 +482,7 @@ function ModalPrestation({ ligne, enCours, onCancel, onConfirm }) {
           >
             <span className="bp-case">{actif && <CheckCircle2 size={13} />}</span>
             <span>
-              <strong>Proposée aux membres</strong>
+              <strong>Proposée aux {mot("membres").toLowerCase()}</strong>
               <em>Décochez pour la retirer sans perdre l'historique</em>
             </span>
           </button>

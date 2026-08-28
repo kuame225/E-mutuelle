@@ -26,6 +26,7 @@ import TombolaPage from "./TombolaPage";
 import ComptabilitePage from "./ComptabilitePage";
 import OperationsDiversesPage from "./OperationsDiversesPage";
 import BaremePage from "./BaremePage";
+import DocumentsPage from "./DocumentsPage";
 import AgendaPage from "./AgendaPage";
 import CommunicationPage from "./CommunicationPage";
 import AssembleesPage from "./AssembleesPage";
@@ -490,6 +491,7 @@ function Shell() {
           {page === "sanctions"     && <SanctionsPage />}
           {page === "aides_admin"   && <AidesAdminPage />}
           {page === "bareme"        && <BaremePage />}
+          {page === "documents"     && <DocumentsPage />}
           {page === "operations"    && <OperationsDiversesPage />}
           {page === "comptabilite"  && <ComptabilitePage />}
           {page === "agenda"        && <AgendaPage />}

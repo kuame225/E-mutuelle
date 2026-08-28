@@ -51,6 +51,11 @@ export const MODULES = [
     label: "Aides sociales",
     aide: "Demandes d'aide, barème des prestations et versements.",
   },
+  {
+    id: "module_documents",
+    label: "Documents",
+    aide: "Statuts, rapports et formulaires, partagés ou réservés au Bureau.",
+  },
 ];
 
 // Valeurs de repli, utilisées tant qu'aucun paramétrage n'a été enregistré.
@@ -104,6 +109,9 @@ export const PARAMS_DEFAUT = {
   // faisaient partie du socle avant de devenir un module, mieux vaut les
   // laisser visibles que les faire disparaître sans prévenir.
   module_aides: true,
+  // Documents, à l'inverse, n'a jamais fait partie du socle : le défaut
+  // « false » est donc le bon repli pour une base pas encore migrée.
+  module_documents: false,
 };
 
 // Emblème neutre, affiché pendant le chargement et lorsqu'aucun logo n'a été

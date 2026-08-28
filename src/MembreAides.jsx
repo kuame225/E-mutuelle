@@ -1,24 +1,32 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Plus, ArrowLeft, Loader2, HandHeart, X, AlertCircle,
   CheckCircle2, Clock, XCircle, Search, ShieldAlert, CalendarClock,
   Info,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import { useVocabulaire } from "./useVocabulaire";
+import { de } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
-const STATUTS = {
-  en_attente: { label: "En attente",  color: C.textMuted, soft: PALETTE.grey200, Icon: Clock,
-                texte: "Votre demande a été enregistrée et attend l'examen du Bureau." },
-  en_examen:  { label: "En examen",   color: C.warning,   soft: "#FEF3C7", Icon: Search,
-                texte: "Le Bureau étudie actuellement votre dossier." },
-  validee:    { label: "Validée",     color: C.success,   soft: "#DCFCE7", Icon: CheckCircle2,
-                texte: "Votre demande est acceptée. Le versement sera effectué prochainement." },
-  payee:      { label: "Payée",       color: C.success,   soft: "#DCFCE7", Icon: CheckCircle2,
-                texte: "L'aide vous a été versée." },
-  rejetee:    { label: "Rejetée",     color: C.danger,    soft: "#FEE2E2", Icon: XCircle,
-                texte: "Votre demande n'a pas pu être retenue." },
-};
+// Fonction plutôt que constante : les deux premiers textes citent le Bureau
+// (bureau_du/bureau_le, dont l'article varie avec le genre — "du Bureau" vs
+// "de la Coordination"), donc calculés une fois le vocabulaire connu plutôt
+// que figés au chargement du module.
+function statutsPour(mot, motMaj) {
+  return {
+    en_attente: { label: "En attente",  color: C.textMuted, soft: PALETTE.grey200, Icon: Clock,
+                  texte: `Votre demande a été enregistrée et attend l'examen ${mot("bureau_du")}.` },
+    en_examen:  { label: "En examen",   color: C.warning,   soft: "#FEF3C7", Icon: Search,
+                  texte: `${motMaj("bureau_le")} étudie actuellement votre dossier.` },
+    validee:    { label: "Validée",     color: C.success,   soft: "#DCFCE7", Icon: CheckCircle2,
+                  texte: "Votre demande est acceptée. Le versement sera effectué prochainement." },
+    payee:      { label: "Payée",       color: C.success,   soft: "#DCFCE7", Icon: CheckCircle2,
+                  texte: "Le versement a été effectué." },
+    rejetee:    { label: "Rejetée",     color: C.danger,    soft: "#FEE2E2", Icon: XCircle,
+                  texte: "Votre demande n'a pas pu être retenue." },
+  };
+}
 
 const CATEGORIES = [
   { id: "heureux",    titre: "Événements heureux" },
@@ -26,6 +34,8 @@ const CATEGORIES = [
 ];
 
 export default function MembreAides({ membre, onBack }) {
+  const { mot, motMaj } = useVocabulaire();
+  const STATUTS = useMemo(() => statutsPour(mot, motMaj), [mot, motMaj]);
   const [aides, setAides] = useState([]);
   const [bareme, setBareme] = useState([]);
   const [suspendu, setSuspendu] = useState(false);
@@ -155,9 +165,11 @@ export default function MembreAides({ membre, onBack }) {
 
       <header className="ma-head">
         <div>
-          <h1 className="ma-titre">Mes demandes d'aide</h1>
+          <h1 className="ma-titre">
+            Mes {mot("demande_aide").toLowerCase().replace(/^demande /, "demandes ")}
+          </h1>
           <p className="ma-sub">
-            Sollicitez le soutien de la mutuelle en cas de besoin.
+            Sollicitez les {mot("aides").toLowerCase()} {mot("organisation_de")} en cas de besoin.
           </p>
         </div>
         {!suspendu && eligibleGlobal && (
@@ -174,8 +186,9 @@ export default function MembreAides({ membre, onBack }) {
           <div>
             <strong>Accès temporairement suspendu</strong>
             <p>
-              Votre retard de cotisation suspend l'accès aux aides sociales.
-              Il sera rétabli automatiquement dès régularisation.
+              Votre retard {de(mot("cotisation").toLowerCase())} suspend l'accès
+              aux {mot("aides").toLowerCase()}. Il sera rétabli automatiquement
+              dès régularisation.
             </p>
           </div>
         </div>
@@ -219,7 +232,7 @@ export default function MembreAides({ membre, onBack }) {
           <HandHeart size={38} color={PALETTE.grey300} />
           <div className="ma-empty-titre">Aucune demande</div>
           <div className="ma-empty-sub">
-            En cas de difficulté, la mutuelle peut vous accompagner.
+            En cas de difficulté, {mot("organisation_la")} peut vous accompagner.
             Vos demandes apparaîtront ici avec leur suivi.
           </div>
         </div>
@@ -284,7 +297,7 @@ export default function MembreAides({ membre, onBack }) {
                 <h2 className="ma-modal-titre">Nouvelle demande</h2>
                 <p className="ma-modal-sub">
                   Choisissez l'événement concerné. Les montants sont fixés par le
-                  règlement intérieur de la mutuelle.
+                  règlement intérieur {mot("organisation_de")}.
                 </p>
               </div>
               <button
@@ -316,7 +329,7 @@ export default function MembreAides({ membre, onBack }) {
                         </span>
                         <span className="ma-type-text">
                           <strong>{b.libelle}</strong>
-                          <em>{descriptionBareme(b)}</em>
+                          <em>{descriptionBareme(b, mot)}</em>
                         </span>
                       </button>
                     ))}
@@ -347,7 +360,7 @@ export default function MembreAides({ membre, onBack }) {
                       <span className="ma-devise">FCFA</span>
                     </div>
                     <p className="ma-note">
-                      <Info size={13} /> {ligneBareme.article} : le montant de l'aide
+                      <Info size={13} /> {ligneBareme.article} : le montant {mot("aide_de")}
                       est arrêté par l'Assemblée Générale. Le chiffre indiqué reste indicatif.
                     </p>
                   </>
@@ -365,7 +378,7 @@ export default function MembreAides({ membre, onBack }) {
                       <Info size={13} /> Montant fixé par {ligneBareme.article} du règlement
                       intérieur.
                       {ligneBareme.montant_calcule &&
-                        " Il correspond à la moitié de vos cotisations versées."}
+                        ` Il correspond à la moitié de vos ${mot("cotisations").toLowerCase()} versées.`}
                     </p>
                   </>
                 )}
@@ -412,7 +425,7 @@ export default function MembreAides({ membre, onBack }) {
               >
                 {envoi
                   ? <><Loader2 size={17} className="ma-spin" /> Envoi…</>
-                  : "Soumettre ma demande"}
+                  : `Soumettre ${mot("demande_aide").toLowerCase().replace(/^demande/, "ma demande")}`}
               </button>
             </div>
           </div>
@@ -424,8 +437,8 @@ export default function MembreAides({ membre, onBack }) {
 
 /* ---------------- Utilitaires ---------------- */
 
-function descriptionBareme(b) {
-  if (b.montant_calcule) return `${b.article} · 50 % des cotisations versées`;
+function descriptionBareme(b, mot) {
+  if (b.montant_calcule) return `${b.article} · 50 % des ${mot("cotisations").toLowerCase()} versées`;
   if (b.montant_membre === 0) return `${b.article} · montant arrêté en Assemblée Générale`;
 
   const base = `${b.article} · ${montant(b.montant_membre)} F`;

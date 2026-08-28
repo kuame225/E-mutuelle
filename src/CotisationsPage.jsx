@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
+import { useVocabulaire } from "./useVocabulaire";
+import { de } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import PaiementModal from "./PaiementModal";
 
@@ -24,6 +26,7 @@ const FILTRES = [
 
 export default function CotisationsPage() {
   const { params } = useParametrage();
+  const { mot } = useVocabulaire();
   const [cotisations, setCotisations] = useState([]);
   const [membres, setMembres] = useState({});
   const [loading, setLoading] = useState(true);
@@ -80,10 +83,10 @@ export default function CotisationsPage() {
     setMessage({
       type: data === 0 && aucunMembre ? "info" : "ok",
       texte: data > 0
-        ? `${data} cotisation${data > 1 ? "s" : ""} générée${data > 1 ? "s" : ""} pour ${formatPeriode(periode)}.`
+        ? `${data} ${data > 1 ? mot("cotisations").toLowerCase() : mot("cotisation").toLowerCase()} générée${data > 1 ? "s" : ""} pour ${formatPeriode(periode)}.`
         : aucunMembre
-          ? "Aucun membre dans cette mutuelle : il n'y a pas encore de cotisation à générer."
-          : `Les cotisations de ${formatPeriode(periode)} existent déjà.`,
+          ? `Pas encore ${de(mot("membres").toLowerCase())} : il n'y a pas encore ${de(mot("cotisation").toLowerCase())} à générer.`
+          : `Les ${mot("cotisations").toLowerCase()} de ${formatPeriode(periode)} existent déjà.`,
     });
     charger();
   }
@@ -146,7 +149,7 @@ export default function CotisationsPage() {
             <div className="ct-sum-val">
               {nbRegle}<em>/{cotisations.length}</em>
             </div>
-            <div className="ct-sum-lab">Cotisations réglées</div>
+            <div className="ct-sum-lab">{mot("cotisations")} réglées</div>
           </div>
         </div>
 
@@ -175,7 +178,7 @@ export default function CotisationsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un membre…"
+            placeholder={`Rechercher ${mot("membre_un")}…`}
             className="ct-input"
           />
         </div>
@@ -197,11 +200,11 @@ export default function CotisationsPage() {
         <div className="ct-empty">
           <Wallet size={36} color={PALETTE.grey300} />
           <div className="ct-empty-title">
-            {cotisations.length === 0 ? "Aucune cotisation" : "Aucun résultat"}
+            {cotisations.length === 0 ? `Aucune ${mot("cotisation").toLowerCase()}` : "Aucun résultat"}
           </div>
           <div className="ct-empty-sub">
             {cotisations.length === 0
-              ? `Cliquez sur « Générer le mois » pour créer les cotisations de ${montant(params.montant_cotisation)} FCFA.`
+              ? `Cliquez sur « Générer le mois » pour créer les ${mot("cotisations").toLowerCase()} de ${montant(params.montant_cotisation)} FCFA.`
               : "Essayez un autre nom ou changez de filtre."}
           </div>
         </div>
@@ -361,8 +364,8 @@ const CSS = `
 
 /* ---- Message ---- */
 .ct-msg{ border-radius:${R.md}px; padding:12px 16px; font-size:14px; }
-.ct-msg.is-ok{ background:#DCFCE7; color:${C.success}
-.ct-msg.is-info{ background:${PALETTE.blue50}; color:${C.primary}; border:1px solid ${PALETTE.blue100}; }; border:1px solid ${C.success}33; }
+.ct-msg.is-ok{ background:#DCFCE7; color:${C.success}; border:1px solid ${C.success}33; }
+.ct-msg.is-info{ background:${PALETTE.blue50}; color:${C.primary}; border:1px solid ${PALETTE.blue100}; }
 .ct-msg.is-err{ background:#FEE2E2; color:${C.danger}; border:1px solid ${C.danger}33; }
 
 /* ---- Outils ---- */

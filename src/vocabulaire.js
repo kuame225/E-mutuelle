@@ -105,6 +105,11 @@ const MUTUELLE = {
   aides: "Aides sociales",
   demande_aide: "Demande d'aide",
   bareme: "Barème des aides",
+  // Forme contractée ("de l'aide" / "du soutien" / "de la ristourne"), sur
+  // le même principe que bureau_du : le genre d'« aide » varie selon le
+  // type (masculin pour appui/service/soutien, féminin pour les autres),
+  // impossible à déduire de l'orthographe, donc déclaré explicitement.
+  aide_de: "de l'aide",
 
   bureau: "Bureau",
   bureau_le: "le Bureau",
@@ -136,6 +141,7 @@ const DIFFERENCES = {
     aides: "Soutiens",
     demande_aide: "Demande de soutien",
     bareme: "Barème des soutiens",
+    aide_de: "du soutien",
     carte: "Carte de membre",
     changer_organisation: "Changer d'association",
   },
@@ -159,6 +165,7 @@ const DIFFERENCES = {
     aides: "Ristournes",
     demande_aide: "Demande de ristourne",
     bareme: "Barème des ristournes",
+    aide_de: "de la ristourne",
     bureau: "Conseil d'administration",
     bureau_le: "le Conseil d'administration",
     bureau_du: "du Conseil d'administration",
@@ -189,6 +196,7 @@ const DIFFERENCES = {
     aides: "Appuis",
     demande_aide: "Demande d'appui",
     bareme: "Barème des appuis",
+    aide_de: "de l'appui",
     bureau: "Coordination",
     bureau_le: "la Coordination",
     bureau_du: "de la Coordination",
@@ -239,6 +247,7 @@ const DIFFERENCES = {
     aides: "Services",
     demande_aide: "Demande de service",
     bareme: "Barème des services",
+    aide_de: "du service",
     bureau: "Bureau",
     carte: "Carte professionnelle",
     changer_organisation: "Changer d'organisation",
@@ -336,4 +345,20 @@ export function libelleType(type) {
 export function capitaliser(texte) {
   const t = String(texte || "");
   return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/**
+ * Préposition « de » avec élision automatique devant une voyelle.
+ * de("cotisation") → "de cotisation" ; de("épargne") → "d'épargne"
+ *
+ * Utile pour composer une phrase autour d'un mot de vocabulaire dont on ne
+ * connaît la première lettre qu'au moment du rendu (le type d'organisation
+ * n'est jamais fixé à l'écriture du code). Ne couvre que l'élision — pas la
+ * contraction avec un article défini (de+le → du) : pour « du Bureau » ou
+ * « de l'aide », des clés dédiées (bureau_du, aide_de) restent nécessaires,
+ * l'élision seule ne suffisant pas à deviner l'article.
+ */
+export function de(mot) {
+  const t = String(mot || "");
+  return /^[aeiouyàâäéèêëïîôöùûüh]/i.test(t) ? `d'${t}` : `de ${t}`;
 }

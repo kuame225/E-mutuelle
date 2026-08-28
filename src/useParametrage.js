@@ -66,6 +66,11 @@ export const MODULES = [
     label: "Activité économique",
     aide: "Achats, ventes et suivi du stock d'articles.",
   },
+  {
+    id: "module_projets",
+    label: "Projets",
+    aide: "Projets, bailleurs de fonds, budgets et dépenses par projet.",
+  },
 ];
 
 // Valeurs de repli, utilisées tant qu'aucun paramétrage n'a été enregistré.
@@ -124,6 +129,7 @@ export const PARAMS_DEFAUT = {
   module_documents: false,
   module_parts_sociales: false,
   module_activites_economiques: false,
+  module_projets: false,
   // Valeur nominale d'une part sociale : pas de défaut chiffré arbitraire —
   // tant qu'elle n'est pas définie par le Bureau, l'écran l'affiche comme
   // non définie plutôt que de suggérer un montant inventé.

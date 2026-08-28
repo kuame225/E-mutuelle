@@ -4,7 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
-  FileText, ShoppingCart,
+  FileText, ShoppingCart, Briefcase, PieChart,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -64,6 +64,8 @@ export const NAV_GROUPS = [
       { id: "prets",       label: "Prêts et avances", icon: Banknote,    module: "module_prets" },
       { id: "sanctions",   label: "Sanctions",        icon: ShieldAlert, module: "module_sanctions" },
       { id: "activite_eco", label: "Activité économique", icon: ShoppingCart, module: "module_activites_economiques" },
+      { id: "projets",      label: "Projets",          icon: Briefcase,   module: "module_projets" },
+      { id: "partage_benefices", label: "Partage des bénéfices", icon: PieChart, module: "module_parts_sociales" },
     ],
   },
   {
@@ -117,6 +119,8 @@ function sousTitresPour(mot) {
     bareme:        "Montants prévus par vos textes",
     tombola:       "Tickets et tirages trimestriels",
     activite_eco:  "Achats, ventes et suivi du stock",
+    projets:       "Projets, budgets et dépenses",
+    partage_benefices: "Intérêt sur les parts sociales, par exercice",
     tontine:       "Cycles, ordre de passage et versements",
     prets:         "Demandes, échéances et remboursements",
     assemblees:    "Convocations, émargement et procès-verbaux",

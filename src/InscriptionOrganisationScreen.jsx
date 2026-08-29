@@ -42,6 +42,68 @@ const LABELS_MODULES = {
   module_partenariats: "Partenariats",
 };
 
+// Le socle n'a pas de colonne module_* — toujours présent, jamais une
+// bascule. Montré ici seulement pour que l'étape Modules donne une vue
+// complète (« Essentiels » + « Recommandés » + « Optionnels »), comme
+// dans la maquette, plutôt qu'une liste des seuls modules facultatifs.
+function socleParType(type) {
+  const base = ["Adhésions et fiches membres", "Comptabilité", "Communications", "Rôles du Bureau"];
+  if (type !== "cooperative") base.splice(1, 0, "Cotisations et paiements");
+  return base;
+}
+
+const ETAPES_PARCOURS = [
+  { id: "type", label: "Type" },
+  { id: "formulaire", label: "Informations" },
+  { id: "modules", label: "Modules" },
+  { id: "recapitulatif", label: "Confirmation" },
+];
+
+function BarreEtapes({ etapeActuelle }) {
+  const indexActuel = ETAPES_PARCOURS.findIndex((e) => e.id === etapeActuelle);
+
+  return (
+    <div className="io-etapes">
+      {ETAPES_PARCOURS.map((e, i) => (
+        <React.Fragment key={e.id}>
+          <div className={`io-etape ${i < indexActuel ? "is-fait" : ""} ${i === indexActuel ? "is-actuel" : ""}`}>
+            <span className="io-etape-rond">
+              {i < indexActuel ? <CheckCircle2 size={13} /> : i + 1}
+            </span>
+            <span className="io-etape-label">{e.label}</span>
+          </div>
+          {i < ETAPES_PARCOURS.length - 1 && <span className="io-etape-trait" />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+// Panneau permanent, mis à jour en direct — visible dès qu'il y a
+// quelque chose à récapituler (à partir du formulaire), pas à l'étape
+// Type où rien n'est encore rempli.
+function PanneauRecap({ type, sigle, nom, secteur, localite, modules }) {
+  const nbModules = Object.values(modules).filter(Boolean).length;
+  const typeLabel = TYPES_ORGANISATION.find((t) => t.id === type)?.label;
+
+  return (
+    <aside className="io-panneau">
+      <div className="io-panneau-titre">Récapitulatif</div>
+      <div className="io-panneau-ligne">
+        <Building2 size={14} /><strong>{typeLabel || "—"}</strong>
+      </div>
+      {sigle && <div className="io-panneau-ligne"><span className="io-panneau-lbl">Sigle</span><strong>{sigle}</strong></div>}
+      {nom && <div className="io-panneau-ligne"><span className="io-panneau-lbl">Nom</span><strong>{nom}</strong></div>}
+      {secteur && <div className="io-panneau-ligne"><span className="io-panneau-lbl">Secteur</span><strong>{secteur}</strong></div>}
+      {localite && <div className="io-panneau-ligne"><span className="io-panneau-lbl">Localité</span><strong>{localite}</strong></div>}
+      <div className="io-panneau-sep" />
+      <div className="io-panneau-ligne">
+        <span className="io-panneau-lbl">Modules sélectionnés</span><strong>{nbModules}</strong>
+      </div>
+    </aside>
+  );
+}
+
 /**
  * Inscription d'une nouvelle organisation.
  *
@@ -239,40 +301,43 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     return (
       <div className="io-shell">
         <style>{CSS}</style>
-        <div className="io-carte io-carte-large">
-          {onBack && (
-            <button className="io-retour" onClick={onBack}>
-              <ArrowLeft size={15} /> Retour
-            </button>
-          )}
-
-          <div className="io-icone"><Building2 size={26} /></div>
-          <h1 className="io-titre">Quel type d'organisation ?</h1>
-          <p className="io-sous">
-            Ce choix adapte le vocabulaire et les fonctions proposées.
-            Il reste modifiable plus tard depuis les paramètres.
-          </p>
-
-          <div className="io-types">
-            {TYPES_ORGANISATION.map((t) => (
-              <button
-                key={t.id}
-                className={`io-type ${type === t.id ? "is-on" : ""}`}
-                onClick={() => setType(t.id)}
-              >
-                <span className="io-type-nom">{t.label}</span>
-                <span className="io-type-desc">{t.description}</span>
+        <div className="io-page">
+          <BarreEtapes etapeActuelle="type" />
+          <div className="io-carte io-carte-large">
+            {onBack && (
+              <button className="io-retour" onClick={onBack}>
+                <ArrowLeft size={15} /> Retour
               </button>
-            ))}
-          </div>
+            )}
 
-          <button
-            className="io-btn"
-            onClick={() => setEtape("formulaire")}
-            disabled={!type}
-          >
-            Continuer <ArrowRight size={17} />
-          </button>
+            <div className="io-icone"><Building2 size={26} /></div>
+            <h1 className="io-titre">Quel type d'organisation ?</h1>
+            <p className="io-sous">
+              Ce choix adapte le vocabulaire et les fonctions proposées.
+              Il reste modifiable plus tard depuis les paramètres.
+            </p>
+
+            <div className="io-types">
+              {TYPES_ORGANISATION.map((t) => (
+                <button
+                  key={t.id}
+                  className={`io-type ${type === t.id ? "is-on" : ""}`}
+                  onClick={() => setType(t.id)}
+                >
+                  <span className="io-type-nom">{t.label}</span>
+                  <span className="io-type-desc">{t.description}</span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              className="io-btn"
+              onClick={() => setEtape("formulaire")}
+              disabled={!type}
+            >
+              Continuer <ArrowRight size={17} />
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -337,38 +402,93 @@ export default function InscriptionOrganisationScreen({ onBack }) {
 
   /* ---------------- Modules recommandés ---------------- */
   if (etape === "modules") {
+    const recommandes = Object.entries(LABELS_MODULES).filter(([cle]) => modules[cle]);
+    const optionnels = Object.entries(LABELS_MODULES).filter(([cle]) => !modules[cle]);
+
     return (
       <div className="io-shell">
         <style>{CSS}</style>
-        <div className="io-carte io-carte-large">
-          <button className="io-retour" onClick={() => setEtape("formulaire")}>
-            <ArrowLeft size={15} /> Retour
-          </button>
+        <div className="io-page">
+          <BarreEtapes etapeActuelle="modules" />
+          <div className="io-layout-duo">
+            <div className="io-carte io-carte-large">
+              <button className="io-retour" onClick={() => setEtape("formulaire")}>
+                <ArrowLeft size={15} /> Retour
+              </button>
 
-          <div className="io-icone"><Sliders size={26} /></div>
-          <h1 className="io-titre">Quels modules activer ?</h1>
-          <p className="io-sous">
-            Une sélection déjà adaptée à {motPourType(type, "organisation_votre")}.
-            Ajustez si besoin — rien n'est figé, tout reste modifiable depuis
-            les paramètres une fois l'espace créé.
-          </p>
+              <div className="io-icone"><Sliders size={26} /></div>
+              <h1 className="io-titre">Quels modules activer ?</h1>
+              <p className="io-sous">
+                Une sélection déjà adaptée à {motPourType(type, "organisation_votre")}.
+                Ajustez si besoin — rien n'est figé, tout reste modifiable depuis
+                les paramètres une fois l'espace créé.
+              </p>
 
-          <div className="io-modules">
-            {Object.entries(LABELS_MODULES).map(([cle, libelle]) => (
-              <label key={cle} className={`io-module ${modules[cle] ? "is-on" : ""}`}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(modules[cle])}
-                  onChange={() => setModules((m) => ({ ...m, [cle]: !m[cle] }))}
-                />
-                <span>{libelle}</span>
-              </label>
-            ))}
+              <div className="io-modules-groupe">
+                <div className="io-modules-titre">
+                  <span className="io-point io-point-essentiel" /> Essentiels — toujours inclus
+                </div>
+                <div className="io-modules-liste">
+                  {socleParType(type).map((libelle) => (
+                    <div key={libelle} className="io-module io-module-fixe">
+                      <span>{libelle}</span>
+                      <CheckCircle2 size={16} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {recommandes.length > 0 && (
+                <div className="io-modules-groupe">
+                  <div className="io-modules-titre">
+                    <span className="io-point io-point-recommande" /> Recommandés pour {motPourType(type, "organisation_votre")}
+                  </div>
+                  <div className="io-modules-liste">
+                    {recommandes.map(([cle, libelle]) => (
+                      <label key={cle} className="io-module">
+                        <span>{libelle}</span>
+                        <span className="io-bascule-wrap">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(modules[cle])}
+                            onChange={() => setModules((m) => ({ ...m, [cle]: !m[cle] }))}
+                          />
+                          <span className="io-bascule" />
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="io-modules-groupe">
+                <div className="io-modules-titre">
+                  <span className="io-point io-point-optionnel" /> Autres modules disponibles
+                </div>
+                <div className="io-modules-liste">
+                  {optionnels.map(([cle, libelle]) => (
+                    <label key={cle} className="io-module">
+                      <span>{libelle}</span>
+                      <span className="io-bascule-wrap">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(modules[cle])}
+                          onChange={() => setModules((m) => ({ ...m, [cle]: !m[cle] }))}
+                        />
+                        <span className="io-bascule" />
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <button className="io-btn" onClick={() => setEtape("recapitulatif")}>
+                Continuer <ArrowRight size={17} />
+              </button>
+            </div>
+
+            <PanneauRecap type={type} sigle={sigle} nom={nom} secteur={secteur} localite={localite} modules={modules} />
           </div>
-
-          <button className="io-btn" onClick={() => setEtape("recapitulatif")}>
-            Continuer <ArrowRight size={17} />
-          </button>
         </div>
       </div>
     );
@@ -381,64 +501,71 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     return (
       <div className="io-shell">
         <style>{CSS}</style>
-        <div className="io-carte io-carte-large">
-          <button className="io-retour" onClick={() => setEtape("modules")}>
-            <ArrowLeft size={15} /> Retour
-          </button>
+        <div className="io-page">
+          <BarreEtapes etapeActuelle="recapitulatif" />
+          <div className="io-layout-duo">
+            <div className="io-carte io-carte-large">
+              <button className="io-retour" onClick={() => setEtape("modules")}>
+                <ArrowLeft size={15} /> Retour
+              </button>
 
-          <div className="io-icone"><ShieldCheck size={26} /></div>
-          <h1 className="io-titre">Vérifiez avant de créer votre espace</h1>
+              <div className="io-icone"><ShieldCheck size={26} /></div>
+              <h1 className="io-titre">Vérifiez avant de créer votre espace</h1>
 
-          <div className="io-recap">
-            <div className="io-recap-ligne">
-              <span>Type</span>
-              <strong>{TYPES_ORGANISATION.find((t) => t.id === type)?.label}</strong>
+              <div className="io-recap">
+                <div className="io-recap-ligne">
+                  <span>Type</span>
+                  <strong>{TYPES_ORGANISATION.find((t) => t.id === type)?.label}</strong>
+                </div>
+                <div className="io-recap-ligne"><span>Sigle</span><strong>{sigle}</strong></div>
+                <div className="io-recap-ligne"><span>Dénomination</span><strong>{nom}</strong></div>
+                {secteur && <div className="io-recap-ligne"><span>Secteur</span><strong>{secteur}</strong></div>}
+                {localite && <div className="io-recap-ligne"><span>Localité</span><strong>{localite}</strong></div>}
+                {contact && <div className="io-recap-ligne"><span>Contact</span><strong>{contact}</strong></div>}
+                <div className="io-recap-ligne"><span>Votre e-mail</span><strong>{email}</strong></div>
+              </div>
+
+              <div className="io-section-titre io-section-suite">Modules activés</div>
+              {modulesActifs.length === 0 ? (
+                <p className="io-sous" style={{ margin: 0 }}>
+                  Aucun module optionnel — seul le socle commun.
+                </p>
+              ) : (
+                <ul className="io-recap-modules">
+                  {modulesActifs.map(([cle, libelle]) => <li key={cle}>{libelle}</li>)}
+                </ul>
+              )}
+
+              <div className="io-rappel-tarif">
+                <ShieldCheck size={16} />
+                <p>
+                  <strong>2 mois d'essai gratuit</strong>, accès complet, sans paiement.
+                  À l'issue de l'essai : forfait + composante variable selon votre
+                  activité, et d'éventuels frais de mise en service (facturés une
+                  seule fois). Votre demande doit d'abord être validée par notre
+                  équipe avant toute activation.
+                </p>
+              </div>
+
+              {erreur && (
+                <div className="io-erreur"><AlertCircle size={16} /> {erreur}</div>
+              )}
+
+              <button className="io-btn" onClick={soumettre} disabled={envoi}>
+                {envoi
+                  ? <><Loader2 size={17} className="io-spin" /> Création…</>
+                  : <>Confirmer et créer mon espace <ArrowRight size={17} /></>}
+              </button>
+
+              <p className="io-legal">
+                Vous devenez administrateur de cette organisation. Vous pourrez ensuite
+                régler ses cotisations, son barème d'aides et les fonctions
+                activées depuis les paramètres.
+              </p>
             </div>
-            <div className="io-recap-ligne"><span>Sigle</span><strong>{sigle}</strong></div>
-            <div className="io-recap-ligne"><span>Dénomination</span><strong>{nom}</strong></div>
-            {secteur && <div className="io-recap-ligne"><span>Secteur</span><strong>{secteur}</strong></div>}
-            {localite && <div className="io-recap-ligne"><span>Localité</span><strong>{localite}</strong></div>}
-            {contact && <div className="io-recap-ligne"><span>Contact</span><strong>{contact}</strong></div>}
-            <div className="io-recap-ligne"><span>Votre e-mail</span><strong>{email}</strong></div>
+
+            <PanneauRecap type={type} sigle={sigle} nom={nom} secteur={secteur} localite={localite} modules={modules} />
           </div>
-
-          <div className="io-section-titre io-section-suite">Modules activés</div>
-          {modulesActifs.length === 0 ? (
-            <p className="io-sous" style={{ margin: 0 }}>
-              Aucun module optionnel — seul le socle commun.
-            </p>
-          ) : (
-            <ul className="io-recap-modules">
-              {modulesActifs.map(([cle, libelle]) => <li key={cle}>{libelle}</li>)}
-            </ul>
-          )}
-
-          <div className="io-rappel-tarif">
-            <ShieldCheck size={16} />
-            <p>
-              <strong>2 mois d'essai gratuit</strong>, accès complet, sans paiement.
-              À l'issue de l'essai : forfait + composante variable selon votre
-              activité, et d'éventuels frais de mise en service (facturés une
-              seule fois). Votre demande doit d'abord être validée par notre
-              équipe avant toute activation.
-            </p>
-          </div>
-
-          {erreur && (
-            <div className="io-erreur"><AlertCircle size={16} /> {erreur}</div>
-          )}
-
-          <button className="io-btn" onClick={soumettre} disabled={envoi}>
-            {envoi
-              ? <><Loader2 size={17} className="io-spin" /> Création…</>
-              : <>Confirmer et créer mon espace <ArrowRight size={17} /></>}
-          </button>
-
-          <p className="io-legal">
-            Vous devenez administrateur de cette organisation. Vous pourrez ensuite
-            régler ses cotisations, son barème d'aides et les fonctions
-            activées depuis les paramètres.
-          </p>
         </div>
       </div>
     );
@@ -447,62 +574,70 @@ export default function InscriptionOrganisationScreen({ onBack }) {
   return (
     <div className="io-shell">
       <style>{CSS}</style>
-      <div className="io-carte">
-        <button className="io-retour" onClick={() => setEtape("type")}>
-          <ArrowLeft size={15} /> Changer de type
-        </button>
+      <div className="io-page">
+        <BarreEtapes etapeActuelle="formulaire" />
+        <div className="io-layout-duo">
+          <div className="io-carte">
+            <button className="io-retour" onClick={() => setEtape("type")}>
+              <ArrowLeft size={15} /> Changer de type
+            </button>
 
-        <div className="io-icone"><Building2 size={26} /></div>
-        <h1 className="io-titre">
-          Ouvrir l'espace de {motPourType(type, "organisation_votre")}
-        </h1>
-        <p className="io-sous">
-          Créez l'espace de votre organisation et votre propre accès administrateur.
-        </p>
+            <div className="io-icone"><Building2 size={26} /></div>
+            <h1 className="io-titre">
+              Ouvrir l'espace de {motPourType(type, "organisation_votre")}
+            </h1>
+            <p className="io-sous">
+              Créez l'espace de votre organisation et votre propre accès administrateur.
+            </p>
 
-        <form onSubmit={passerAuxModules} className="io-form">
-          <div className="io-section-titre">
-            {motPourType(type, "organisation").toUpperCase()}
+            <form onSubmit={passerAuxModules} className="io-form">
+              <div className="io-section-titre">
+                {motPourType(type, "organisation").toUpperCase()}
+              </div>
+
+              <Champ label="Sigle" value={sigle} onChange={setSigle}
+                placeholder="Ex : MUGEFCI" maxLength={20}
+                aide={`Nom court, affiché aux membres. Sert aussi d'adresse propre à ${motPourType(type, "organisation_votre")}.`} />
+
+              <Champ label="Dénomination complète" value={nom} onChange={setNom}
+                placeholder={`Ex : ${EXEMPLES_DENOMINATION[type] || EXEMPLES_DENOMINATION.autre}...`} />
+
+              <div className="io-duo">
+                <Champ label="Secteur d'activité de l'organisation" value={secteur} onChange={setSecteur}
+                  placeholder="Ex : Santé, Agriculture, Éducation…" Icon={Briefcase}
+                  aide="Le domaine où intervient l'organisation — pas votre métier à vous. Facultatif." />
+                <Champ label="Localité" value={localite} onChange={setLocalite}
+                  placeholder="Ex : Abidjan" Icon={MapPin} />
+              </div>
+
+              <Champ label="Contact" value={contact} onChange={onChangerContact}
+                placeholder="Téléphone ou e-mail du Bureau"
+                aide="Facultatif — affiché aux membres en cas de besoin. Un numéro de téléphone est limité à 10 chiffres." />
+
+              <div className="io-section-titre io-section-suite">Votre accès</div>
+
+              <Champ label="Votre adresse e-mail" value={email} onChange={setEmail}
+                type="email" Icon={Mail} placeholder="vous@exemple.com" />
+
+              <div className="io-duo">
+                <Champ label="Mot de passe" value={motDePasse} onChange={setMotDePasse}
+                  type="password" Icon={Lock} placeholder="••••••••" />
+                <Champ label="Confirmer" value={confirmation} onChange={setConfirmation}
+                  type="password" Icon={Lock} placeholder="••••••••" />
+              </div>
+
+              {erreur && (
+                <div className="io-erreur"><AlertCircle size={16} /> {erreur}</div>
+              )}
+
+              <button type="submit" className="io-btn">
+                Continuer <ArrowRight size={17} />
+              </button>
+            </form>
           </div>
 
-          <Champ label="Sigle" value={sigle} onChange={setSigle}
-            placeholder="Ex : MUGEFCI" maxLength={20}
-            aide={`Nom court, affiché aux membres. Sert aussi d'adresse propre à ${motPourType(type, "organisation_votre")}.`} />
-
-          <Champ label="Dénomination complète" value={nom} onChange={setNom}
-            placeholder={`Ex : ${EXEMPLES_DENOMINATION[type] || EXEMPLES_DENOMINATION.autre}...`} />
-
-          <div className="io-duo">
-            <Champ label="Secteur" value={secteur} onChange={setSecteur}
-              placeholder="Ex : Santé" Icon={Briefcase} />
-            <Champ label="Localité" value={localite} onChange={setLocalite}
-              placeholder="Ex : Abidjan" Icon={MapPin} />
-          </div>
-
-          <Champ label="Contact" value={contact} onChange={onChangerContact}
-            placeholder="Téléphone ou e-mail du Bureau"
-            aide="Facultatif — affiché aux membres en cas de besoin. Un numéro de téléphone est limité à 10 chiffres." />
-
-          <div className="io-section-titre io-section-suite">Votre accès</div>
-
-          <Champ label="Votre adresse e-mail" value={email} onChange={setEmail}
-            type="email" Icon={Mail} placeholder="vous@exemple.com" />
-
-          <div className="io-duo">
-            <Champ label="Mot de passe" value={motDePasse} onChange={setMotDePasse}
-              type="password" Icon={Lock} placeholder="••••••••" />
-            <Champ label="Confirmer" value={confirmation} onChange={setConfirmation}
-              type="password" Icon={Lock} placeholder="••••••••" />
-          </div>
-
-          {erreur && (
-            <div className="io-erreur"><AlertCircle size={16} /> {erreur}</div>
-          )}
-
-          <button type="submit" className="io-btn">
-            Continuer <ArrowRight size={17} />
-          </button>
-        </form>
+          <PanneauRecap type={type} sigle={sigle} nom={nom} secteur={secteur} localite={localite} modules={modules} />
+        </div>
       </div>
     </div>
   );
@@ -556,6 +691,82 @@ const CSS = `
 }
 .io-carte-centree{ text-align:center; }
 .io-carte-large{ max-width:620px; }
+
+.io-page{ width:100%; max-width:920px; display:flex; flex-direction:column; align-items:center; gap:${S.lg}px; }
+.io-layout-duo{ width:100%; display:grid; grid-template-columns:1fr 300px; gap:${S.lg}px; align-items:start; }
+@media (max-width:820px){ .io-layout-duo{ grid-template-columns:1fr; } }
+.io-layout-duo .io-carte{ max-width:none; width:100%; }
+
+/* ---- Barre d'étapes ---- */
+.io-etapes{ display:flex; align-items:center; width:100%; }
+.io-etape{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.io-etape-rond{
+  width:26px; height:26px; border-radius:50%; flex-shrink:0;
+  background:${PALETTE.grey200}; color:${C.textSubtle};
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; transition:all .18s ease;
+}
+.io-etape-label{ font-size:12.5px; font-weight:600; color:${C.textSubtle}; white-space:nowrap; }
+.io-etape.is-actuel .io-etape-rond{ background:${C.primary}; color:#fff; }
+.io-etape.is-actuel .io-etape-label{ color:${C.text}; }
+.io-etape.is-fait .io-etape-rond{ background:${C.success}; color:#fff; }
+.io-etape.is-fait .io-etape-label{ color:${C.textMuted}; }
+.io-etape-trait{ flex:1; height:2px; background:${PALETTE.grey200}; margin:0 8px; min-width:16px; }
+@media (max-width:560px){ .io-etape-label{ display:none; } }
+
+/* ---- Panneau récapitulatif permanent ---- */
+.io-panneau{
+  background:${C.surface}; border:1px solid ${C.border}; border-radius:${R.xl}px;
+  padding:${S.lg}px; box-shadow:${SHADOW.xs}; position:sticky; top:${S.xl}px;
+}
+.io-panneau-titre{
+  font-size:12px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.06em; color:${C.textSubtle}; margin-bottom:${S.md}px;
+}
+.io-panneau-ligne{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:7px 0; font-size:13px; border-bottom:1px solid ${C.border};
+}
+.io-panneau-ligne:first-of-type{ justify-content:flex-start; color:${C.primary}; font-weight:700; }
+.io-panneau-ligne:last-child{ border-bottom:none; }
+.io-panneau-lbl{ color:${C.textSubtle}; }
+.io-panneau-ligne strong{ color:${C.text}; text-align:right; }
+.io-panneau-sep{ height:1px; background:${C.border}; margin:${S.sm}px 0; }
+@media (max-width:820px){ .io-panneau{ position:static; } }
+
+/* ---- Cartes de modules (étape Modules) ---- */
+.io-modules-groupe{ margin-bottom:${S.lg}px; }
+.io-modules-titre{
+  display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700;
+  color:${C.textMuted}; margin-bottom:${S.sm}px; text-transform:uppercase; letter-spacing:.04em;
+}
+.io-point{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.io-point-essentiel{ background:${C.success}; }
+.io-point-recommande{ background:${C.primary}; }
+.io-point-optionnel{ background:${PALETTE.grey300}; }
+.io-modules-liste{ display:flex; flex-direction:column; gap:6px; }
+.io-module{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 14px; background:${C.bg}; border:1px solid ${C.border};
+  border-radius:${R.md}px; font-size:13.5px; font-weight:600; color:${C.text};
+  cursor:pointer;
+}
+.io-module-fixe{ cursor:default; color:${C.textMuted}; }
+.io-module-fixe svg{ color:${C.success}; flex-shrink:0; }
+
+.io-bascule-wrap{ position:relative; width:38px; height:22px; flex-shrink:0; }
+.io-bascule-wrap input{ position:absolute; inset:0; opacity:0; cursor:pointer; margin:0; z-index:1; }
+.io-bascule{
+  position:absolute; inset:0; background:${PALETTE.grey300}; border-radius:999px;
+  transition:background .18s ease; pointer-events:none;
+}
+.io-bascule::after{
+  content:""; position:absolute; top:2px; left:2px; width:18px; height:18px;
+  background:#fff; border-radius:50%; transition:transform .18s ease;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);
+}
+.io-bascule-wrap input:checked + .io-bascule{ background:${C.primary}; }
+.io-bascule-wrap input:checked + .io-bascule::after{ transform:translateX(16px); }
 
 /* ---- Choix du type d'organisation ---- */
 .io-types{

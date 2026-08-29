@@ -71,6 +71,11 @@ export const MODULES = [
     label: "Projets",
     aide: "Projets, bailleurs de fonds, budgets et dépenses par projet.",
   },
+  {
+    id: "module_services",
+    label: "Services offerts",
+    aide: "Catalogue de services, partagé ou réservé au Bureau.",
+  },
 ];
 
 // Valeurs de repli, utilisées tant qu'aucun paramétrage n'a été enregistré.
@@ -130,6 +135,7 @@ export const PARAMS_DEFAUT = {
   module_parts_sociales: false,
   module_activites_economiques: false,
   module_projets: false,
+  module_services: false,
   // Valeur nominale d'une part sociale : pas de défaut chiffré arbitraire —
   // tant qu'elle n'est pas définie par le Bureau, l'écran l'affiche comme
   // non définie plutôt que de suggérer un montant inventé.

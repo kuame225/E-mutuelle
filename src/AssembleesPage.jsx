@@ -284,7 +284,7 @@ function FicheAssemblee({ assemblee, onBack, onRefresh }) {
     setEnCours(true);
     await supabase.from("assemblees")
       .update({ statut: "cloturee" })
-      .eq("id", assemblee.id);
+      .eq("id", assemblee.id).eq("organisation_id", assemblee.organisation_id);
     setEnCours(false);
     onRefresh();
   }
@@ -293,7 +293,7 @@ function FicheAssemblee({ assemblee, onBack, onRefresh }) {
     setEnCours(true);
     await supabase.from("assemblees")
       .update({ pv_texte: pvTexte.trim() || null })
-      .eq("id", assemblee.id);
+      .eq("id", assemblee.id).eq("organisation_id", assemblee.organisation_id);
     setEnCours(false);
     onRefresh();
   }
@@ -325,7 +325,8 @@ function FicheAssemblee({ assemblee, onBack, onRefresh }) {
     const { data } = supabase.storage.from("pv-assemblees").getPublicUrl(chemin);
     const url = `${data.publicUrl}?v=${Date.now()}`;
 
-    await supabase.from("assemblees").update({ pv_url: url }).eq("id", assemblee.id);
+    await supabase.from("assemblees").update({ pv_url: url })
+      .eq("id", assemblee.id).eq("organisation_id", assemblee.organisation_id);
 
     setUploadPv(false);
     onRefresh();

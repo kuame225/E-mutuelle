@@ -181,7 +181,8 @@ function FichePret({ pret, onBack, onRefresh }) {
     setErreur("");
     const { error } = await supabase.from("prets")
       .update({ statut: "rejete", motif_rejet: motifRejet.trim() || null, decide_le: new Date().toISOString() })
-      .eq("id", pret.id);
+      .eq("id", pret.id)
+      .eq("organisation_id", pret.organisation_id);
     setEnCours(false);
     if (error) { setErreur(error.message); return; }
 
@@ -495,7 +496,8 @@ function CatalogueTypesPret({ onBack }) {
     };
 
     const { error } = f.id
-      ? await supabase.from("types_pret").update(donnees).eq("id", f.id)
+      ? await supabase.from("types_pret").update(donnees)
+          .eq("id", f.id).eq("organisation_id", params.organisation_id)
       : await supabase.from("types_pret").insert({ ...donnees, organisation_id: params.organisation_id, ordre: types.length });
 
     setEnvoi(false);
@@ -505,12 +507,14 @@ function CatalogueTypesPret({ onBack }) {
   }
 
   async function basculerActif(t) {
-    await supabase.from("types_pret").update({ actif: !t.actif }).eq("id", t.id);
+    await supabase.from("types_pret").update({ actif: !t.actif })
+      .eq("id", t.id).eq("organisation_id", params.organisation_id);
     charger();
   }
 
   async function supprimer(id) {
-    await supabase.from("types_pret").delete().eq("id", id);
+    await supabase.from("types_pret").delete()
+      .eq("id", id).eq("organisation_id", params.organisation_id);
     charger();
   }
 

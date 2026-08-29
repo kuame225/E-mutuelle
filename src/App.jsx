@@ -27,10 +27,13 @@ import ComptabilitePage from "./ComptabilitePage";
 import OperationsDiversesPage from "./OperationsDiversesPage";
 import BaremePage from "./BaremePage";
 import DocumentsPage from "./DocumentsPage";
+import ServicesPage from "./ServicesPage";
 import ActiviteEconomiquePage from "./ActiviteEconomiquePage";
 import ProjetsPage from "./ProjetsPage";
 import PartageBeneficesPage from "./PartageBeneficesPage";
 import ClotureAvecPage from "./ClotureAvecPage";
+import MoyensPaiementPage from "./MoyensPaiementPage";
+import DeclarationsPaiementPage from "./DeclarationsPaiementPage";
 import AgendaPage from "./AgendaPage";
 import CommunicationPage from "./CommunicationPage";
 import AssembleesPage from "./AssembleesPage";
@@ -491,11 +494,14 @@ function Shell() {
           {page === "adhesions"     && <AdhesionsPanel />}
           {page === "membres"       && <MembresPage />}
           {page === "cotisations"   && <CotisationsPage />}
+          {page === "moyens_paiement" && <MoyensPaiementPage />}
+          {page === "declarations_paiement" && <DeclarationsPaiementPage />}
           {page === "tombola"       && <TombolaPage />}
           {page === "sanctions"     && <SanctionsPage />}
           {page === "aides_admin"   && <AidesAdminPage />}
           {page === "bareme"        && <BaremePage />}
           {page === "documents"     && <DocumentsPage />}
+          {page === "services"      && <ServicesPage />}
           {page === "activite_eco"  && <ActiviteEconomiquePage />}
           {page === "projets"       && <ProjetsPage />}
           {page === "partage_benefices" && <PartageBeneficesPage />}
@@ -679,25 +685,67 @@ function PageMembre({ onBack, children }) {
 
 function MembreCotisations({ membre }) {
   const [cotisations, setCotisations] = useState([]);
+  const [moyens, setMoyens] = useState([]);
+  const [declarations, setDeclarations] = useState([]);
+  const [waveActif, setWaveActif] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [declarationOuverte, setDeclarationOuverte] = useState(null); // cotisation ciblée
+  const [waveEnCours, setWaveEnCours] = useState(null); // cotisation.id en cours de redirection
+  const [waveErreur, setWaveErreur] = useState("");
 
-  useEffect(() => {
-    supabase
-      .from("cotisations")
-      .select("*")
-      .eq("membre_id", membre.id)
-      .order("periode", { ascending: false })
-      .then(({ data }) => {
-        setCotisations(data || []);
-        setLoading(false);
-      });
-  }, [membre.id]);
+  async function charger() {
+    const [{ data: cot }, { data: moy }, { data: decl }, { data: wave }] = await Promise.all([
+      supabase.from("cotisations").select("*").eq("membre_id", membre.id).order("periode", { ascending: false }),
+      supabase.from("moyens_paiement").select("*").eq("organisation_id", membre.organisation_id).eq("actif", true).order("ordre"),
+      supabase.from("declarations_paiement").select("cotisation_id, statut").eq("membre_id", membre.id).eq("statut", "en_attente"),
+      supabase.from("integrations_paiement").select("actif").eq("organisation_id", membre.organisation_id).eq("fournisseur", "wave").maybeSingle(),
+    ]);
+    setCotisations(cot || []);
+    setMoyens(moy || []);
+    setDeclarations(decl || []);
+    setWaveActif(Boolean(wave?.actif));
+    setLoading(false);
+  }
+
+  useEffect(() => { charger(); }, [membre.id]);
+
+  async function payerAvecWave(cotisation) {
+    setWaveEnCours(cotisation.id);
+    setWaveErreur("");
+
+    const { data, error } = await supabase.functions.invoke("creer-session-wave", {
+      body: {
+        organisationId: membre.organisation_id,
+        cotisationId: cotisation.id,
+        origine: window.location.origin,
+      },
+    });
+
+    if (error || !data?.wave_launch_url) {
+      setWaveEnCours(null);
+      setWaveErreur(data?.error || "Impossible de démarrer le paiement Wave pour le moment.");
+      return;
+    }
+
+    window.location.href = data.wave_launch_url;
+  }
 
   if (loading) return <div style={{ color: C.textSubtle }}>Chargement…</div>;
+
+  const declarationEnAttentePour = (cotisationId) =>
+    declarations.some((d) => d.cotisation_id === cotisationId);
 
   return (
     <div>
       <h2 style={titrePage}>Mes cotisations</h2>
+
+      {moyens.length > 0 && <MoyensPaiementApercu moyens={moyens} />}
+
+      {waveErreur && (
+        <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>
+          {waveErreur}
+        </div>
+      )}
 
       {cotisations.length === 0 ? (
         <div style={carteVide}>Aucune cotisation pour le moment.</div>
@@ -709,33 +757,220 @@ function MembreCotisations({ membre }) {
               : c.statut === "partiel"
                 ? { bg: C.warningSoft, fg: C.warning, label: "Partiel" }
                 : { bg: C.dangerSoft, fg: C.danger, label: "En attente" };
+            const enAttente = declarationEnAttentePour(c.id);
 
             return (
               <div
                 key={c.id}
                 style={{
-                  display: "flex", justifyContent: "space-between",
-                  alignItems: "center", padding: "14px 18px",
+                  padding: "14px 18px",
                   borderBottom: i < cotisations.length - 1
                     ? `1px solid ${C.border}` : "none",
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14.5 }}>
-                    {formatPeriode(c.periode)}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14.5 }}>
+                      {formatPeriode(c.periode)}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 2 }}>
+                      {montant(c.montant_paye)} / {montant(c.montant_du)} FCFA
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 2 }}>
-                    {montant(c.montant_paye)} / {montant(c.montant_du)} FCFA
-                  </div>
+                  <span style={{ ...badge, background: st.bg, color: st.fg }}>
+                    {st.label}
+                  </span>
                 </div>
-                <span style={{ ...badge, background: st.bg, color: st.fg }}>
-                  {st.label}
-                </span>
+
+                {c.statut !== "paye" && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                    {waveActif && (
+                      <button
+                        onClick={() => payerAvecWave(c)}
+                        disabled={waveEnCours === c.id}
+                        style={{
+                          background: C.primary, border: "none", color: "#fff",
+                          borderRadius: 8, padding: "7px 13px", cursor: "pointer",
+                          fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+                        }}
+                      >
+                        {waveEnCours === c.id ? "Redirection…" : "Payer avec Wave"}
+                      </button>
+                    )}
+
+                    {moyens.length > 0 && (
+                      enAttente ? (
+                        <span style={{ fontSize: 12.5, color: C.textSubtle, alignSelf: "center" }}>
+                          Déclaration envoyée, en attente de confirmation.
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setDeclarationOuverte(c)}
+                          style={{
+                            background: "none", border: `1.5px solid ${C.primary}`,
+                            color: C.primary, borderRadius: 8, padding: "7px 13px", cursor: "pointer",
+                            fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+                          }}
+                        >
+                          J'ai payé
+                        </button>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
+
+      {declarationOuverte && (
+        <DeclarationPaiementModal
+          cotisation={declarationOuverte}
+          membre={membre}
+          moyens={moyens}
+          onClose={() => setDeclarationOuverte(null)}
+          onDone={() => { setDeclarationOuverte(null); charger(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Récapitulatif compact des moyens de paiement de l'organisation, affiché
+// en haut de l'écran — pour que le membre sache où envoyer l'argent avant
+// même d'avoir besoin de déclarer un paiement.
+function MoyensPaiementApercu({ moyens }) {
+  const LABELS = { wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money", moov_money: "Moov Money", autre: "Autre" };
+  return (
+    <div style={{ ...carteVide, textAlign: "left", padding: "14px 18px", marginBottom: 14 }}>
+      <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8 }}>Comment payer</div>
+      {moyens.map((m) => (
+        <div key={m.id} style={{ fontSize: 13, color: C.textMuted, marginBottom: 6 }}>
+          <strong>{m.libelle || LABELS[m.type] || m.type}</strong>
+          {m.lien && <> — <a href={m.lien} target="_blank" rel="noreferrer" style={{ color: C.primary }}>{m.lien}</a></>}
+          {m.numero && <> — {m.numero}</>}
+          {m.instructions && <div style={{ fontSize: 12.5, marginTop: 2 }}>{m.instructions}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Déclaration d'un paiement par le membre — ne crée jamais de paiement
+// réel : seulement une demande que le Bureau confirme ou rejette dans
+// "Paiements déclarés", exactement comme aujourd'hui pour un règlement
+// signalé par un autre canal, sans la ressaisie manuelle.
+function DeclarationPaiementModal({ cotisation, membre, moyens, onClose, onDone }) {
+  const restant = (cotisation.montant_du || 0) - (cotisation.montant_paye || 0);
+  const [moyenId, setMoyenId] = useState(moyens[0]?.id || "");
+  const [montantSaisi, setMontantSaisi] = useState(String(restant));
+  const [reference, setReference] = useState("");
+  const [note, setNote] = useState("");
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  async function envoyer() {
+    const m = parseInt(montantSaisi, 10);
+    if (!m || m <= 0) { setErreur("Indiquez le montant payé."); return; }
+
+    setEnCours(true);
+    setErreur("");
+
+    const { error } = await supabase.from("declarations_paiement").insert({
+      organisation_id: membre.organisation_id,
+      membre_id: membre.id,
+      cotisation_id: cotisation.id,
+      moyen_paiement_id: moyenId || null,
+      montant: m,
+      reference: reference.trim() || null,
+      note: note.trim() || null,
+    });
+
+    setEnCours(false);
+
+    if (error) { setErreur(error.message); return; }
+    onDone();
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200, background: "rgba(10,20,40,.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420 }}
+      >
+        <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>J'ai payé</h3>
+        <p style={{ fontSize: 13, color: C.textSubtle, margin: "0 0 16px" }}>
+          {formatPeriode(cotisation.periode)} — reste dû {montant(restant)} FCFA
+        </p>
+
+        {moyens.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Moyen utilisé</label>
+            <select
+              value={moyenId}
+              onChange={(e) => setMoyenId(e.target.value)}
+              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14 }}
+            >
+              {moyens.map((m) => (
+                <option key={m.id} value={m.id}>{m.libelle || m.type}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Montant payé</label>
+          <input
+            type="number" value={montantSaisi} onChange={(e) => setMontantSaisi(e.target.value)}
+            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Référence — facultative</label>
+          <input
+            value={reference} onChange={(e) => setReference(e.target.value)}
+            placeholder="Numéro de transaction, si vous l'avez"
+            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Note — facultative</label>
+          <input
+            value={note} onChange={(e) => setNote(e.target.value)}
+            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+          />
+        </div>
+
+        {erreur && (
+          <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 14 }}>
+            {erreur}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onClose} disabled={enCours}
+            style={{ flex: 1, background: "#fff", border: `1.5px solid ${C.border}`, color: C.textMuted, borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
+          >
+            Annuler
+          </button>
+          <button
+            onClick={envoyer} disabled={enCours}
+            style={{ flex: 2, background: C.primary, border: "none", color: "#fff", borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
+          >
+            {enCours ? "Envoi…" : "Envoyer"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

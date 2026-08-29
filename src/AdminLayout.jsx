@@ -4,7 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
-  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck,
+  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -79,6 +79,8 @@ export const NAV_GROUPS = [
       { id: "assemblees",    label: (mot) => mot("assemblees"), icon: Users2, module: "module_assemblees" },
       { id: "documents",     label: "Documents", icon: FileText, module: "module_documents" },
       { id: "services",      label: "Services offerts", icon: Briefcase, module: "module_services" },
+      { id: "formations",    label: "Formations", icon: GraduationCap, module: "module_formations" },
+      { id: "partenariats",  label: "Partenariats", icon: Handshake, module: "module_partenariats" },
     ],
   },
   {
@@ -133,6 +135,8 @@ function sousTitresPour(mot) {
     assemblees:    "Convocations, émargement et procès-verbaux",
     documents:     `Statuts, rapports et formulaires ${mot("organisation_de")}`,
     services:      `Catalogue des services proposés ${mot("organisation_de")}`,
+    formations:    "Calendrier, inscriptions et suivi de présence",
+    partenariats:  `Annuaire des partenaires ${mot("organisation_de")}`,
     communication: `Communiqués aux ${mot("membres").toLowerCase()}`,
     agenda:        "Échéances et événements",
     parametrage:   "Configuration de la plateforme",

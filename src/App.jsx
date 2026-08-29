@@ -28,6 +28,8 @@ import OperationsDiversesPage from "./OperationsDiversesPage";
 import BaremePage from "./BaremePage";
 import DocumentsPage from "./DocumentsPage";
 import ServicesPage from "./ServicesPage";
+import FormationsPage from "./FormationsPage";
+import PartenairesPage from "./PartenairesPage";
 import ActiviteEconomiquePage from "./ActiviteEconomiquePage";
 import ProjetsPage from "./ProjetsPage";
 import PartageBeneficesPage from "./PartageBeneficesPage";
@@ -61,6 +63,9 @@ const PAGES_MEMBRE_MODULES = {
   assemblees: "module_assemblees",
   tontine: "module_tontine",
   prets: "module_prets",
+  formations: "module_formations",
+  services: "module_services",
+  partenariats: "module_partenariats",
 };
 
 function Shell() {
@@ -437,6 +442,24 @@ function Shell() {
               </PageMembre>
             )}
 
+            {page === "formations" && (
+              <PageMembre onBack={() => setPage("accueil")}>
+                <MembreFormations membre={membre} />
+              </PageMembre>
+            )}
+
+            {page === "services" && (
+              <PageMembre onBack={() => setPage("accueil")}>
+                <MembreServices membre={membre} />
+              </PageMembre>
+            )}
+
+            {page === "partenariats" && (
+              <PageMembre onBack={() => setPage("accueil")}>
+                <MembrePartenaires membre={membre} />
+              </PageMembre>
+            )}
+
             {page === "tombola" && (
               <PageMembre onBack={() => setPage("accueil")}>
                 <MembreTombola membre={membre} />
@@ -502,6 +525,8 @@ function Shell() {
           {page === "bareme"        && <BaremePage />}
           {page === "documents"     && <DocumentsPage />}
           {page === "services"      && <ServicesPage />}
+          {page === "formations"    && <FormationsPage />}
+          {page === "partenariats"  && <PartenairesPage />}
           {page === "activite_eco"  && <ActiviteEconomiquePage />}
           {page === "projets"       && <ProjetsPage />}
           {page === "partage_benefices" && <PartageBeneficesPage />}
@@ -840,6 +865,257 @@ function MembreCotisations({ membre }) {
 // Récapitulatif compact des moyens de paiement de l'organisation, affiché
 // en haut de l'écran — pour que le membre sache où envoyer l'argent avant
 // même d'avoir besoin de déclarer un paiement.
+const STATUTS_FORMATION = {
+  planifiee: { label: "Planifiée", bg: PALETTE.blue100, fg: C.primary },
+  terminee:  { label: "Terminée",  bg: C.successSoft,   fg: C.success },
+  annulee:   { label: "Annulée",   bg: PALETTE.grey200, fg: C.textSubtle },
+};
+
+function MembreFormations({ membre }) {
+  const [formations, setFormations] = useState([]);
+  const [mesPresences, setMesPresences] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [enCours, setEnCours] = useState(null);
+
+  async function charger() {
+    const [{ data: f }, { data: p }] = await Promise.all([
+      supabase.from("formations").select("*").eq("organisation_id", membre.organisation_id).order("date_debut", { ascending: false }),
+      supabase.from("formation_presences").select("*").eq("membre_id", membre.id),
+    ]);
+    setFormations(f || []);
+    setMesPresences(p || []);
+    setLoading(false);
+  }
+
+  useEffect(() => { charger(); }, [membre.id]);
+
+  const maPresence = (formationId) => mesPresences.find((p) => p.formation_id === formationId);
+
+  async function inscrire(formation) {
+    setEnCours(formation.id);
+    await supabase.from("formation_presences").insert({
+      formation_id: formation.id,
+      organisation_id: membre.organisation_id,
+      membre_id: membre.id,
+      statut: "inscrit",
+    });
+    setEnCours(null);
+    charger();
+  }
+
+  async function seDesinscrire(presence) {
+    setEnCours(presence.formation_id);
+    await supabase.from("formation_presences").delete().eq("id", presence.id);
+    setEnCours(null);
+    charger();
+  }
+
+  if (loading) return <div style={{ color: C.textSubtle }}>Chargement…</div>;
+
+  return (
+    <div>
+      <h2 style={titrePage}>Formations</h2>
+
+      {formations.length === 0 ? (
+        <div style={carteVide}>Aucune formation pour le moment.</div>
+      ) : (
+        <div style={carteListe}>
+          {formations.map((f, i) => {
+            const st = STATUTS_FORMATION[f.statut] || STATUTS_FORMATION.planifiee;
+            const presence = maPresence(f.id);
+
+            return (
+              <div
+                key={f.id}
+                style={{
+                  padding: "14px 18px",
+                  borderBottom: i < formations.length - 1 ? `1px solid ${C.border}` : "none",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14.5 }}>{f.titre}</div>
+                    <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 2 }}>
+                      {new Date(f.date_debut).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                      {f.lieu && ` · ${f.lieu}`}
+                    </div>
+                  </div>
+                  <span style={{ ...badge, background: st.bg, color: st.fg }}>{st.label}</span>
+                </div>
+
+                {f.description && (
+                  <div style={{ fontSize: 13, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+                    {f.description}
+                  </div>
+                )}
+
+                <div style={{ marginTop: 10 }}>
+                  {f.statut === "planifiee" ? (
+                    presence ? (
+                      <button
+                        onClick={() => seDesinscrire(presence)}
+                        disabled={enCours === f.id}
+                        style={{
+                          background: "none", border: `1.5px solid ${C.border}`, color: C.textMuted,
+                          borderRadius: 8, padding: "7px 13px", cursor: "pointer",
+                          fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+                        }}
+                      >
+                        {enCours === f.id ? "…" : "Inscrit(e) · Se désinscrire"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => inscrire(f)}
+                        disabled={enCours === f.id}
+                        style={{
+                          background: C.primary, border: "none", color: "#fff",
+                          borderRadius: 8, padding: "7px 13px", cursor: "pointer",
+                          fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+                        }}
+                      >
+                        {enCours === f.id ? "…" : "Je m'inscris"}
+                      </button>
+                    )
+                  ) : presence && (
+                    <span style={{ fontSize: 12.5, color: presence.statut === "present" ? C.success : C.textSubtle, fontWeight: 600 }}>
+                      {presence.statut === "present" ? "Présent(e)" : presence.statut === "absent" ? "Absent(e)" : "Inscrit(e)"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Deux catalogues, chacun en simple lecture — pas d'inscription ni de
+// présence, contrairement aux formations. Le Bureau décide qui est
+// visible via le bouton correspondant dans son propre écran.
+function MembreServices({ membre }) {
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("services_offerts")
+      .select("*")
+      .eq("organisation_id", membre.organisation_id)
+      .eq("visible_membres", true)
+      .eq("actif", true)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { setServices(data || []); setLoading(false); });
+  }, [membre.organisation_id]);
+
+  if (loading) return <div style={{ color: C.textSubtle }}>Chargement…</div>;
+
+  return (
+    <div>
+      <h2 style={titrePage}>Services</h2>
+
+      {services.length === 0 ? (
+        <div style={carteVide}>Aucun service pour le moment.</div>
+      ) : (
+        <div style={carteListe}>
+          {services.map((s, i) => (
+            <div
+              key={s.id}
+              style={{ padding: "14px 18px", borderBottom: i < services.length - 1 ? `1px solid ${C.border}` : "none" }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 14.5 }}>{s.nom}</div>
+              {s.description && (
+                <div style={{ fontSize: 13, color: C.textMuted, marginTop: 4, lineHeight: 1.5 }}>
+                  {s.description}
+                </div>
+              )}
+              {s.tarif != null && (
+                <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 6, fontWeight: 600 }}>
+                  {montant(s.tarif)} FCFA
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MembrePartenaires({ membre }) {
+  const [partenaires, setPartenaires] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("partenaires")
+      .select("*")
+      .eq("organisation_id", membre.organisation_id)
+      .eq("visible_membres", true)
+      .eq("actif", true)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { setPartenaires(data || []); setLoading(false); });
+  }, [membre.organisation_id]);
+
+  if (loading) return <div style={{ color: C.textSubtle }}>Chargement…</div>;
+
+  return (
+    <div>
+      <h2 style={titrePage}>Partenaires</h2>
+
+      {partenaires.length === 0 ? (
+        <div style={carteVide}>Aucun partenaire pour le moment.</div>
+      ) : (
+        <div style={carteListe}>
+          {partenaires.map((p, i) => {
+            const logoUrl = p.logo_chemin
+              ? supabase.storage.from("logos-partenaires").getPublicUrl(p.logo_chemin).data.publicUrl
+              : null;
+            return (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex", gap: 12, padding: "14px 18px",
+                  borderBottom: i < partenaires.length - 1 ? `1px solid ${C.border}` : "none",
+                }}
+              >
+                {logoUrl ? (
+                  <img src={logoUrl} alt={p.nom} style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.border}` }} />
+                ) : (
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 8, flexShrink: 0,
+                    background: C.primaryLight + "22", color: C.primary,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700,
+                  }}>
+                    {p.nom.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14.5 }}>{p.nom}</div>
+                  {p.description && (
+                    <div style={{ fontSize: 13, color: C.textMuted, marginTop: 3, lineHeight: 1.5 }}>
+                      {p.description}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 10, marginTop: 6, fontSize: 12, color: C.textSubtle }}>
+                    {p.site_web && (
+                      <a href={p.site_web} target="_blank" rel="noreferrer" style={{ color: C.primary, fontWeight: 600, textDecoration: "none" }}>
+                        Site web
+                      </a>
+                    )}
+                    {p.contact && <span>{p.contact}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MoyensPaiementApercu({ moyens }) {
   const LABELS = { wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money", moov_money: "Moov Money", autre: "Autre" };
   return (

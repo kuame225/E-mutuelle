@@ -4,6 +4,7 @@ import {
   Bell, LogOut, CreditCard, HandHeart, Gift, UserCircle2,
   CheckCircle2, Clock, AlertTriangle, CalendarDays, Wallet,
   Megaphone, Ticket, X, ChevronRight, Users, UserPlus, Users2, RefreshCw, Banknote,
+  GraduationCap, Briefcase, Handshake,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import CarteMembreModal from "./CarteMembreModal";
@@ -37,6 +38,12 @@ function raccourcisPourType(mot) {
       module: "module_tontine" },
     { id: "prets",         icon: Banknote,    l1: "Prêts",    l2: "& avances",     color: C.success,
       module: "module_prets" },
+    { id: "formations",    icon: GraduationCap, l1: "Formations", l2: "à venir",   color: C.primaryLight,
+      module: "module_formations" },
+    { id: "services",      icon: Briefcase,   l1: "Services",  l2: "offerts",     color: C.warning,
+      module: "module_services" },
+    { id: "partenariats",  icon: Handshake,   l1: "Partenaires", l2: "de l'organisation", color: C.success,
+      module: "module_partenariats" },
     { id: "beneficiaires", icon: Users,       l1: "Mes",      l2: "bénéficiaires", color: C.primaryLight },
   ];
 }

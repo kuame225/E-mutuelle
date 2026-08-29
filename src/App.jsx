@@ -853,7 +853,25 @@ function MoyensPaiementApercu({ moyens }) {
 
         return (
           <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
-            {logoUrl ? (
+            {m.lien ? (
+              <a href={m.lien} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
+                {logoUrl ? (
+                  <img
+                    src={logoUrl} alt={nom}
+                    style={{ width: 34, height: 34, borderRadius: 8, objectFit: "cover", cursor: "pointer", border: `1px solid ${C.border}` }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 8, cursor: "pointer",
+                    background: C.primaryLight + "22", color: C.primary,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontWeight: 700, fontSize: 13,
+                  }}>
+                    {(nom || "?").charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </a>
+            ) : logoUrl ? (
               <img
                 src={logoUrl} alt={nom}
                 style={{ width: 34, height: 34, borderRadius: 8, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.border}` }}
@@ -873,17 +891,6 @@ function MoyensPaiementApercu({ moyens }) {
               <strong style={{ color: C.text }}>{nom}</strong>
               {m.numero && <div style={{ marginTop: 2 }}>{m.numero}</div>}
               {m.instructions && <div style={{ fontSize: 12.5, marginTop: 2 }}>{m.instructions}</div>}
-              {m.lien && (
-                <a
-                  href={m.lien} target="_blank" rel="noreferrer"
-                  style={{
-                    display: "inline-block", marginTop: 6, color: C.primary,
-                    fontWeight: 600, fontSize: 12.5, textDecoration: "none",
-                  }}
-                >
-                  Ouvrir le lien de paiement →
-                </a>
-              )}
             </div>
           </div>
         );

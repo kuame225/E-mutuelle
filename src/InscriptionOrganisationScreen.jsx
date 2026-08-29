@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Building2, ArrowLeft, ArrowRight, Loader2, AlertCircle,
-  CheckCircle2, Mail, Lock, MapPin, Briefcase, ShieldCheck,
+  CheckCircle2, Mail, Lock, MapPin, Briefcase, ShieldCheck, Sliders,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { TYPES_ORGANISATION, motPourType } from "./vocabulaire";
@@ -22,6 +22,26 @@ const EXEMPLES_DENOMINATION = {
   autre: "Nom de votre organisation",
 };
 
+// Les 14 modules réellement optionnels (colonnes module_* de
+// parametrage) — le socle (membres, cotisations, communications...)
+// n'est jamais un module à cocher, il est toujours présent.
+const LABELS_MODULES = {
+  module_qr_carte: "Carte de membre (QR code)",
+  module_assemblees: "Assemblées générales",
+  module_documents: "Documents",
+  module_aides: "Aides sociales",
+  module_prets: "Prêts et avances",
+  module_tontine: "Tontine",
+  module_tombola: "Tombola",
+  module_sanctions: "Sanctions",
+  module_parts_sociales: "Parts sociales",
+  module_activites_economiques: "Activité économique",
+  module_projets: "Projets et bailleurs",
+  module_services: "Services offerts",
+  module_formations: "Formations",
+  module_partenariats: "Partenariats",
+};
+
 /**
  * Inscription d'une nouvelle organisation.
  *
@@ -37,7 +57,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
   // Le choix du type vient en premier : il détermine le vocabulaire et les
   // modules de toute l'organisation, et donne au formulaire suivant des
   // libellés déjà adaptés (« Sigle de l'association », etc.).
-  const [etape, setEtape] = useState("type"); // type | formulaire | sigle_seul | succes
+  const [etape, setEtape] = useState("type"); // type | formulaire | modules | recapitulatif | sigle_seul | succes
 
   const [type, setType] = useState(null);
   const [nom, setNom] = useState("");
@@ -48,9 +68,20 @@ export default function InscriptionOrganisationScreen({ onBack }) {
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [modules, setModules] = useState({});
 
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
+
+  // Dès le type choisi, on récupère les vrais défauts depuis la même
+  // fonction que la création utilisera — jamais une copie de cette
+  // logique réécrite ici, qui finirait par diverger du serveur.
+  useEffect(() => {
+    if (!type) return;
+    supabase.rpc("modules_par_defaut", { p_type: type }).then(({ data }) => {
+      if (data) setModules(data);
+    });
+  }, [type]);
 
   // Le champ Contact accepte un numéro OU une adresse e-mail : on ne peut
   // pas filtrer les caractères non numériques sans casser la saisie d'un
@@ -81,6 +112,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
       p_localite: localite || null,
       p_contact: contact || null,
       p_type: type || "mutuelle",
+      p_modules: modules,
     });
 
     if (error) {
@@ -123,10 +155,16 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     setTimeout(() => window.location.reload(), 5000);
   }
 
-  async function soumettre(e) {
+  function passerAuxModules(e) {
     e.preventDefault();
     const probleme = validerFormulaire();
     if (probleme) { setErreur(probleme); return; }
+    setErreur("");
+    setEtape("modules");
+  }
+
+  async function soumettre(e) {
+    e?.preventDefault();
 
     setEnvoi(true);
     setErreur("");
@@ -297,6 +335,115 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     );
   }
 
+  /* ---------------- Modules recommandés ---------------- */
+  if (etape === "modules") {
+    return (
+      <div className="io-shell">
+        <style>{CSS}</style>
+        <div className="io-carte io-carte-large">
+          <button className="io-retour" onClick={() => setEtape("formulaire")}>
+            <ArrowLeft size={15} /> Retour
+          </button>
+
+          <div className="io-icone"><Sliders size={26} /></div>
+          <h1 className="io-titre">Quels modules activer ?</h1>
+          <p className="io-sous">
+            Une sélection déjà adaptée à {motPourType(type, "organisation_votre")}.
+            Ajustez si besoin — rien n'est figé, tout reste modifiable depuis
+            les paramètres une fois l'espace créé.
+          </p>
+
+          <div className="io-modules">
+            {Object.entries(LABELS_MODULES).map(([cle, libelle]) => (
+              <label key={cle} className={`io-module ${modules[cle] ? "is-on" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(modules[cle])}
+                  onChange={() => setModules((m) => ({ ...m, [cle]: !m[cle] }))}
+                />
+                <span>{libelle}</span>
+              </label>
+            ))}
+          </div>
+
+          <button className="io-btn" onClick={() => setEtape("recapitulatif")}>
+            Continuer <ArrowRight size={17} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------- Récapitulatif ---------------- */
+  if (etape === "recapitulatif") {
+    const modulesActifs = Object.entries(LABELS_MODULES).filter(([cle]) => modules[cle]);
+
+    return (
+      <div className="io-shell">
+        <style>{CSS}</style>
+        <div className="io-carte io-carte-large">
+          <button className="io-retour" onClick={() => setEtape("modules")}>
+            <ArrowLeft size={15} /> Retour
+          </button>
+
+          <div className="io-icone"><ShieldCheck size={26} /></div>
+          <h1 className="io-titre">Vérifiez avant de créer votre espace</h1>
+
+          <div className="io-recap">
+            <div className="io-recap-ligne">
+              <span>Type</span>
+              <strong>{TYPES_ORGANISATION.find((t) => t.id === type)?.label}</strong>
+            </div>
+            <div className="io-recap-ligne"><span>Sigle</span><strong>{sigle}</strong></div>
+            <div className="io-recap-ligne"><span>Dénomination</span><strong>{nom}</strong></div>
+            {secteur && <div className="io-recap-ligne"><span>Secteur</span><strong>{secteur}</strong></div>}
+            {localite && <div className="io-recap-ligne"><span>Localité</span><strong>{localite}</strong></div>}
+            {contact && <div className="io-recap-ligne"><span>Contact</span><strong>{contact}</strong></div>}
+            <div className="io-recap-ligne"><span>Votre e-mail</span><strong>{email}</strong></div>
+          </div>
+
+          <div className="io-section-titre io-section-suite">Modules activés</div>
+          {modulesActifs.length === 0 ? (
+            <p className="io-sous" style={{ margin: 0 }}>
+              Aucun module optionnel — seul le socle commun.
+            </p>
+          ) : (
+            <ul className="io-recap-modules">
+              {modulesActifs.map(([cle, libelle]) => <li key={cle}>{libelle}</li>)}
+            </ul>
+          )}
+
+          <div className="io-rappel-tarif">
+            <ShieldCheck size={16} />
+            <p>
+              <strong>2 mois d'essai gratuit</strong>, accès complet, sans paiement.
+              À l'issue de l'essai : forfait + composante variable selon votre
+              activité, et d'éventuels frais de mise en service (facturés une
+              seule fois). Votre demande doit d'abord être validée par notre
+              équipe avant toute activation.
+            </p>
+          </div>
+
+          {erreur && (
+            <div className="io-erreur"><AlertCircle size={16} /> {erreur}</div>
+          )}
+
+          <button className="io-btn" onClick={soumettre} disabled={envoi}>
+            {envoi
+              ? <><Loader2 size={17} className="io-spin" /> Création…</>
+              : <>Confirmer et créer mon espace <ArrowRight size={17} /></>}
+          </button>
+
+          <p className="io-legal">
+            Vous devenez administrateur de cette organisation. Vous pourrez ensuite
+            régler ses cotisations, son barème d'aides et les fonctions
+            activées depuis les paramètres.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="io-shell">
       <style>{CSS}</style>
@@ -313,7 +460,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
           Créez l'espace de votre organisation et votre propre accès administrateur.
         </p>
 
-        <form onSubmit={soumettre} className="io-form">
+        <form onSubmit={passerAuxModules} className="io-form">
           <div className="io-section-titre">
             {motPourType(type, "organisation").toUpperCase()}
           </div>
@@ -352,28 +499,9 @@ export default function InscriptionOrganisationScreen({ onBack }) {
             <div className="io-erreur"><AlertCircle size={16} /> {erreur}</div>
           )}
 
-          <div className="io-rappel-tarif">
-            <ShieldCheck size={16} />
-            <p>
-              <strong>2 mois d'essai gratuit</strong>, accès complet, sans paiement.
-              À l'issue de l'essai : forfait + composante variable selon votre
-              activité, et d'éventuels frais de mise en service (facturés une
-              seule fois). Votre demande doit d'abord être validée par notre
-              équipe avant toute activation.
-            </p>
-          </div>
-
-          <button type="submit" className="io-btn" disabled={envoi}>
-            {envoi
-              ? <><Loader2 size={17} className="io-spin" /> Création…</>
-              : <>Créer l'espace <ArrowRight size={17} /></>}
+          <button type="submit" className="io-btn">
+            Continuer <ArrowRight size={17} />
           </button>
-
-          <p className="io-legal">
-            Vous devenez administrateur de cette organisation. Vous pourrez ensuite
-            régler ses cotisations, son barème d'aides et les fonctions
-            activées depuis les paramètres.
-          </p>
         </form>
       </div>
     </div>
@@ -528,6 +656,38 @@ const CSS = `
 }
 .io-rappel-tarif p{ margin:0; font-size:12.5px; line-height:1.55; color:${C.textMuted}; }
 .io-rappel-tarif strong{ color:${C.text}; }
+
+.io-modules{
+  display:grid; grid-template-columns:1fr 1fr; gap:${S.sm}px;
+  margin-bottom:${S.lg}px;
+}
+@media (max-width:520px){ .io-modules{ grid-template-columns:1fr; } }
+.io-module{
+  display:flex; align-items:center; gap:10px; text-align:left;
+  padding:11px 14px; cursor:pointer;
+  background:${C.surface}; border:1.5px solid ${C.border};
+  border-radius:${R.md}px; font-size:13.5px; font-weight:600; color:${C.textMuted};
+  transition:border-color .15s ease, background .15s ease, color .15s ease;
+}
+.io-module:hover{ border-color:${PALETTE.grey300}; }
+.io-module.is-on{ border-color:${C.primary}; background:${PALETTE.blue50}; color:${C.text}; }
+.io-module input{ accent-color:${C.primary}; width:16px; height:16px; flex-shrink:0; }
+
+.io-recap{
+  background:${C.bg}; border:1px solid ${C.border}; border-radius:${R.lg}px;
+  padding:${S.md}px ${S.lg}px; margin-bottom:${S.md}px;
+}
+.io-recap-ligne{
+  display:flex; justify-content:space-between; gap:${S.md}px;
+  padding:6px 0; font-size:13.5px; border-bottom:1px solid ${C.border};
+}
+.io-recap-ligne:last-child{ border-bottom:none; }
+.io-recap-ligne span{ color:${C.textSubtle}; }
+.io-recap-ligne strong{ color:${C.text}; text-align:right; }
+.io-recap-modules{
+  margin:0 0 ${S.md}px; padding-left:20px; font-size:13.5px;
+  color:${C.textMuted}; line-height:1.9;
+}
 
 .io-barre{
   height:4px; border-radius:4px; background:${PALETTE.grey200};

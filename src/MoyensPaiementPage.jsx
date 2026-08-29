@@ -65,8 +65,9 @@ export default function MoyensPaiementPage() {
 
   async function supprimer(m) {
     setEnCours(true);
-    if (m.qr_code_chemin) {
-      await supabase.storage.from(BUCKET_QR).remove([m.qr_code_chemin]);
+    const chemins = [m.qr_code_chemin, m.logo_chemin].filter(Boolean);
+    if (chemins.length > 0) {
+      await supabase.storage.from(BUCKET_QR).remove(chemins);
     }
     const { error } = await supabase.from("moyens_paiement").delete().eq("id", m.id);
     setEnCours(false);
@@ -129,11 +130,11 @@ export default function MoyensPaiementPage() {
         <ul className="mp-liste">
           {moyens.map((m) => (
             <li key={m.id} className={`mp-ligne ${!m.actif ? "is-inactif" : ""}`}>
-              {m.qr_code_chemin ? (
+              {m.logo_chemin || m.qr_code_chemin ? (
                 <img
                   className="mp-qr-apercu"
-                  src={supabase.storage.from(BUCKET_QR).getPublicUrl(m.qr_code_chemin).data.publicUrl}
-                  alt="QR code"
+                  src={supabase.storage.from(BUCKET_QR).getPublicUrl(m.logo_chemin || m.qr_code_chemin).data.publicUrl}
+                  alt={m.logo_chemin ? "Logo" : "QR code"}
                 />
               ) : (
                 <span className="mp-icon"><Wallet size={18} /></span>
@@ -357,6 +358,12 @@ function ModalMoyen({ moyen, organisationId, nbExistants, onCancel, onDone }) {
   const [lien, setLien] = useState(moyen?.lien || "");
   const [numero, setNumero] = useState(moyen?.numero || "");
   const [instructions, setInstructions] = useState(moyen?.instructions || "");
+  const [logoFichier, setLogoFichier] = useState(null);
+  const [logoApercu, setLogoApercu] = useState(
+    moyen?.logo_chemin
+      ? supabase.storage.from(BUCKET_QR).getPublicUrl(moyen.logo_chemin).data.publicUrl
+      : null
+  );
   const [qrFichier, setQrFichier] = useState(null);
   const [qrApercu, setQrApercu] = useState(
     moyen?.qr_code_chemin
@@ -365,6 +372,15 @@ function ModalMoyen({ moyen, organisationId, nbExistants, onCancel, onDone }) {
   );
   const [enCours, setEnCours] = useState(false);
   const [err, setErr] = useState("");
+
+  function choisirLogo(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 1 * 1024 * 1024) { setErr("Image trop lourde (1 Mo maximum pour un logo)."); return; }
+    setErr("");
+    setLogoFichier(f);
+    setLogoApercu(URL.createObjectURL(f));
+  }
 
   function choisirQr(e) {
     const f = e.target.files?.[0];
@@ -383,6 +399,23 @@ function ModalMoyen({ moyen, organisationId, nbExistants, onCancel, onDone }) {
 
     setEnCours(true);
     setErr("");
+
+    let logoChemin = moyen?.logo_chemin || null;
+
+    if (logoFichier) {
+      const ext = logoFichier.name.split(".").pop();
+      const chemin = `${organisationId}/logo-${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET_QR)
+        .upload(chemin, logoFichier, { contentType: logoFichier.type });
+
+      if (upErr) { setEnCours(false); setErr("Échec du téléversement du logo : " + upErr.message); return; }
+
+      if (moyen?.logo_chemin) {
+        await supabase.storage.from(BUCKET_QR).remove([moyen.logo_chemin]);
+      }
+      logoChemin = chemin;
+    }
 
     let qrChemin = moyen?.qr_code_chemin || null;
 
@@ -407,6 +440,7 @@ function ModalMoyen({ moyen, organisationId, nbExistants, onCancel, onDone }) {
       lien: lien.trim() || null,
       numero: numero.trim() || null,
       instructions: instructions.trim() || null,
+      logo_chemin: logoChemin,
       qr_code_chemin: qrChemin,
     };
 
@@ -475,6 +509,23 @@ function ModalMoyen({ moyen, organisationId, nbExistants, onCancel, onDone }) {
             onChange={(e) => setNumero(e.target.value)}
             placeholder="Ex : 07 00 00 00 00"
           />
+        </div>
+
+        <div className="mp-champ">
+          <label className="mp-label" htmlFor="mp-logo">
+            Logo <span className="mp-opt">— facultatif, affiché aux membres à la place du lien</span>
+          </label>
+          {logoApercu ? (
+            <div className="mp-qr-choisi">
+              <img src={logoApercu} alt="Aperçu logo" />
+              <label htmlFor="mp-logo" className="mp-qr-changer">Changer</label>
+            </div>
+          ) : (
+            <label className="mp-drop" htmlFor="mp-logo">
+              <Upload size={18} /> Choisir un logo… (capture ou export officiel de l'application)
+            </label>
+          )}
+          <input id="mp-logo" type="file" accept="image/*" onChange={choisirLogo} style={{ display: "none" }} />
         </div>
 
         <div className="mp-champ">

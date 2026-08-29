@@ -844,15 +844,50 @@ function MoyensPaiementApercu({ moyens }) {
   const LABELS = { wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money", moov_money: "Moov Money", autre: "Autre" };
   return (
     <div style={{ ...carteVide, textAlign: "left", padding: "14px 18px", marginBottom: 14 }}>
-      <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8 }}>Comment payer</div>
-      {moyens.map((m) => (
-        <div key={m.id} style={{ fontSize: 13, color: C.textMuted, marginBottom: 6 }}>
-          <strong>{m.libelle || LABELS[m.type] || m.type}</strong>
-          {m.lien && <> — <a href={m.lien} target="_blank" rel="noreferrer" style={{ color: C.primary }}>{m.lien}</a></>}
-          {m.numero && <> — {m.numero}</>}
-          {m.instructions && <div style={{ fontSize: 12.5, marginTop: 2 }}>{m.instructions}</div>}
-        </div>
-      ))}
+      <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 10 }}>Comment payer</div>
+      {moyens.map((m) => {
+        const logoUrl = m.logo_chemin
+          ? supabase.storage.from("qr-paiement").getPublicUrl(m.logo_chemin).data.publicUrl
+          : null;
+        const nom = m.libelle || LABELS[m.type] || m.type;
+
+        return (
+          <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+            {logoUrl ? (
+              <img
+                src={logoUrl} alt={nom}
+                style={{ width: 34, height: 34, borderRadius: 8, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.border}` }}
+              />
+            ) : (
+              <div style={{
+                width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                background: C.primaryLight + "22", color: C.primary,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 700, fontSize: 13,
+              }}>
+                {(nom || "?").charAt(0).toUpperCase()}
+              </div>
+            )}
+
+            <div style={{ flex: 1, fontSize: 13, color: C.textMuted }}>
+              <strong style={{ color: C.text }}>{nom}</strong>
+              {m.numero && <div style={{ marginTop: 2 }}>{m.numero}</div>}
+              {m.instructions && <div style={{ fontSize: 12.5, marginTop: 2 }}>{m.instructions}</div>}
+              {m.lien && (
+                <a
+                  href={m.lien} target="_blank" rel="noreferrer"
+                  style={{
+                    display: "inline-block", marginTop: 6, color: C.primary,
+                    fontWeight: 600, fontSize: 12.5, textDecoration: "none",
+                  }}
+                >
+                  Ouvrir le lien de paiement →
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

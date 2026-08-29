@@ -6,10 +6,12 @@ import {
 import { useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
 import { useParametrage, LOGO_DEFAUT } from "./useParametrage";
+import { useVocabulaire } from "./useVocabulaire";
 import { C, S, R, SHADOW, PALETTE } from "./theme";
 
 export default function LoginScreen({ onAdhesion, onBack }) {
   const { params } = useParametrage();
+  const { mot } = useVocabulaire();
   const [mode, setMode] = useState("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,6 +29,12 @@ export default function LoginScreen({ onAdhesion, onBack }) {
   const sigle = params.nom_mutuelle;
   const denomination = params.adresse;
   const logo = params.logo_url || LOGO_DEFAUT;
+  // Capitalisé à la main plutôt que de supposer le comportement exact
+  // d'une éventuelle variante déjà majusculée du système de vocabulaire —
+  // mot("organisation_la") est le seul usage déjà confirmé ce soir
+  // (WelcomeScreen.jsx), donc le seul sur lequel je m'appuie ici.
+  const organisationLa = mot("organisation_la");
+  const organisationLaMaj = organisationLa.charAt(0).toUpperCase() + organisationLa.slice(1);
 
   const reset = () => { setError(""); setNotice(""); };
 
@@ -109,7 +117,7 @@ export default function LoginScreen({ onAdhesion, onBack }) {
               Plus simple,<br />plus proche,<br />plus solidaire.
             </h1>
             <p className="brand-subtitle">
-              Votre mutuelle vous accompagne, vous et votre famille,
+              {organisationLaMaj} vous accompagne, vous et votre famille,
               vers un avenir plus sûr.
             </p>
           </div>
@@ -278,12 +286,12 @@ export default function LoginScreen({ onAdhesion, onBack }) {
           )}
 
           <footer className="card-footer">
-            Pas encore membre ?{" "}
+            Pas encore {mot("membre_singulier").toLowerCase()} ?{" "}
             <button
               type="button" className="link"
               onClick={() => onAdhesion && onAdhesion()}
             >
-              Adhérer à la mutuelle
+              {mot("adherer")}
             </button>
           </footer>
         </div>

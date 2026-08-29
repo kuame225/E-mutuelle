@@ -63,3 +63,45 @@ function base64EnTableau(base64) {
   const brut = atob(normalise);
   return Uint8Array.from([...brut].map((c) => c.charCodeAt(0)));
 }
+
+// Même mécanique que activerNotifications(), pour l'exploitant : un
+// abonnement séparé (push_abonnements_exploitant), indexé par user_id
+// plutôt que membre_id — l'exploitant n'a pas de fiche membre, c'est un
+// rôle plateforme, pas un rattachement à une organisation.
+export async function activerNotificationsExploitant(userId) {
+  if (!pushDisponible()) {
+    return { ok: false, motif: "non_supporte" };
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    return { ok: false, motif: "refuse" };
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+
+  let abonnement = await registration.pushManager.getSubscription();
+  if (!abonnement) {
+    abonnement = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64EnTableau(VAPID_PUBLIC_KEY),
+    });
+  }
+
+  const brut = abonnement.toJSON();
+
+  const { error } = await supabase.from("push_abonnements_exploitant").upsert(
+    {
+      user_id: userId,
+      endpoint: brut.endpoint,
+      p256dh: brut.keys.p256dh,
+      auth: brut.keys.auth,
+      appareil: navigator.userAgent.slice(0, 200),
+    },
+    { onConflict: "endpoint" }
+  );
+
+  if (error) return { ok: false, motif: "enregistrement", detail: error.message };
+
+  return { ok: true };
+}

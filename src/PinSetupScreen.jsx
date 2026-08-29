@@ -5,9 +5,11 @@ import {
 import { definirPin } from "./pinLock";
 import { biometrieSupportee, activerBiometrie } from "./biometrie";
 import { pushDisponible, activerNotifications } from "./push";
+import { useVocabulaire } from "./useVocabulaire";
 import { C, S, SHADOW } from "./theme";
 
 export default function PinSetupScreen({ userId, membreId, nomAffiche, onTermine }) {
+  const { mot } = useVocabulaire();
   const [etape, setEtape] = useState("saisie");  // saisie | confirmation | biometrie | notifications
   const [pin, setPin] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -176,8 +178,8 @@ export default function PinSetupScreen({ userId, membreId, nomAffiche, onTermine
         <div className="pl-icone pl-icone-notif"><Bell size={28} /></div>
         <h1 className="pl-titre">Recevoir les alertes ?</h1>
         <p className="pl-sous">
-          Soyez prévenu de vos échéances de cotisation et des nouvelles de la
-          mutuelle, directement sur votre téléphone.
+          Soyez prévenu de vos échéances de {mot("cotisation").toLowerCase()} et des
+          nouvelles {mot("organisation_de")}, directement sur votre téléphone.
         </p>
 
         {erreur && <p className="pl-erreur pl-erreur-large">{erreur}</p>}

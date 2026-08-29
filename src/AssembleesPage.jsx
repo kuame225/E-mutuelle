@@ -322,14 +322,27 @@ function FicheAssemblee({ assemblee, onBack, onRefresh }) {
       return;
     }
 
-    const { data } = supabase.storage.from("pv-assemblees").getPublicUrl(chemin);
-    const url = `${data.publicUrl}?v=${Date.now()}`;
-
-    await supabase.from("assemblees").update({ pv_url: url })
+    // Le bucket est privé désormais : on stocke seulement le chemin,
+    // jamais un lien direct — une URL signée se génère à la demande,
+    // au moment où quelqu'un veut réellement ouvrir le document, avec
+    // une durée de vie courte plutôt qu'un lien permanent.
+    await supabase.from("assemblees").update({ pv_chemin: chemin })
       .eq("id", assemblee.id).eq("organisation_id", assemblee.organisation_id);
 
     setUploadPv(false);
     onRefresh();
+  }
+
+  async function ouvrirPv() {
+    const { data, error } = await supabase.storage
+      .from("pv-assemblees")
+      .createSignedUrl(assemblee.pv_chemin, 60);
+
+    if (error || !data?.signedUrl) {
+      setErreur("Impossible d'ouvrir le document pour le moment.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
   }
 
   return (
@@ -440,10 +453,10 @@ function FicheAssemblee({ assemblee, onBack, onRefresh }) {
         <div className="fa-separateur">— ou —</div>
 
         <label className="ag-label">Document à téléverser (PDF, image)</label>
-        {assemblee.pv_url && (
-          <a href={assemblee.pv_url} target="_blank" rel="noreferrer" className="fa-pv-lien">
+        {assemblee.pv_chemin && (
+          <button className="fa-pv-lien" onClick={ouvrirPv}>
             <FileText size={14} /> Document actuel
-          </a>
+          </button>
         )}
         <label className="btn-secondary fa-upload-btn">
           {uploadPv ? <Loader2 size={15} className="spin" /> : <Upload size={15} />}
@@ -560,7 +573,10 @@ const CSS = `
 
 .fa-separateur{ text-align:center; font-size:12px; color:${C.textSubtle}; }
 .fa-upload-btn{ width:fit-content; }
-.fa-pv-lien{ display:inline-flex; align-items:center; gap:6px; font-size:13px; color:${C.primary}; margin-bottom:6px; }
+.fa-pv-lien{
+  display:inline-flex; align-items:center; gap:6px; font-size:13px; color:${C.primary};
+  margin-bottom:6px; background:none; border:none; cursor:pointer; padding:0; font-family:inherit;
+}
 
 .ag-overlay{
   position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:50;

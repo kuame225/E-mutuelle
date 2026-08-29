@@ -3,39 +3,122 @@ import {
   Building2, ArrowRight, AlertTriangle, Sigma, Eye, RefreshCw, Users,
   CreditCard, HandHeart, ClipboardList, Wallet, Megaphone, ShieldCheck,
   KeyRound, Sliders, ScrollText, Download, CheckCircle2,
+  PiggyBank, ShoppingCart, FolderKanban, GraduationCap,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 const NOM_PLATEFORME = import.meta.env.VITE_NOM_PLATEFORME || "Baamo";
 
+// Contenu qui change selon le type d'organisation choisi par le visiteur —
+// via le sélecteur sur la page, ou un paramètre d'URL (?type=cooperative)
+// pour une campagne ciblée. Sans sélection, TYPES_LANDING.defaut s'applique :
+// un discours neutre, plus aucun type mis en avant par défaut.
+const TYPES_LANDING = {
+  defaut: {
+    label: null, genre: "f",
+    eyebrow: "Pour mutuelles, associations, coopératives, ONG et bien d'autres",
+    cta: "Créer mon espace",
+    heroNom: "organisation",
+    lead: "Cotisations, activités et comptabilité : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à votre organisation.",
+  },
+  mutuelle: {
+    label: "Mutuelle", genre: "f",
+    eyebrow: "Pour les mutuelles de santé et de prévoyance",
+    cta: "Inscrire ma mutuelle",
+    heroNom: "mutuelle",
+    lead: "Cotisations, aides sociales et comptabilité : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à vos statuts.",
+  },
+  association: {
+    label: "Association", genre: "f",
+    eyebrow: "Pour les associations culturelles, sportives et sociales",
+    cta: "Inscrire mon association",
+    heroNom: "association",
+    lead: "Adhésions, cotisations et activités : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à vos statuts.",
+  },
+  cooperative: {
+    label: "Coopérative", genre: "f",
+    eyebrow: "Pour les coopératives et entreprises collectives",
+    cta: "Inscrire ma coopérative",
+    heroNom: "coopérative",
+    lead: "Parts sociales, activité économique et partage des bénéfices : tout ce que votre Bureau suit aujourd'hui à la main, calculé et archivé automatiquement, avec les règles propres à vos statuts.",
+  },
+  ong: {
+    label: "ONG", genre: "f",
+    eyebrow: "Pour les ONG et fondations",
+    cta: "Inscrire mon ONG",
+    heroNom: "ONG",
+    lead: "Projets, bailleurs et aides sociales : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à vos statuts.",
+  },
+  avec: {
+    label: "Groupe d'épargne", genre: "m",
+    eyebrow: "Pour les groupes d'épargne et de crédit villageois",
+    cta: "Inscrire mon groupe",
+    heroNom: "groupe",
+    lead: "Tontine, prêts et épargne : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à vos statuts.",
+  },
+  professionnelle: {
+    label: "Organisation professionnelle", genre: "f",
+    eyebrow: "Pour les ordres, syndicats et groupements professionnels",
+    cta: "Inscrire mon organisation",
+    heroNom: "organisation professionnelle",
+    lead: "Cotisations, services offerts et formations : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à vos statuts.",
+  },
+  federation: {
+    label: "Fédération", genre: "f",
+    eyebrow: "Pour les fédérations et unions d'organisations",
+    cta: "Inscrire ma fédération",
+    heroNom: "fédération",
+    lead: "Projets, documents et communications : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à vos statuts.",
+  },
+  reseau: {
+    label: "Réseau", genre: "m",
+    eyebrow: "Pour les réseaux d'organisations",
+    cta: "Inscrire mon réseau",
+    heroNom: "réseau",
+    lead: "Projets, documents et communications : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à vos statuts.",
+  },
+};
+
+const ORDRE_TYPES = ["mutuelle", "association", "cooperative", "ong", "avec", "professionnelle", "federation", "reseau"];
+
+// Trois organisations réelles seulement (MAEPHDA, FDSD, LES QUETEUSES) —
+// aucune autre ajoutée à côté : en inventer pour représenter les types
+// encore non couverts (coopérative, ONG, AVEC, professionnelle...)
+// reviendrait à fabriquer un faux témoignage client.
 const ORGANISATIONS = [
   { logo: "/logo-mephda.png", nom: "MAEPHDA — Mutuelle des Agents de l'EPHD de Dabakala", secteur: "Santé" },
-  { init: "AC", nom: "ACDA — Association des Cultivateurs de Dabakala", secteur: "Agriculture" },
-  { init: "MC", nom: "MACEDA — Maracana Club Étudiant Dabakala", secteur: "Sport" },
-  { init: "MD", nom: "MADAB — Mutuelle des Akans de Dabakala", secteur: "Communautaire" },
-  { init: "ME", nom: "Mutuelle des Enseignants de Bouaké", secteur: "Éducation" },
-  { init: "CO", nom: "Coopérative Agricole de Soubré", secteur: "Agriculture" },
-  { init: "AT", nom: "Association des Transporteurs de Yamoussoukro", secteur: "Transport" },
-  { init: "MP", nom: "Mutuelle du Personnel de Santé de Korhogo", secteur: "Santé" },
+  { init: "FD", nom: "FDSD — Famille District Sanitaire de Daloa", secteur: "Santé" },
+  { init: "LQ", nom: "Les Quêteuses", secteur: "Association religieuse" },
 ];
 
+// Chaque fonctionnalité déclare les types d'organisation concernés — la
+// grille se filtre en conséquence quand un type est sélectionné. Les
+// quatre dernières n'existaient pas dans la version d'origine, pensée
+// uniquement pour les mutuelles : Parts sociales, Activité économique,
+// Projets et Services/Formations/Partenariats n'y étaient jamais montrés.
+const TOUS_TYPES = ["mutuelle", "association", "cooperative", "ong", "avec", "professionnelle", "federation", "reseau", "autre"];
+
 const FONCTIONNALITES = [
-  { Icon: Users, titre: "Adhésions et fiches membres", texte: "Demandes en ligne, validation par le Bureau, carte de membre et registre à jour.", couleur: "navy" },
-  { Icon: CreditCard, titre: "Cotisations et paiements", texte: "Suivi mensuel, paiements fractionnés, reçus automatiques, sanctions sans intervention manuelle.", couleur: "green" },
-  { Icon: HandHeart, titre: "Aides sociales", texte: "Demandes, décisions et versements tracés selon le barème de vos statuts.", couleur: "orange" },
-  { Icon: Wallet, titre: "Comptabilité", texte: "Recettes et dépenses diverses, justificatifs joints, rapports prêts à présenter.", couleur: "navy" },
-  { Icon: Megaphone, titre: "Communications", texte: "Annonces et rappels d'échéance, notification individuelle au bon moment.", couleur: "green" },
-  { Icon: ShieldCheck, titre: "Rôles du Bureau", texte: "Président, trésorier, secrétaire général : chacun accède à ce que sa fonction exige.", couleur: "orange" },
-  { Icon: ClipboardList, titre: "Assemblées générales", texte: "Convocation, émargement, quorum en direct, procès-verbal archivé.", couleur: "navy", payant: true },
-  { Icon: RefreshCw, titre: "Tontine", texte: "Ordre de passage fixé, versements suivis tour par tour, notification au bénéficiaire.", couleur: "green", payant: true },
-  { Icon: KeyRound, titre: "Prêts et avances", texte: "Demande par le membre ou saisie directe du Bureau, échéances suivies une à une.", couleur: "orange", payant: true },
+  { Icon: Users, titre: "Adhésions et fiches membres", texte: "Demandes en ligne, validation par le Bureau, carte de membre et registre à jour.", couleur: "navy", types: TOUS_TYPES },
+  { Icon: CreditCard, titre: "Cotisations et paiements", texte: "Suivi mensuel, paiements fractionnés, reçus automatiques, sanctions sans intervention manuelle.", couleur: "green", types: TOUS_TYPES.filter((t) => t !== "cooperative") },
+  { Icon: HandHeart, titre: "Aides sociales", texte: "Demandes, décisions et versements tracés selon le barème de vos statuts.", couleur: "orange", types: ["mutuelle", "ong"] },
+  { Icon: Wallet, titre: "Comptabilité", texte: "Recettes et dépenses diverses, justificatifs joints, rapports prêts à présenter.", couleur: "navy", types: TOUS_TYPES },
+  { Icon: Megaphone, titre: "Communications", texte: "Annonces et rappels d'échéance, notification individuelle au bon moment.", couleur: "green", types: TOUS_TYPES },
+  { Icon: ShieldCheck, titre: "Rôles du Bureau", texte: "Président, trésorier, secrétaire général : chacun accède à ce que sa fonction exige.", couleur: "orange", types: TOUS_TYPES },
+  { Icon: ClipboardList, titre: "Assemblées générales", texte: "Convocation, émargement, quorum en direct, procès-verbal archivé.", couleur: "navy", payant: true, types: TOUS_TYPES.filter((t) => t !== "avec") },
+  { Icon: RefreshCw, titre: "Tontine", texte: "Ordre de passage fixé, versements suivis tour par tour, notification au bénéficiaire.", couleur: "green", payant: true, types: ["avec"] },
+  { Icon: KeyRound, titre: "Prêts et avances", texte: "Demande par le membre ou saisie directe du Bureau, échéances suivies une à une.", couleur: "orange", payant: true, types: ["cooperative", "avec"] },
+  { Icon: PiggyBank, titre: "Parts sociales et capital", texte: "Souscriptions, remboursements, capital détenu par chaque membre suivi à tout moment.", couleur: "navy", types: ["cooperative"] },
+  { Icon: ShoppingCart, titre: "Activité économique", texte: "Achats, ventes et stock suivis, partage des bénéfices calculé en fin d'exercice.", couleur: "green", types: ["cooperative"] },
+  { Icon: FolderKanban, titre: "Projets et bailleurs", texte: "Budgets, dépenses et indicateurs de suivi par projet, bailleur par bailleur.", couleur: "orange", types: ["ong", "association", "federation", "reseau"] },
+  { Icon: GraduationCap, titre: "Services, formations et partenariats", texte: "Catalogue de services, calendrier de formations et annuaire de partenaires.", couleur: "navy", types: ["professionnelle"] },
 ];
 
 const ETAPES = [
   { titre: "On parle de vos statuts", texte: "Cotisations, seuils, types d'aide : vos règles reprises telles qu'écrites." },
   { titre: "Vos membres sont importés", texte: "Le registre actuel est repris et intégré — pas de ressaisie manuelle." },
   { titre: "Le Bureau est formé", texte: "Président, trésorier, secrétaire général apprennent leur propre espace." },
-  { titre: "La mutuelle est en ligne", texte: "Les membres reçoivent leurs accès, et le cahier passe le relais." },
+  { titre: "Votre organisation est en ligne", texte: "Les membres reçoivent leurs accès, et le cahier passe le relais." },
 ];
 
 export default function LandingPage({ onCreationMutuelle, onConnexion }) {
@@ -43,6 +126,19 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
   const orgOuterRef = useRef(null);
   const revealRefs = useRef([]);
   revealRefs.current = [];
+
+  // Un paramètre d'URL (?type=cooperative) permet à une campagne ciblée
+  // d'arriver directement sur le bon discours ; sans paramètre, le
+  // visiteur peut aussi choisir lui-même via le sélecteur ci-dessous.
+  const [type, setType] = useState(() => {
+    const parametre = new URLSearchParams(window.location.search).get("type");
+    return TYPES_LANDING[parametre] ? parametre : null;
+  });
+
+  const cfg = TYPES_LANDING[type] || TYPES_LANDING.defaut;
+  const fonctionnalitesVisibles = type
+    ? FONCTIONNALITES.filter((f) => f.types.includes(type))
+    : FONCTIONNALITES;
 
   function addReveal(el) {
     if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
@@ -99,30 +195,43 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
           <div className="lp-nav-actions">
             <button className="lp-btn-connexion" onClick={onConnexion}>Se connecter</button>
             <button className="lp-btn lp-btn-primary" onClick={onCreationMutuelle}>
-              Inscrire ma mutuelle <ArrowRight size={16} />
+              {cfg.cta} <ArrowRight size={16} />
             </button>
           </div>
+        </div>
+
+        <div className="lp-type-selecteur">
+          <span className="lp-type-label">Vous êtes plutôt :</span>
+          {ORDRE_TYPES.map((id) => (
+            <button
+              key={id}
+              className={`lp-type-pill ${type === id ? "is-on" : ""}`}
+              onClick={() => setType(type === id ? null : id)}
+            >
+              {TYPES_LANDING[id].label}
+            </button>
+          ))}
         </div>
       </header>
 
       <section className="lp-hero">
         <div className="lp-hero-grid">
           <div>
-            <span className="lp-eyebrow">Pour mutuelles, associations et coopératives</span>
-            <h1 className="lp-h1">Votre mutuelle, <span className="lp-accent">gérée simplement</span> — sans perdre le contrôle.</h1>
+            <span className="lp-eyebrow">{cfg.eyebrow}</span>
+            <h1 className="lp-h1">
+              Votre {cfg.heroNom}, <span className="lp-accent">{cfg.genre === "m" ? "géré" : "gérée"} simplement</span> — sans perdre le contrôle.
+            </h1>
             <p className="lp-lead">
-              Cotisations, aides sociales et comptabilité : tout ce que votre Bureau
-              suit aujourd'hui à la main, calculé, notifié et archivé automatiquement,
-              avec les règles propres à vos statuts.
+              {cfg.lead}
             </p>
             <div className="lp-ctas">
               <button className="lp-btn lp-btn-primary" onClick={onCreationMutuelle}>
-                Inscrire ma mutuelle <ArrowRight size={17} />
+                {cfg.cta} <ArrowRight size={17} />
               </button>
             </div>
             <div className="lp-note"><span className="lp-dot" />Chaque organisation cloisonnée : aucune ne peut voir les données d'une autre.</div>
             <div className="lp-note lp-note-membre">
-              Déjà membre d'une mutuelle cliente ? Utilisez le lien fourni par votre Bureau.
+              Déjà membre d'une organisation cliente ? Utilisez le lien fourni par votre Bureau.
             </div>
           </div>
 
@@ -161,7 +270,7 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
           <h2 className="lp-reveal lp-center" ref={addReveal}>Tout ce que gère déjà votre Bureau — au même endroit</h2>
           <p className="lp-reveal lp-center lp-sub" ref={addReveal}>Un socle commun, et des modules additionnels activables selon vos besoins.</p>
           <div className="lp-grid-feat">
-            {FONCTIONNALITES.map((f) => (
+            {fonctionnalitesVisibles.map((f) => (
               <div className="lp-reveal lp-feat" ref={addReveal} key={f.titre}>
                 <div className={`lp-feat-ic lp-ic-${f.couleur}`}><f.Icon size={19} /></div>
                 <h3>{f.titre}</h3>
@@ -192,7 +301,7 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
         <div className="lp-wrap">
           <div className="lp-reveal lp-orgs-head" ref={addReveal}>
             <h2>Ces organisations nous ont fait confiance</h2>
-            <p>Mutuelles, coopératives et associations — aucun nom de membre n'apparaît jamais sur la plateforme.</p>
+            <p>Mutuelles, coopératives, associations et bien d'autres — aucun nom de membre n'apparaît jamais sur la plateforme.</p>
           </div>
           <div className="lp-marquee-outer" ref={orgOuterRef}>
             <div className="lp-marquee-track" ref={orgTrackRef}>
@@ -219,20 +328,20 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
           <div className="lp-reveal" ref={addReveal}>
             <span className="lp-eyebrow">Confiance</span>
             <h2>Vos données n'appartiennent qu'à vous</h2>
-            <p className="lp-trust-lead">Une plateforme commune ne veut pas dire des données communes. Chaque mutuelle est isolée des autres au niveau de la base elle-même.</p>
+            <p className="lp-trust-lead">Une plateforme commune ne veut pas dire des données communes. Chaque organisation est isolée des autres au niveau de la base elle-même.</p>
           </div>
           <div className="lp-reveal lp-trust-points" ref={addReveal}>
-            <div className="lp-tp"><ShieldCheck size={18} /><div><h4>Cloisonnement strict</h4><p>Aucune mutuelle cliente ne peut voir les membres ou les finances d'une autre.</p></div></div>
+            <div className="lp-tp"><ShieldCheck size={18} /><div><h4>Cloisonnement strict</h4><p>Aucune organisation cliente ne peut voir les membres ou les finances d'une autre.</p></div></div>
             <div className="lp-tp"><Sliders size={18} /><div><h4>Rôles précis</h4><p>Un trésorier gère les cotisations ; il n'a pas accès aux réglages de l'administrateur technique.</p></div></div>
             <div className="lp-tp"><ScrollText size={18} /><div><h4>Journal de toute action sensible</h4><p>Connexions, paiements, adhésions validées : tout est horodaté.</p></div></div>
-            <div className="lp-tp"><Download size={18} /><div><h4>Export à tout moment</h4><p>Le fichier des membres appartient à la mutuelle, exportable quand vous le souhaitez.</p></div></div>
+            <div className="lp-tp"><Download size={18} /><div><h4>Export à tout moment</h4><p>Le fichier des membres appartient à votre organisation, exportable quand vous le souhaitez.</p></div></div>
           </div>
         </div>
       </section>
 
       <section className="lp-pricing">
         <div className="lp-wrap lp-center">
-          <h2 className="lp-reveal" ref={addReveal}>Un tarif construit autour de votre mutuelle</h2>
+          <h2 className="lp-reveal" ref={addReveal}>Un tarif construit autour de votre organisation</h2>
           <p className="lp-reveal lp-sub" ref={addReveal}>Forfait de base + composante variable selon votre activité, modules payants en option.</p>
           <div className="lp-reveal lp-price-card" ref={addReveal}>
             <div className="lp-price-part"><span className="lp-lbl">Base</span><h3>Un forfait fixe</h3><p>Accès à la plateforme et au socle commun.</p></div>
@@ -250,9 +359,9 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
         <div className="lp-wrap lp-center">
           <div className="lp-reveal lp-final-card" ref={addReveal}>
             <h2>Prêt à faire passer votre cahier au numérique ?</h2>
-            <p>Deux mois d'essai complet, sans engagement, pour voir si votre mutuelle s'y retrouve.</p>
+            <p>Deux mois d'essai complet, sans engagement, pour voir si votre organisation s'y retrouve.</p>
             <button className="lp-btn lp-btn-inverse" onClick={onCreationMutuelle}>
-              <CheckCircle2 size={17} /> Inscrire ma mutuelle
+              <CheckCircle2 size={17} /> {cfg.cta}
             </button>
           </div>
         </div>
@@ -286,6 +395,20 @@ section{ padding:88px 0; }
 .lp-nav-actions{ display:flex; align-items:center; gap:16px; }
 .lp-btn-connexion{ background:none; border:none; font-family:inherit; font-size:14px; font-weight:600; color:${C.textMuted}; cursor:pointer; }
 .lp-btn-connexion:hover{ color:${C.primary}; }
+
+.lp-type-selecteur{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  max-width:1180px; margin:0 auto; padding:14px 24px 0;
+}
+.lp-type-label{ font-size:12.5px; color:${C.textSubtle}; font-weight:600; margin-right:2px; }
+.lp-type-pill{
+  background:${C.bg}; border:1px solid ${C.border}; color:${C.textMuted};
+  border-radius:999px; padding:6px 13px; font-size:12.5px; font-weight:600;
+  cursor:pointer; font-family:inherit; transition:all .15s ease; white-space:nowrap;
+}
+.lp-type-pill:hover{ border-color:${C.primary}; color:${C.primary}; }
+.lp-type-pill.is-on{ background:${C.primary}; border-color:${C.primary}; color:#fff; }
+@media (max-width:700px){ .lp-type-selecteur{ overflow-x:auto; flex-wrap:nowrap; padding-bottom:4px; } }
 
 .lp-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:13px 22px; border-radius:${R.md}px; font-size:14.5px; font-weight:600; border:none; cursor:pointer; transition:transform .15s ease, background .15s ease; font-family:inherit; }
 .lp-btn:hover{ transform:translateY(-2px); }

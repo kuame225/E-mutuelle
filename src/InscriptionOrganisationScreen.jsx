@@ -7,6 +7,21 @@ import { supabase } from "./supabaseClient";
 import { TYPES_ORGANISATION, motPourType } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
+// Un exemple de dénomination par type, pour que le placeholder du champ
+// ne suggère plus systématiquement une mutuelle — repéré comme un oubli
+// isolé, le reste de l'écran adaptait déjà correctement son vocabulaire.
+const EXEMPLES_DENOMINATION = {
+  mutuelle: "Mutuelle Générale des Fonctionnaires",
+  association: "Association des Femmes Entrepreneures",
+  cooperative: "Coopérative des Planteurs de Cacao",
+  ong: "Fondation pour l'Éducation des Filles",
+  avec: "Association Villageoise d'Épargne et de Crédit de Divo",
+  professionnelle: "Ordre des Experts-Comptables",
+  federation: "Fédération des Mutuelles de Santé",
+  reseau: "Réseau des Coopératives Agricoles",
+  autre: "Nom de votre organisation",
+};
+
 /**
  * Inscription d'une nouvelle organisation.
  *
@@ -83,6 +98,13 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     supabase.functions.invoke("notifier-inscription", {
       body: { nom: nom.trim(), sigle: sigle.trim(), email: email.trim().toLowerCase() },
     }).catch((e) => console.error("[InscriptionOrganisationScreen] notifier-inscription a échoué :", e));
+
+    // Notification push à l'exploitant, si un appareil est abonné — voir
+    // push_abonnements_exploitant. Même logique de non-blocage : un échec
+    // ici ne doit jamais remettre en cause une inscription déjà réussie.
+    supabase.functions.invoke("envoyer-push-exploitant", {
+      body: { organisation_id: data.organisation_id },
+    }).catch((e) => console.error("[InscriptionOrganisationScreen] envoyer-push-exploitant a échoué :", e));
 
     // Drapeau explicite plutôt qu'un pari sur la vitesse de résolution de
     // l'organisation : Shell() (App.jsx) le lit pour ne jamais proposer la
@@ -301,7 +323,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
             aide={`Nom court, affiché aux membres. Sert aussi d'adresse propre à ${motPourType(type, "organisation_votre")}.`} />
 
           <Champ label="Dénomination complète" value={nom} onChange={setNom}
-            placeholder="Ex : Mutuelle Générale des Fonctionnaires..." />
+            placeholder={`Ex : ${EXEMPLES_DENOMINATION[type] || EXEMPLES_DENOMINATION.autre}...`} />
 
           <div className="io-duo">
             <Champ label="Secteur" value={secteur} onChange={setSecteur}

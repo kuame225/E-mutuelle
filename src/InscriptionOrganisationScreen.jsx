@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   Building2, ArrowLeft, ArrowRight, Loader2, AlertCircle,
   CheckCircle2, Mail, Lock, MapPin, Briefcase, ShieldCheck, Sliders,
+  HeartHandshake, Users2, Handshake, Globe, PiggyBank, Network, Share2,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { TYPES_ORGANISATION, motPourType } from "./vocabulaire";
@@ -40,6 +41,20 @@ const LABELS_MODULES = {
   module_services: "Services offerts",
   module_formations: "Formations",
   module_partenariats: "Partenariats",
+};
+
+// Une icône par type, pour que le choix ne soit plus qu'un nom et une
+// phrase — repéré comme l'un des écrans les plus plats du parcours.
+const ICONES_TYPE = {
+  mutuelle: HeartHandshake,
+  association: Users2,
+  cooperative: Handshake,
+  ong: Globe,
+  avec: PiggyBank,
+  professionnelle: Briefcase,
+  federation: Network,
+  reseau: Share2,
+  autre: Building2,
 };
 
 // Le socle n'a pas de colonne module_* — toujours présent, jamais une
@@ -369,16 +384,23 @@ export default function InscriptionOrganisationScreen({ onBack }) {
             </p>
 
             <div className="io-types">
-              {TYPES_ORGANISATION.map((t) => (
-                <button
-                  key={t.id}
-                  className={`io-type ${type === t.id ? "is-on" : ""}`}
-                  onClick={() => setType(t.id)}
-                >
-                  <span className="io-type-nom">{t.label}</span>
-                  <span className="io-type-desc">{t.description}</span>
-                </button>
-              ))}
+              {TYPES_ORGANISATION.map((t) => {
+                const IconeType = ICONES_TYPE[t.id] || Building2;
+                return (
+                  <button
+                    key={t.id}
+                    className={`io-type ${type === t.id ? "is-on" : ""}`}
+                    onClick={() => setType(t.id)}
+                  >
+                    {type === t.id && (
+                      <span className="io-type-coche"><CheckCircle2 size={15} /></span>
+                    )}
+                    <span className="io-type-icone"><IconeType size={19} /></span>
+                    <span className="io-type-nom">{t.label}</span>
+                    <span className="io-type-desc">{t.description}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <button
@@ -493,7 +515,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
                   </div>
                   <div className="io-modules-liste">
                     {recommandes.map(([cle, libelle]) => (
-                      <label key={cle} className="io-module">
+                      <label key={cle} className={`io-module ${modules[cle] ? "is-on" : ""}`}>
                         <span>{libelle}</span>
                         <span className="io-bascule-wrap">
                           <input
@@ -515,7 +537,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
                 </div>
                 <div className="io-modules-liste">
                   {optionnels.map(([cle, libelle]) => (
-                    <label key={cle} className="io-module">
+                    <label key={cle} className={`io-module ${modules[cle] ? "is-on" : ""}`}>
                       <span>{libelle}</span>
                       <span className="io-bascule-wrap">
                         <input
@@ -776,7 +798,11 @@ const CSS = `
   width:100%; max-width:460px; background:${C.surface};
   border:1px solid ${C.border}; border-radius:${R.xxl}px;
   padding:${S.xxl}px ${S.xl}px; box-shadow:${SHADOW.md};
-  animation:ioIn .3s ease;
+  animation:ioIn .3s ease; position:relative; overflow:hidden;
+}
+.io-carte::before{
+  content:""; position:absolute; top:0; left:0; right:0; height:4px;
+  background:linear-gradient(90deg, ${C.primary}, ${PALETTE.blue600});
 }
 .io-carte-centree{ text-align:center; }
 .io-carte-large{ max-width:620px; }
@@ -837,10 +863,12 @@ const CSS = `
 .io-module{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:10px 14px; background:${C.bg}; border:1px solid ${C.border};
+  border-left:3px solid ${PALETTE.grey300};
   border-radius:${R.md}px; font-size:13.5px; font-weight:600; color:${C.text};
-  cursor:pointer;
+  cursor:pointer; transition:border-color .15s ease, background .15s ease;
 }
-.io-module-fixe{ cursor:default; color:${C.textMuted}; }
+.io-module.is-on{ border-left-color:${C.primary}; background:${PALETTE.blue50}; }
+.io-module-fixe{ cursor:default; color:${C.textMuted}; border-left-color:${C.success}; }
 .io-module-fixe svg{ color:${C.success}; flex-shrink:0; }
 
 .io-bascule-wrap{ position:relative; width:38px; height:22px; flex-shrink:0; }
@@ -864,16 +892,25 @@ const CSS = `
 }
 @media (max-width:520px){ .io-types{ grid-template-columns:1fr; } }
 .io-type{
-  display:flex; flex-direction:column; gap:4px; text-align:left;
+  display:flex; flex-direction:column; gap:4px; text-align:left; position:relative;
   padding:${S.md}px ${S.lg}px; cursor:pointer;
   background:${C.surface}; border:1.5px solid ${C.border};
   border-radius:${R.lg}px; font-family:inherit;
-  transition:border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  transition:border-color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease;
 }
-.io-type:hover{ border-color:${PALETTE.grey300}; background:${C.bg}; }
+.io-type:hover{ border-color:${PALETTE.grey300}; background:${C.bg}; transform:translateY(-1px); box-shadow:${SHADOW.sm}; }
 .io-type.is-on{
   border-color:${C.primary}; background:${PALETTE.blue50};
   box-shadow:${SHADOW.focus};
+}
+.io-type-icone{
+  width:36px; height:36px; border-radius:${R.md}px; margin-bottom:6px;
+  background:${PALETTE.blue100}; color:${C.primary};
+  display:flex; align-items:center; justify-content:center;
+}
+.io-type.is-on .io-type-icone{ background:${C.primary}; color:#fff; }
+.io-type-coche{
+  position:absolute; top:12px; right:12px; color:${C.primary}; display:flex;
 }
 .io-type-nom{ font-size:14.5px; font-weight:600; color:${C.text}; }
 .io-type-desc{ font-size:12px; color:${C.textSubtle}; line-height:1.45; }
@@ -890,8 +927,9 @@ const CSS = `
   width:56px; height:56px; border-radius:16px; margin:0 auto ${S.lg}px;
   background:${PALETTE.blue100}; color:${C.primary};
   display:flex; align-items:center; justify-content:center;
+  box-shadow:0 6px 16px -6px ${C.primary}55;
 }
-.io-icone-ok{ background:#DCFCE7; color:${C.success}; }
+.io-icone-ok{ background:#DCFCE7; color:${C.success}; box-shadow:0 6px 16px -6px ${C.success}55; }
 
 .io-titre{ font-size:21px; font-weight:700; letter-spacing:-.02em; margin:0; }
 .io-sous{
@@ -914,7 +952,11 @@ const CSS = `
 .io-champ{ display:flex; flex-direction:column; gap:6px; }
 .io-label{ font-size:13px; font-weight:600; color:${C.textMuted}; }
 .io-input-wrap{ position:relative; display:flex; align-items:center; }
-.io-input-icon{ position:absolute; left:14px; color:${C.textSubtle}; pointer-events:none; }
+.io-input-icon{
+  position:absolute; left:9px; width:24px; height:24px; border-radius:50%;
+  background:${PALETTE.blue50}; color:${C.primary};
+  display:flex; align-items:center; justify-content:center; pointer-events:none;
+}
 .io-input{
   width:100%; box-sizing:border-box; padding:12px 14px;
   border:1.5px solid ${C.border}; border-radius:${R.md}px;
@@ -922,7 +964,7 @@ const CSS = `
   font-family:inherit; font-size:14.5px; outline:none;
   transition:border-color .15s ease, box-shadow .15s ease;
 }
-.io-input-avec-icone{ padding-left:40px; }
+.io-input-avec-icone{ padding-left:46px; }
 .io-input::placeholder{ color:${PALETTE.grey300}; }
 .io-input:focus{ border-color:${C.primary}; box-shadow:${SHADOW.focus}; }
 .io-aide{ font-size:12px; color:${C.textSubtle}; line-height:1.5; }
@@ -936,12 +978,14 @@ const CSS = `
 
 .io-btn{
   display:flex; align-items:center; justify-content:center; gap:9px;
-  width:100%; background:${C.primary}; color:#fff; border:none;
+  width:100%; background:linear-gradient(135deg, ${C.primary} 0%, ${C.primaryDark} 100%);
+  color:#fff; border:none;
   border-radius:${R.md}px; padding:15px 0; cursor:pointer;
   font-family:inherit; font-size:15px; font-weight:600;
-  box-shadow:${SHADOW.sm}; transition:background .18s ease; margin-top:4px;
+  box-shadow:0 4px 14px -4px ${C.primary}88; margin-top:4px;
+  transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease;
 }
-.io-btn:hover:not(:disabled){ background:${C.primaryDark}; }
+.io-btn:hover:not(:disabled){ transform:translateY(-1px); box-shadow:0 6px 18px -4px ${C.primary}aa; }
 .io-btn:disabled{ opacity:.6; cursor:not-allowed; }
 
 .io-legal{

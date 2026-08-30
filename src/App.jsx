@@ -143,6 +143,26 @@ function Shell() {
     setPinDeverrouille(false);
   }, [userId]);
 
+  // Drapeau posé explicitement par InscriptionOrganisationScreen, plutôt
+  // que de parier sur la rapidité de useParametrage : tant qu'il est
+  // présent, aucun écran de PIN n'est jamais montré, quelle que soit la
+  // vitesse à laquelle l'organisation se résout. Retiré ci-dessous dès
+  // que l'état de l'organisation (actif ou non) est connu avec certitude.
+  //
+  // Calculé et l'effet déclaré ici, avant tout retour anticipé (splash,
+  // chargement...) — les placer après une condition de retour, comme la
+  // première tentative l'avait fait, viole les règles des Hooks : le
+  // nombre de Hooks appelés doit rester identique à chaque rendu, jamais
+  // conditionné par un retour précédent (React error #310).
+  const venantDInscription = session && !isExploitant
+    && sessionStorage.getItem("post_inscription_org") === "1";
+
+  useEffect(() => {
+    if (venantDInscription && orgActif !== null) {
+      sessionStorage.removeItem("post_inscription_org");
+    }
+  }, [venantDInscription, orgActif]);
+
   // Un administrateur ne peut basculer que s'il possède une fiche membre
   const peutBasculer = isAdmin && Boolean(membre);
   const enEspaceMembre = !isAdmin || (peutBasculer && !espaceAdmin);
@@ -180,27 +200,6 @@ function Shell() {
   }
 
   // ---------- Juste après une inscription de mutuelle ----------
-  // Drapeau posé explicitement par InscriptionOrganisationScreen, plutôt
-  // que de parier sur la rapidité de useParametrage : tant qu'il est
-  // présent, aucun écran de PIN n'est jamais montré, quelle que soit la
-  // vitesse à laquelle l'organisation se résout. Retiré ci-dessous dès
-  // que l'état de l'organisation (actif ou non) est connu avec certitude,
-  // pour que le comportement normal reprenne ensuite, y compris pour ce
-  // même compte lors d'une connexion future.
-  const venantDInscription = session && !isExploitant
-    && sessionStorage.getItem("post_inscription_org") === "1";
-
-  // Effet de bord déplacé ici depuis le corps du rendu — le retirer
-  // pendant le rendu lui-même provoquait un cycle Chargement → Espace
-  // non actif → Chargement → Espace non actif : React.StrictMode
-  // (actif dans main.jsx) double délibérément l'exécution des rendus
-  // pour détecter exactement ce genre d'effet de bord impur.
-  useEffect(() => {
-    if (venantDInscription && orgActif !== null) {
-      sessionStorage.removeItem("post_inscription_org");
-    }
-  }, [venantDInscription, orgActif]);
-
   if (venantDInscription && (parametrageEnCours || orgActif === null)) {
     return <div style={ecranAttente}>Chargement…</div>;
   }

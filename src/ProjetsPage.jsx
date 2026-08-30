@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import {
   Plus, X, Loader2, AlertCircle, CheckCircle2, Trash2, Search,
   ArrowLeft, ChevronRight, Briefcase, Wallet, Calendar, Pencil, TrendingUp,
+  FileSpreadsheet, Upload,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
@@ -179,6 +181,7 @@ function FicheProjet({ projet, bailleurs, onBack, onUpdate, onDelete, onNouveauB
   const [indicateurs, setIndicateurs] = useState([]);
   const [loadingIndicateurs, setLoadingIndicateurs] = useState(true);
   const [ajoutIndicateur, setAjoutIndicateur] = useState(false);
+  const [importExcel, setImportExcel] = useState(false);
   const [releveOuvert, setReleveOuvert] = useState(null); // indicateur_id du relevé en saisie
   const [suppressionIndicateur, setSuppressionIndicateur] = useState(null);
 
@@ -353,6 +356,9 @@ function FicheProjet({ projet, bailleurs, onBack, onUpdate, onDelete, onNouveauB
       {/* ---- Suivi & Évaluation ---- */}
       <div className="pj-tools">
         <h2 className="pj-section-titre">Suivi &amp; Évaluation</h2>
+        <button className="pj-lien" onClick={() => setImportExcel(true)}>
+          <FileSpreadsheet size={15} /> Importer depuis Excel
+        </button>
         <button className="pj-btn" onClick={() => setAjoutIndicateur(true)}>
           <Plus size={17} /> Ajouter un indicateur
         </button>
@@ -422,6 +428,16 @@ function FicheProjet({ projet, bailleurs, onBack, onUpdate, onDelete, onNouveauB
           organisationId={projet.organisation_id}
           onCancel={() => setAjoutIndicateur(false)}
           onDone={(texte) => { setAjoutIndicateur(false); notifier(texte); chargerIndicateurs(); }}
+        />
+      )}
+
+      {importExcel && (
+        <ModalImportExcel
+          projetId={projet.id}
+          organisationId={projet.organisation_id}
+          indicateursExistants={indicateurs}
+          onCancel={() => setImportExcel(false)}
+          onDone={(texte) => { setImportExcel(false); notifier(texte); chargerIndicateurs(); }}
         />
       )}
 
@@ -836,6 +852,158 @@ function ModalIndicateur({ projetId, organisationId, onCancel, onDone }) {
   );
 }
 
+// Import en masse depuis un fichier Excel — colonnes attendues :
+// Indicateur, Date, Valeur, Note (facultative), Unité et Cible
+// (facultatives, utilisées seulement si l'indicateur n'existe pas encore
+// et doit être créé à la volée). Un indicateur déjà présent (comparé par
+// libellé, sans tenir compte de la casse) reçoit simplement un nouveau
+// relevé, il n'est jamais dupliqué.
+function ModalImportExcel({ projetId, organisationId, indicateursExistants, onCancel, onDone }) {
+  const [fichier, setFichier] = useState(null);
+  const [enCours, setEnCours] = useState(false);
+  const [resultat, setResultat] = useState(null);
+  const [err, setErr] = useState("");
+
+  function choisirFichier(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFichier(f);
+    setResultat(null);
+    setErr("");
+  }
+
+  async function traiter() {
+    if (!fichier) { setErr("Choisissez d'abord un fichier Excel."); return; }
+
+    setEnCours(true);
+    setErr("");
+
+    let lignes;
+    try {
+      const tampon = await fichier.arrayBuffer();
+      const classeur = XLSX.read(tampon, { type: "array", cellDates: true });
+      const feuille = classeur.Sheets[classeur.SheetNames[0]];
+      lignes = XLSX.utils.sheet_to_json(feuille, { defval: null });
+    } catch (e) {
+      setEnCours(false);
+      setErr("Fichier illisible — vérifiez qu'il s'agit bien d'un fichier Excel (.xlsx).");
+      return;
+    }
+
+    let ajoutes = 0, crees = 0, ignores = 0;
+    const indicateursParLibelle = new Map(
+      indicateursExistants.map((i) => [i.libelle.trim().toLowerCase(), i.indicateur_id])
+    );
+
+    for (const ligne of lignes) {
+      const libelleLigne = String(ligne["Indicateur"] || "").trim();
+      const valeurLigne = ligne["Valeur"];
+      const dateLigne = ligne["Date"];
+
+      if (!libelleLigne || valeurLigne == null || valeurLigne === "" || !dateLigne) {
+        ignores++;
+        continue;
+      }
+
+      const cle = libelleLigne.toLowerCase();
+      let indicateurId = indicateursParLibelle.get(cle);
+
+      if (!indicateurId) {
+        const { data, error } = await supabase
+          .from("indicateurs_projet")
+          .insert({
+            organisation_id: organisationId,
+            projet_id: projetId,
+            libelle: libelleLigne,
+            unite: ligne["Unité"] ? String(ligne["Unité"]).trim() : null,
+            valeur_cible: ligne["Cible"] ? parseFloat(ligne["Cible"]) : null,
+          })
+          .select()
+          .single();
+
+        if (error || !data) { ignores++; continue; }
+        indicateurId = data.id;
+        indicateursParLibelle.set(cle, indicateurId);
+        crees++;
+      }
+
+      const dateReleve = dateLigne instanceof Date
+        ? dateLigne.toISOString().slice(0, 10)
+        : String(dateLigne).slice(0, 10);
+
+      const { error: erreurReleve } = await supabase.from("releves_indicateur").insert({
+        indicateur_id: indicateurId,
+        valeur: parseFloat(valeurLigne),
+        date_releve: dateReleve,
+        note: ligne["Note"] ? String(ligne["Note"]).trim() : null,
+      });
+
+      if (erreurReleve) { ignores++; continue; }
+      ajoutes++;
+    }
+
+    setEnCours(false);
+    setResultat({ ajoutes, crees, ignores });
+  }
+
+  return (
+    <div className="pj-overlay" onClick={onCancel}>
+      <div className="pj-modal" onClick={(e) => e.stopPropagation()}>
+        <header className="pj-modal-head">
+          <h3 className="pj-modal-titre">Importer des relevés depuis Excel</h3>
+          <button className="pj-close" onClick={onCancel} aria-label="Fermer"><X size={20} /></button>
+        </header>
+
+        {!resultat ? (
+          <>
+            <p className="pj-modal-texte">
+              Colonnes attendues : <strong>Indicateur</strong>, <strong>Date</strong>,{" "}
+              <strong>Valeur</strong>, et facultativement Note, Unité et Cible (ces deux
+              dernières ne servent que si l'indicateur n'existe pas encore).
+            </p>
+
+            <label className="pj-drop" htmlFor="pj-fichier-excel">
+              <Upload size={18} />
+              {fichier ? fichier.name : "Choisir un fichier .xlsx…"}
+            </label>
+            <input
+              id="pj-fichier-excel" type="file" accept=".xlsx,.xls"
+              onChange={choisirFichier} style={{ display: "none" }}
+            />
+
+            {err && <div className="pj-err"><AlertCircle size={15} /> {err}</div>}
+
+            <div className="pj-modal-actions">
+              <button className="pj-mbtn pj-mbtn-ghost" onClick={onCancel} disabled={enCours}>
+                Annuler
+              </button>
+              <button className="pj-mbtn pj-mbtn-primary" onClick={traiter} disabled={enCours || !fichier}>
+                {enCours ? <><Loader2 size={16} className="pj-spin" /> Import…</> : "Importer"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="pj-import-resultat">
+              <CheckCircle2 size={22} color={C.success} />
+              <p>
+                <strong>{resultat.ajoutes}</strong> relevé(s) ajouté(s),{" "}
+                <strong>{resultat.crees}</strong> nouvel(aux) indicateur(s) créé(s)
+                {resultat.ignores > 0 && <>, <strong>{resultat.ignores}</strong> ligne(s) ignorée(s) (colonnes manquantes ou illisibles)</>}.
+              </p>
+            </div>
+            <div className="pj-modal-actions">
+              <button className="pj-mbtn pj-mbtn-primary" onClick={() => onDone("Import terminé.")}>
+                Fermer
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Formulaire compact, affiché en ligne sous l'indicateur plutôt qu'en
 // fenêtre à part : on relève une valeur, on ne remplit pas une fiche.
 function ModalReleve({ indicateurId, onCancel, onDone }) {
@@ -1054,6 +1222,21 @@ const CSS = `
   transition:all .16s ease;
 }
 .pj-choix-btn.is-on{ border-color:${C.primary}; background:${PALETTE.blue50}; color:${C.primary}; }
+
+.pj-drop{
+  display:flex; align-items:center; gap:9px;
+  border:1.5px dashed ${C.border}; border-radius:${R.md}px;
+  padding:14px 15px; cursor:pointer; font-size:14px; color:${C.textMuted};
+  margin-bottom:${S.md}px;
+}
+.pj-drop:hover{ border-color:${C.primary}; background:${PALETTE.blue50}; }
+
+.pj-import-resultat{
+  display:flex; align-items:flex-start; gap:10px;
+  background:#DCFCE7; border:1px solid ${C.success}33;
+  border-radius:${R.md}px; padding:14px 16px; margin-bottom:${S.md}px;
+}
+.pj-import-resultat p{ margin:0; font-size:13.5px; line-height:1.6; color:${C.text}; }
 
 .pj-err{
   display:flex; align-items:flex-start; gap:8px;

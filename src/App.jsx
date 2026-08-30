@@ -9,6 +9,7 @@ import { C, R, S, SHADOW, PALETTE } from "./theme";
 import WelcomeScreen from "./WelcomeScreen";
 import LandingPage from "./LandingPage";
 import InscriptionOrganisationScreen from "./InscriptionOrganisationScreen";
+import DonPubliqueScreen from "./DonPubliqueScreen";
 import LoginScreen from "./LoginScreen";
 import AdhesionFlow from "./AdhesionFlow";
 
@@ -43,6 +44,7 @@ import TontinePage from "./TontinePage";
 import PretsPage from "./PretsPage";
 import ParametragePage from "./ParametragePage";
 import RapportsPage from "./RapportsPage";
+import DonsPage from "./DonsPage";
 import SanctionsPage from "./SanctionsPage";
 import SplashScreen from "./SplashScreen";
 import ActivationScreen from "./ActivationScreen";
@@ -186,6 +188,17 @@ function Shell() {
   function versEspaceAdmin() {
     setEspaceAdmin(true);
     setPage("dashboard");
+  }
+
+  // Page de don publique — reconnue par un paramètre d'URL, jamais par
+  // un chemin (?don=SIGLE plutôt que /don/SIGLE), pour ne pas dépendre
+  // d'une configuration particulière de Cloudflare Pages pour rediriger
+  // les chemins vers l'application. Vérifiée avant tout autre retour
+  // anticipé : un lien de don partagé doit s'afficher immédiatement,
+  // qu'une session existe ou non dans ce navigateur.
+  const donSlug = new URLSearchParams(window.location.search).get("don");
+  if (donSlug) {
+    return <DonPubliqueScreen slug={donSlug} />;
   }
 
   // L'écran de démarrage s'efface dès que la session est connue, plutôt
@@ -565,6 +578,7 @@ function Shell() {
           {page === "prets"         && <PretsPage />}
           {page === "parametrage"   && <ParametragePage />}
           {page === "rapports"      && <RapportsPage />}
+          {page === "dons"          && <DonsPage />}
           {page === "journal"       && <JournalPage />}
           {page === "roles"         && <RolesPage />}
           {!ADMIN_PAGES.includes(page) && <TableauBordFinancier />}

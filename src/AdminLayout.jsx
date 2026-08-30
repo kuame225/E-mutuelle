@@ -4,7 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
-  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake,
+  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake, Heart,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -81,6 +81,7 @@ export const NAV_GROUPS = [
       { id: "services",      label: "Services offerts", icon: Briefcase, module: "module_services" },
       { id: "formations",    label: "Formations", icon: GraduationCap, module: "module_formations" },
       { id: "partenariats",  label: "Partenariats", icon: Handshake, module: "module_partenariats" },
+      { id: "dons",          label: "Dons publics", icon: Heart, module: "module_dons" },
     ],
   },
   {
@@ -137,6 +138,7 @@ function sousTitresPour(mot) {
     services:      `Catalogue des services proposés ${mot("organisation_de")}`,
     formations:    "Calendrier, inscriptions et suivi de présence",
     partenariats:  `Annuaire des partenaires ${mot("organisation_de")}`,
+    dons:          "Page publique de collecte et historique des dons reçus",
     communication: `Communiqués aux ${mot("membres").toLowerCase()}`,
     agenda:        "Échéances et événements",
     parametrage:   "Configuration de la plateforme",

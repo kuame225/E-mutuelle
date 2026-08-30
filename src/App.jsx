@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  LogOut, UserCircle2, ArrowLeft, PowerOff, ShieldOff, ShieldCheck,
+  LogOut, UserCircle2, ArrowLeft, PowerOff, ShieldOff, ShieldCheck, CheckCircle2,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
@@ -190,12 +190,19 @@ function Shell() {
   const venantDInscription = session && !isExploitant
     && sessionStorage.getItem("post_inscription_org") === "1";
 
+  // Effet de bord déplacé ici depuis le corps du rendu — le retirer
+  // pendant le rendu lui-même provoquait un cycle Chargement → Espace
+  // non actif → Chargement → Espace non actif : React.StrictMode
+  // (actif dans main.jsx) double délibérément l'exécution des rendus
+  // pour détecter exactement ce genre d'effet de bord impur.
+  useEffect(() => {
+    if (venantDInscription && orgActif !== null) {
+      sessionStorage.removeItem("post_inscription_org");
+    }
+  }, [venantDInscription, orgActif]);
+
   if (venantDInscription && (parametrageEnCours || orgActif === null)) {
     return <div style={ecranAttente}>Chargement…</div>;
-  }
-
-  if (venantDInscription && orgActif !== null) {
-    sessionStorage.removeItem("post_inscription_org");
   }
 
   // ---------- Organisation en cours de résolution ----------
@@ -229,14 +236,16 @@ function Shell() {
   if (session && !isExploitant && params.organisation_id && orgActif === false) {
     return (
       <div style={ecranAttenteOrg}>
-        <ShieldOff size={32} color={C.textSubtle} />
+        {venantDInscription
+          ? <CheckCircle2 size={32} color={C.success} />
+          : <ShieldOff size={32} color={C.textSubtle} />}
         <h1 style={{ fontSize: 19, fontWeight: 700, margin: "14px 0 8px" }}>
-          Espace non actif
+          {venantDInscription ? "Félicitations, votre organisation a été créée !" : "Espace non actif"}
         </h1>
         <p style={{ fontSize: 14.5, color: C.textMuted, maxWidth: "36ch", lineHeight: 1.6, margin: 0 }}>
-          L'espace de votre mutuelle n'est pas encore actif. Si vous venez de
-          l'inscrire, notre équipe la valide sous peu et vous préviendra.
-          Pour toute question, contactez-nous directement.
+          {venantDInscription
+            ? "Votre demande est enregistrée. Notre équipe la valide sous peu et vous préviendra par e-mail dès que votre espace sera actif."
+            : "L'espace de votre organisation n'est pas encore actif. Si vous venez de l'inscrire, notre équipe la valide sous peu et vous préviendra. Pour toute question, contactez-nous directement."}
         </p>
         <div
           style={{

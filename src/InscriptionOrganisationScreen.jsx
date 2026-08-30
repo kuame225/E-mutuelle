@@ -280,19 +280,20 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     // gardait ce résultat en cache indéfiniment — rien ne le rafraîchissait
     // ensuite, d'où le blocage prolongé sur "Chargement…" observé plus tôt.
     //
-    // Point à ne pas répéter : rafraîchir AVANT setEtape("succes") réglait
-    // ce blocage, mais faisait basculer Shell() (App.jsx) vers son propre
-    // écran si vite que celui-ci n'avait jamais l'occasion de s'afficher à
-    // l'écran — la personne ne voyait alors jamais "Félicitations". L'ordre
-    // compte : l'écran de succès s'affiche d'abord, le rafraîchissement est
-    // différé de façon à lui laisser le temps d'être réellement peint.
+    // Ce composant n'est de toute façon rendu que tant qu'aucune session
+    // n'existe (voir App.jsx, "if (!session)") : dès que signUp() réussit,
+    // il disparaît de l'arbre avant même que l'écran "succès" ci-dessous
+    // n'ait la moindre chance de s'afficher — un délai ici ne protège donc
+    // rien. Le vrai message de confirmation vit maintenant dans l'écran
+    // "Espace non actif" d'App.jsx, le seul qui s'affiche réellement après
+    // une inscription. On rafraîchit donc immédiatement, sans délai.
+    await rafraichirIdentite();
+
     setEtape("succes");
-    setTimeout(() => { rafraichirIdentite(); }, 1200);
-    // Délai allongé (5s) pour laisser le temps de lire le rappel des
-    // conditions tarifaires affiché sur cet écran, et pour rester après
-    // la bascule de Shell() vers "Espace non actif" une fois l'identité
-    // rafraîchie ci-dessus — au cas où la personne reviendrait sur cet
-    // onglet avant que ce changement de page n'ait eu lieu.
+    // En pratique, ce composant disparaît de l'arbre bien avant ce délai
+    // (dès que Shell() bascule vers "Espace non actif"). Ce rechargement
+    // ne reste utile que dans le cas marginal où, pour une raison ou une
+    // autre, ce basculement tarderait anormalement.
     setTimeout(() => window.location.reload(), 5000);
   }
 

@@ -104,6 +104,58 @@ function PanneauRecap({ type, sigle, nom, secteur, localite, modules }) {
   );
 }
 
+// Panneau de marque permanent — même traitement que LoginScreen.jsx
+// (dégradé sombre, argumentaire, icônes), pour que ce parcours ne soit
+// plus le seul écran resté au style plus sobre du reste de l'application.
+// Une seule <style>{CSS}</style>, hissée ici plutôt que répétée à
+// chacun des six écrans du parcours.
+function PageInscription({ children }) {
+  return (
+    <div className="io-shell-duo">
+      <style>{CSS}</style>
+
+      <aside className="io-marque">
+        <div className="io-marque-glow io-marque-glow-1" />
+        <div className="io-marque-glow io-marque-glow-2" />
+
+        <div className="io-marque-contenu">
+          <div className="io-marque-mark">
+            <div className="io-marque-logo"><Building2 size={20} /></div>
+            <span className="io-marque-nom">Baamo</span>
+          </div>
+
+          <h1 className="io-marque-titre">
+            Votre organisation,<br />prête en quelques minutes.
+          </h1>
+          <p className="io-marque-sous">
+            Cotisations, membres et activités : tout ce que vous gérez
+            aujourd'hui à la main, réuni au même endroit.
+          </p>
+
+          <ul className="io-marque-atouts">
+            <li>
+              <span className="io-marque-icone"><ShieldCheck size={16} /></span>
+              Chaque organisation isolée et sécurisée
+            </li>
+            <li>
+              <span className="io-marque-icone"><Sliders size={16} /></span>
+              Un espace déjà adapté à votre type d'organisation
+            </li>
+            <li>
+              <span className="io-marque-icone"><CheckCircle2 size={16} /></span>
+              2 mois d'essai complet, sans engagement
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <main className="io-contenu">
+        {children}
+      </main>
+    </div>
+  );
+}
+
 /**
  * Inscription d'une nouvelle organisation.
  *
@@ -299,8 +351,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
   /* ---------------- Choix du type ---------------- */
   if (etape === "type") {
     return (
-      <div className="io-shell">
-        <style>{CSS}</style>
+      <PageInscription>
         <div className="io-page">
           <BarreEtapes etapeActuelle="type" />
           <div className="io-carte io-carte-large">
@@ -339,14 +390,13 @@ export default function InscriptionOrganisationScreen({ onBack }) {
             </button>
           </div>
         </div>
-      </div>
+      </PageInscription>
     );
   }
 
   if (etape === "succes") {
     return (
-      <div className="io-shell">
-        <style>{CSS}</style>
+      <PageInscription>
         <div className="io-carte io-carte-centree">
           <div className="io-icone io-icone-ok"><CheckCircle2 size={30} /></div>
           <h1 className="io-titre">Demande envoyée</h1>
@@ -365,14 +415,13 @@ export default function InscriptionOrganisationScreen({ onBack }) {
           </div>
           <div className="io-barre"><span /></div>
         </div>
-      </div>
+      </PageInscription>
     );
   }
 
   if (etape === "sigle_seul") {
     return (
-      <div className="io-shell">
-        <style>{CSS}</style>
+      <PageInscription>
         <div className="io-carte">
           <div className="io-icone"><Building2 size={26} /></div>
           <h1 className="io-titre">Un autre sigle</h1>
@@ -396,7 +445,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
             </button>
           </form>
         </div>
-      </div>
+      </PageInscription>
     );
   }
 
@@ -406,8 +455,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     const optionnels = Object.entries(LABELS_MODULES).filter(([cle]) => !modules[cle]);
 
     return (
-      <div className="io-shell">
-        <style>{CSS}</style>
+      <PageInscription>
         <div className="io-page">
           <BarreEtapes etapeActuelle="modules" />
           <div className="io-layout-duo">
@@ -490,7 +538,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
             <PanneauRecap type={type} sigle={sigle} nom={nom} secteur={secteur} localite={localite} modules={modules} />
           </div>
         </div>
-      </div>
+      </PageInscription>
     );
   }
 
@@ -499,8 +547,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     const modulesActifs = Object.entries(LABELS_MODULES).filter(([cle]) => modules[cle]);
 
     return (
-      <div className="io-shell">
-        <style>{CSS}</style>
+      <PageInscription>
         <div className="io-page">
           <BarreEtapes etapeActuelle="recapitulatif" />
           <div className="io-layout-duo">
@@ -567,13 +614,12 @@ export default function InscriptionOrganisationScreen({ onBack }) {
             <PanneauRecap type={type} sigle={sigle} nom={nom} secteur={secteur} localite={localite} modules={modules} />
           </div>
         </div>
-      </div>
+      </PageInscription>
     );
   }
 
   return (
-    <div className="io-shell">
-      <style>{CSS}</style>
+    <PageInscription>
       <div className="io-page">
         <BarreEtapes etapeActuelle="formulaire" />
         <div className="io-layout-duo">
@@ -639,7 +685,7 @@ export default function InscriptionOrganisationScreen({ onBack }) {
           <PanneauRecap type={type} sigle={sigle} nom={nom} secteur={secteur} localite={localite} modules={modules} />
         </div>
       </div>
-    </div>
+    </PageInscription>
   );
 }
 
@@ -678,11 +724,54 @@ function traduireErreurCompte(message = "") {
 /* ---------------- Styles ---------------- */
 
 const CSS = `
-.io-shell{
-  min-height:100vh; display:flex; align-items:center; justify-content:center;
-  background:linear-gradient(160deg, ${PALETTE.blue50} 0%, ${C.bg} 55%);
-  padding:${S.xl}px; font-family:'Inter','Poppins',system-ui,sans-serif; color:${C.text};
+.io-shell-duo{
+  min-height:100vh; display:grid; grid-template-columns:1fr;
+  font-family:'Inter','Poppins',system-ui,sans-serif; color:${C.text};
 }
+@media (min-width:960px){ .io-shell-duo{ grid-template-columns:0.8fr 1.2fr; } }
+
+/* ---- Panneau de marque ---- */
+.io-marque{
+  display:flex; flex-direction:column; justify-content:center;
+  position:relative; overflow:hidden;
+  background:linear-gradient(150deg, ${PALETTE.blue900} 0%, ${PALETTE.blue800} 55%, ${PALETTE.blue600} 130%);
+  color:#fff; padding:${S.xl}px ${S.lg}px;
+}
+@media (min-width:960px){ .io-marque{ align-items:center; padding:${S.xxxl}px; } }
+.io-marque-glow{ position:absolute; border-radius:50%; filter:blur(4px); }
+.io-marque-glow-1{ width:280px; height:280px; right:-90px; top:-90px; background:rgba(255,255,255,.06); }
+.io-marque-glow-2{ width:200px; height:200px; left:-70px; bottom:-60px; background:rgba(255,255,255,.05); }
+@media (min-width:960px){
+  .io-marque-glow-1{ width:420px; height:420px; right:-140px; top:-120px; }
+  .io-marque-glow-2{ width:300px; height:300px; left:-100px; bottom:-90px; }
+}
+.io-marque-contenu{ position:relative; z-index:1; max-width:400px; margin:0 auto; width:100%; }
+.io-marque-mark{ display:flex; align-items:center; gap:10px; margin-bottom:${S.lg}px; }
+@media (min-width:960px){ .io-marque-mark{ margin-bottom:${S.xxxl}px; } }
+.io-marque-logo{
+  width:36px; height:36px; border-radius:${R.md}px; flex-shrink:0;
+  background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center;
+}
+.io-marque-nom{ font-size:16px; font-weight:700; letter-spacing:.02em; }
+.io-marque-titre{ font-size:22px; font-weight:700; line-height:1.25; letter-spacing:-.02em; margin:0 0 ${S.sm}px; }
+@media (min-width:960px){ .io-marque-titre{ font-size:34px; margin-bottom:${S.lg}px; } }
+.io-marque-sous{ font-size:13.5px; line-height:1.55; opacity:.85; margin:0 0 ${S.lg}px; max-width:36ch; }
+@media (min-width:960px){ .io-marque-sous{ font-size:15.5px; margin-bottom:${S.xxxl}px; } }
+.io-marque-atouts{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:${S.sm}px; }
+@media (min-width:960px){ .io-marque-atouts{ gap:${S.md}px; } }
+.io-marque-atouts li{ display:flex; align-items:center; gap:${S.sm}px; font-size:12.5px; opacity:.92; }
+@media (min-width:960px){ .io-marque-atouts li{ font-size:14px; } }
+.io-marque-icone{
+  width:28px; height:28px; border-radius:${R.sm}px; flex-shrink:0;
+  background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center;
+}
+
+.io-contenu{
+  min-height:100%; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(160deg, ${PALETTE.blue50} 0%, ${C.bg} 55%);
+  padding:${S.xl}px;
+}
+
 .io-carte{
   width:100%; max-width:460px; background:${C.surface};
   border:1px solid ${C.border}; border-radius:${R.xxl}px;

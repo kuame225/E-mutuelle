@@ -147,16 +147,6 @@ export default function LoginScreen({ onAdhesion, onBack }) {
             </button>
           )}
 
-          <div className="mobile-mark">
-            <img
-              src={logo}
-              alt={`Logo ${sigle}`}
-              className="brand-logo-img brand-logo-img-sm"
-              onError={(e) => { e.currentTarget.src = LOGO_DEFAUT; }}
-            />
-            <div className="mobile-mark-text">{sigle}</div>
-          </div>
-
           <header className="card-header">
             <h2 className="card-title">Connexion</h2>
             <p className="card-subtitle">Accédez à votre espace mutualiste</p>
@@ -360,36 +350,54 @@ const CSS = `
 @media (min-width:960px){ .auth-shell{ grid-template-columns:1.05fr 1fr; } }
 
 /* ---- Marque ---- */
+/* Visible désormais à toutes les tailles — condensé sous 960px plutôt
+   que masqué. Sur mobile, il s'affiche au-dessus du formulaire (l'ordre
+   naturel de la grille à une colonne) au lieu de disparaître, pour que
+   l'argumentaire touche aussi les visiteurs sur téléphone, probablement
+   la majorité des visiteurs réels. */
 .auth-brand{
-  display:none; position:relative; overflow:hidden;
+  display:flex; flex-direction:column; justify-content:center;
+  position:relative; overflow:hidden;
   background:linear-gradient(150deg, ${PALETTE.blue900} 0%, ${PALETTE.blue800} 55%, ${PALETTE.blue600} 130%);
-  color:#fff; padding:${S.xxxl}px;
+  color:#fff; padding:${S.xl}px ${S.lg}px;
 }
-@media (min-width:960px){ .auth-brand{ display:flex; align-items:center; } }
+@media (min-width:960px){ .auth-brand{ align-items:center; padding:${S.xxxl}px; } }
 .brand-glow{ position:absolute; border-radius:50%; filter:blur(4px); }
-.brand-glow-1{ width:420px; height:420px; right:-140px; top:-120px; background:rgba(255,255,255,.06); }
-.brand-glow-2{ width:300px; height:300px; left:-100px; bottom:-90px; background:rgba(255,255,255,.05); }
+.brand-glow-1{ width:280px; height:280px; right:-90px; top:-90px; background:rgba(255,255,255,.06); }
+.brand-glow-2{ width:200px; height:200px; left:-70px; bottom:-60px; background:rgba(255,255,255,.05); }
+@media (min-width:960px){
+  .brand-glow-1{ width:420px; height:420px; right:-140px; top:-120px; }
+  .brand-glow-2{ width:300px; height:300px; left:-100px; bottom:-90px; }
+}
 .brand-content{ position:relative; z-index:1; max-width:440px; margin:0 auto; width:100%; }
-.brand-mark{ display:flex; align-items:center; gap:${S.md}px; margin-bottom:${S.xxxl}px; }
+.brand-mark{ display:flex; align-items:center; gap:${S.sm}px; margin-bottom:${S.lg}px; }
+@media (min-width:960px){ .brand-mark{ gap:${S.md}px; margin-bottom:${S.xxxl}px; } }
 .brand-logo-img{
-  width:52px; height:52px; object-fit:contain; flex-shrink:0;
-  background:#fff; border-radius:${R.md}px; padding:6px;
+  width:40px; height:40px; object-fit:contain; flex-shrink:0;
+  background:#fff; border-radius:${R.md}px; padding:5px;
   box-shadow:0 2px 10px rgba(0,0,0,.12);
 }
-.brand-logo-img-sm{ width:42px; height:42px; padding:4px; box-shadow:none; }
+@media (min-width:960px){ .brand-logo-img{ width:52px; height:52px; padding:6px; } }
 .brand-name{
-  font-size:20px; font-weight:700; letter-spacing:.02em; line-height:1.1;
+  font-size:16px; font-weight:700; letter-spacing:.02em; line-height:1.1;
   overflow-wrap:anywhere;
 }
-.brand-tagline{ font-size:13px; opacity:.75; max-width:26ch; line-height:1.4; }
-.brand-title{ font-size:40px; font-weight:700; line-height:1.15; letter-spacing:-.03em; margin:0 0 ${S.lg}px; }
-.brand-subtitle{ font-size:17px; line-height:1.6; opacity:.82; margin:0 0 ${S.xxxl}px; max-width:38ch; }
-.brand-features{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:${S.lg}px; }
-.brand-features li{ display:flex; align-items:center; gap:${S.md}px; font-size:15px; opacity:.92; }
+@media (min-width:960px){ .brand-name{ font-size:20px; } }
+.brand-tagline{ font-size:12px; opacity:.75; max-width:26ch; line-height:1.4; }
+@media (min-width:960px){ .brand-tagline{ font-size:13px; } }
+.brand-title{ font-size:24px; font-weight:700; line-height:1.2; letter-spacing:-.02em; margin:0 0 ${S.sm}px; }
+@media (min-width:960px){ .brand-title{ font-size:40px; margin-bottom:${S.lg}px; } }
+.brand-subtitle{ font-size:14px; line-height:1.55; opacity:.85; margin:0 0 ${S.lg}px; max-width:38ch; }
+@media (min-width:960px){ .brand-subtitle{ font-size:17px; margin-bottom:${S.xxxl}px; } }
+.brand-features{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:${S.sm}px; }
+@media (min-width:960px){ .brand-features{ gap:${S.lg}px; } }
+.brand-features li{ display:flex; align-items:center; gap:${S.sm}px; font-size:13px; opacity:.92; }
+@media (min-width:960px){ .brand-features li{ gap:${S.md}px; font-size:15px; } }
 .feature-icon{
-  width:38px; height:38px; border-radius:${R.sm}px; flex-shrink:0;
+  width:30px; height:30px; border-radius:${R.sm}px; flex-shrink:0;
   background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center;
 }
+@media (min-width:960px){ .feature-icon{ width:38px; height:38px; } }
 
 /* ---- Formulaire ---- */
 .auth-main{
@@ -410,13 +418,6 @@ const CSS = `
   font-weight:600; color:${C.primary};
 }
 .back-top:hover{ text-decoration:underline; }
-
-.mobile-mark{ display:flex; align-items:center; gap:${S.sm}px; margin-bottom:${S.xl}px; }
-@media (min-width:960px){ .mobile-mark{ display:none; } }
-.mobile-mark-text{
-  font-size:17px; font-weight:700; color:${C.primary}; letter-spacing:.02em;
-  overflow-wrap:anywhere;
-}
 
 .card-header{ margin-bottom:${S.xl}px; }
 .card-title{ font-size:28px; font-weight:700; letter-spacing:-.02em; margin:0 0 6px; }

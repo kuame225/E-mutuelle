@@ -55,6 +55,8 @@ import ExploitantConsole from "./ExploitantConsole";
 import { consigner, EVENEMENTS } from "./journal";
 import { pinEstDefini } from "./pinLock";
 import { useParametrage, moduleActif, LOGO_DEFAUT } from "./useParametrage";
+import { genererAttestation } from "./AttestationAdhesion";
+import { genererHistorique } from "./HistoriqueCotisations";
 import { usePermissions } from "./usePermissions";
 
 // Pages de l'espace membre relevant d'un module
@@ -456,6 +458,12 @@ function Shell() {
             {page === "cotisations" && (
               <PageMembre onBack={() => setPage("accueil")}>
                 <MembreCotisations membre={membre} />
+              </PageMembre>
+            )}
+
+            {page === "documents_membre" && (
+              <PageMembre onBack={() => setPage("accueil")}>
+                <MembreDocuments membre={membre} />
               </PageMembre>
             )}
 
@@ -1124,6 +1132,133 @@ function MembrePartenaires({ membre }) {
                     {p.contact && <span>{p.contact}</span>}
                   </div>
                 </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PRODUITS_MEMBRE_LABELS = {
+  attestation_adhesion: "Attestation d'adhésion",
+  historique_cotisations: "Historique de cotisations",
+};
+
+// Le paiement va vers Baamo lui-même (creer-session-wave-plateforme),
+// jamais vers l'organisation du membre — un circuit entièrement séparé
+// de celui des cotisations. Un achat déverrouille l'accès de façon
+// permanente : pas de re-paiement pour régénérer le même document plus
+// tard, il reflète toujours les données actuelles.
+function MembreDocuments({ membre }) {
+  const { params } = useParametrage();
+  const [produits, setProduits] = useState([]);
+  const [achats, setAchats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [enCours, setEnCours] = useState(null);
+  const [erreur, setErreur] = useState("");
+
+  async function charger() {
+    const [{ data: p }, { data: a }] = await Promise.all([
+      supabase.from("produits_membre").select("*").eq("actif", true),
+      supabase.from("achats_membre").select("produit_code").eq("membre_id", membre.id),
+    ]);
+    setProduits(p || []);
+    setAchats((a || []).map((x) => x.produit_code));
+    setLoading(false);
+  }
+
+  useEffect(() => { charger(); }, [membre.id]);
+
+  async function payer(produitCode) {
+    setEnCours(produitCode);
+    setErreur("");
+
+    const { data, error } = await supabase.functions.invoke("creer-session-wave-plateforme", {
+      body: {
+        organisationId: membre.organisation_id,
+        produitCode,
+        origine: window.location.origin,
+      },
+    });
+
+    if (error || !data?.wave_launch_url) {
+      setEnCours(null);
+      setErreur(data?.error || "Impossible de démarrer le paiement pour le moment.");
+      return;
+    }
+
+    window.location.href = data.wave_launch_url;
+  }
+
+  async function telecharger(produitCode) {
+    setEnCours(produitCode);
+    setErreur("");
+
+    try {
+      if (produitCode === "attestation_adhesion") {
+        await genererAttestation({ membre, params });
+      } else if (produitCode === "historique_cotisations") {
+        const { data: cotisations } = await supabase
+          .from("cotisations")
+          .select("*")
+          .eq("membre_id", membre.id);
+        await genererHistorique({ membre, cotisations: cotisations || [], params });
+      }
+    } catch (e) {
+      setErreur("Impossible de générer le document pour le moment.");
+    }
+
+    setEnCours(null);
+  }
+
+  if (loading) return <div style={{ color: C.textSubtle }}>Chargement…</div>;
+
+  return (
+    <div>
+      <h2 style={titrePage}>Mes documents</h2>
+
+      {erreur && (
+        <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>
+          {erreur}
+        </div>
+      )}
+
+      {produits.length === 0 ? (
+        <div style={carteVide}>Aucun document disponible pour le moment.</div>
+      ) : (
+        <div style={carteListe}>
+          {produits.map((p, i) => {
+            const achete = achats.includes(p.code);
+            return (
+              <div
+                key={p.code}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "14px 18px",
+                  borderBottom: i < produits.length - 1 ? `1px solid ${C.border}` : "none",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14.5 }}>
+                    {PRODUITS_MEMBRE_LABELS[p.code] || p.libelle}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 2 }}>
+                    {achete ? "Déjà acheté — téléchargeable à tout moment" : `${montant(p.prix)} FCFA`}
+                  </div>
+                </div>
+                <button
+                  onClick={() => achete ? telecharger(p.code) : payer(p.code)}
+                  disabled={enCours === p.code}
+                  style={{
+                    background: achete ? C.success : C.primary, border: "none", color: "#fff",
+                    borderRadius: 8, padding: "9px 16px", cursor: "pointer",
+                    fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                  }}
+                >
+                  {enCours === p.code ? "…" : achete ? "Télécharger" : "Payer avec Wave"}
+                </button>
               </div>
             );
           })}

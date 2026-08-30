@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { TYPES_ORGANISATION, motPourType } from "./vocabulaire";
+import { rafraichirIdentite } from "./useParametrage";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 // Un exemple de dénomination par type, pour que le placeholder du champ
@@ -273,6 +274,15 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     // quelle que soit la rapidité de useParametrage à ce moment précis.
     // Retiré par Shell() lui-même dès que l'état de l'organisation est connu.
     sessionStorage.setItem("post_inscription_org", "1");
+
+    // Point corrigé : useParametrage() avait déjà résolu "aucune organisation"
+    // juste après signUp() (avant que creer_organisation() n'ait fini), et
+    // gardait ce résultat en cache indéfiniment — rien ne le rafraîchissait
+    // ensuite. Sans cet appel, Shell() restait bloqué sur "Chargement…"
+    // jusqu'à ce qu'un rechargement complet de page force une lecture
+    // neuve. Ici, on force explicitement cette lecture dès que l'organisation
+    // existe réellement, sans attendre le rechargement de secours plus bas.
+    await rafraichirIdentite();
 
     setEtape("succes");
     // Délai allongé (5s au lieu de 2,2s) pour laisser le temps de lire le

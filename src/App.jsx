@@ -157,11 +157,18 @@ function Shell() {
   const venantDInscription = session && !isExploitant
     && sessionStorage.getItem("post_inscription_org") === "1";
 
+  // Le drapeau ne doit disparaître qu'une fois TOUT stabilisé, pas
+  // seulement orgActif : loadingMembre se résout séparément (un second
+  // appel réseau, déclenché en même temps mais pas forcément terminé au
+  // même instant), et le retirer trop tôt faisait perdre le message de
+  // félicitations avant même que l'écran final ne s'affiche.
+  const identiteStabilisee = orgActif !== null && !loadingMembre;
+
   useEffect(() => {
-    if (venantDInscription && orgActif !== null) {
+    if (venantDInscription && identiteStabilisee) {
       sessionStorage.removeItem("post_inscription_org");
     }
-  }, [venantDInscription, orgActif]);
+  }, [venantDInscription, identiteStabilisee]);
 
   // Un administrateur ne peut basculer que s'il possède une fiche membre
   const peutBasculer = isAdmin && Boolean(membre);

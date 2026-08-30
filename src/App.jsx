@@ -1146,51 +1146,40 @@ const PRODUITS_MEMBRE_LABELS = {
   historique_cotisations: "Historique de cotisations",
 };
 
-// Le paiement va vers Baamo lui-même (creer-session-wave-plateforme),
-// jamais vers l'organisation du membre — un circuit entièrement séparé
-// de celui des cotisations. Un achat déverrouille l'accès de façon
-// permanente : pas de re-paiement pour régénérer le même document plus
-// tard, il reflète toujours les données actuelles.
+// Le paiement va vers Baamo lui-même, jamais vers l'organisation du
+// membre — un circuit séparé de celui des cotisations, mais sur le même
+// principe que DeclarationPaiementModal plus haut : pas de paiement en
+// ligne automatisé, le membre déclare, l'exploitant confirme. Un achat
+// déverrouille l'accès de façon permanente : pas de re-paiement pour
+// régénérer le même document plus tard, il reflète toujours les
+// données actuelles.
 function MembreDocuments({ membre }) {
   const { params } = useParametrage();
   const [produits, setProduits] = useState([]);
   const [achats, setAchats] = useState([]);
+  const [declarationsEnAttente, setDeclarationsEnAttente] = useState([]);
+  const [moyens, setMoyens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enCours, setEnCours] = useState(null);
   const [erreur, setErreur] = useState("");
+  const [message, setMessage] = useState("");
+  const [produitADeclarer, setProduitADeclarer] = useState(null);
 
   async function charger() {
-    const [{ data: p }, { data: a }] = await Promise.all([
+    const [{ data: p }, { data: a }, { data: d }, { data: m }] = await Promise.all([
       supabase.from("produits_membre").select("*").eq("actif", true),
       supabase.from("achats_membre").select("produit_code").eq("membre_id", membre.id),
+      supabase.from("declarations_paiement_membre").select("produit_code").eq("membre_id", membre.id).eq("statut", "en_attente"),
+      supabase.from("moyens_paiement_plateforme").select("*").eq("actif", true),
     ]);
     setProduits(p || []);
     setAchats((a || []).map((x) => x.produit_code));
+    setDeclarationsEnAttente((d || []).map((x) => x.produit_code));
+    setMoyens(m || []);
     setLoading(false);
   }
 
   useEffect(() => { charger(); }, [membre.id]);
-
-  async function payer(produitCode) {
-    setEnCours(produitCode);
-    setErreur("");
-
-    const { data, error } = await supabase.functions.invoke("creer-session-wave-plateforme", {
-      body: {
-        organisationId: membre.organisation_id,
-        produitCode,
-        origine: window.location.origin,
-      },
-    });
-
-    if (error || !data?.wave_launch_url) {
-      setEnCours(null);
-      setErreur(data?.error || "Impossible de démarrer le paiement pour le moment.");
-      return;
-    }
-
-    window.location.href = data.wave_launch_url;
-  }
 
   async function telecharger(produitCode) {
     setEnCours(produitCode);
@@ -1219,6 +1208,11 @@ function MembreDocuments({ membre }) {
     <div>
       <h2 style={titrePage}>Mes documents</h2>
 
+      {message && (
+        <div style={{ background: "#DCFCE7", color: C.success, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>
+          {message}
+        </div>
+      )}
       {erreur && (
         <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>
           {erreur}
@@ -1231,6 +1225,7 @@ function MembreDocuments({ membre }) {
         <div style={carteListe}>
           {produits.map((p, i) => {
             const achete = achats.includes(p.code);
+            const enAttente = declarationsEnAttente.includes(p.code);
             return (
               <div
                 key={p.code}
@@ -1245,25 +1240,175 @@ function MembreDocuments({ membre }) {
                     {PRODUITS_MEMBRE_LABELS[p.code] || p.libelle}
                   </div>
                   <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 2 }}>
-                    {achete ? "Déjà acheté — téléchargeable à tout moment" : `${montant(p.prix)} FCFA`}
+                    {achete
+                      ? "Déjà acheté — téléchargeable à tout moment"
+                      : enAttente
+                        ? "Paiement déclaré — en attente de confirmation"
+                        : `${montant(p.prix)} FCFA`}
                   </div>
                 </div>
                 <button
-                  onClick={() => achete ? telecharger(p.code) : payer(p.code)}
-                  disabled={enCours === p.code}
+                  onClick={() => achete ? telecharger(p.code) : setProduitADeclarer(p)}
+                  disabled={enCours === p.code || enAttente}
                   style={{
-                    background: achete ? C.success : C.primary, border: "none", color: "#fff",
-                    borderRadius: 8, padding: "9px 16px", cursor: "pointer",
+                    background: achete ? C.success : enAttente ? C.border : C.primary,
+                    border: "none", color: enAttente ? C.textSubtle : "#fff",
+                    borderRadius: 8, padding: "9px 16px", cursor: enAttente ? "default" : "pointer",
                     fontFamily: "inherit", fontSize: 13, fontWeight: 600,
                   }}
                 >
-                  {enCours === p.code ? "…" : achete ? "Télécharger" : "Payer avec Wave"}
+                  {enCours === p.code ? "…" : achete ? "Télécharger" : enAttente ? "En attente" : "J'ai payé"}
                 </button>
               </div>
             );
           })}
         </div>
       )}
+
+      {produitADeclarer && (
+        <ModalDeclarerPaiementMembre
+          membre={membre}
+          produit={produitADeclarer}
+          moyens={moyens}
+          onClose={() => setProduitADeclarer(null)}
+          onDone={() => {
+            setProduitADeclarer(null);
+            setMessage("Déclaration envoyée — en attente de confirmation.");
+            setTimeout(() => setMessage(""), 4000);
+            charger();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Même déclaration que DeclarationPaiementModal (cotisations), mais vers
+// declarations_paiement_membre — le montant n'est jamais saisi par le
+// membre : c'est le prix fixe du produit, pas un paiement partiel.
+function ModalDeclarerPaiementMembre({ membre, produit, moyens, onClose, onDone }) {
+  const [moyenId, setMoyenId] = useState(moyens[0]?.id || "");
+  const [reference, setReference] = useState("");
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const LABELS = { wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money", moov_money: "Moov Money", autre: "Autre" };
+  const moyenChoisi = moyens.find((m) => m.id === moyenId);
+  const qrUrl = moyenChoisi?.qr_code_chemin
+    ? supabase.storage.from("qr-plateforme").getPublicUrl(moyenChoisi.qr_code_chemin).data.publicUrl
+    : null;
+
+  async function envoyer() {
+    if (!moyenId) { setErreur("Choisissez un moyen de paiement."); return; }
+
+    setEnCours(true);
+    setErreur("");
+
+    const { error } = await supabase.from("declarations_paiement_membre").insert({
+      membre_id: membre.id,
+      produit_code: produit.code,
+      moyen_paiement_id: moyenId,
+      montant: produit.prix,
+      reference: reference.trim() || null,
+    });
+
+    setEnCours(false);
+
+    if (error) { setErreur(error.message); return; }
+    onDone();
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200, background: "rgba(10,20,40,.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420 }}
+      >
+        <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>J'ai payé</h3>
+        <p style={{ fontSize: 13, color: C.textSubtle, margin: "0 0 16px" }}>
+          {PRODUITS_MEMBRE_LABELS[produit.code] || produit.libelle} — {montant(produit.prix)} FCFA
+        </p>
+
+        {moyens.length === 0 ? (
+          <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 14 }}>
+            Aucun moyen de paiement disponible pour le moment.
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Moyen utilisé</label>
+              <select
+                value={moyenId}
+                onChange={(e) => setMoyenId(e.target.value)}
+                style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14 }}
+              >
+                {moyens.map((m) => (
+                  <option key={m.id} value={m.id}>{m.libelle || LABELS[m.type] || m.type}</option>
+                ))}
+              </select>
+            </div>
+
+            {moyenChoisi && (
+              <div style={{ background: C.bg, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                {moyenChoisi.lien && (
+                  <div style={{ fontSize: 13 }}>
+                    <a href={moyenChoisi.lien} target="_blank" rel="noreferrer" style={{ color: C.primary, fontWeight: 600 }}>
+                      Ouvrir le lien de paiement
+                    </a>
+                  </div>
+                )}
+                {moyenChoisi.numero && (
+                  <div style={{ fontSize: 13, marginTop: moyenChoisi.lien ? 6 : 0 }}>
+                    Numéro : <strong>{moyenChoisi.numero}</strong>
+                  </div>
+                )}
+                {qrUrl && (
+                  <img src={qrUrl} alt="QR code" style={{ width: 120, height: 120, marginTop: 8, borderRadius: 8, border: `1px solid ${C.border}` }} />
+                )}
+                {moyenChoisi.instructions && (
+                  <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 6 }}>{moyenChoisi.instructions}</div>
+                )}
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Référence — facultative</label>
+              <input
+                value={reference} onChange={(e) => setReference(e.target.value)}
+                placeholder="Numéro de transaction, si vous l'avez"
+                style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+              />
+            </div>
+          </>
+        )}
+
+        {erreur && (
+          <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 14 }}>
+            {erreur}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onClose} disabled={enCours}
+            style={{ flex: 1, background: "#fff", border: `1.5px solid ${C.border}`, color: C.textMuted, borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
+          >
+            Annuler
+          </button>
+          <button
+            onClick={envoyer} disabled={enCours || moyens.length === 0}
+            style={{ flex: 2, background: C.primary, border: "none", color: "#fff", borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
+          >
+            {enCours ? "Envoi…" : "Envoyer"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

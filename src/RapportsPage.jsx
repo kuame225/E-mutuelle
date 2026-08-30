@@ -10,7 +10,7 @@ import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 export default function RapportsPage() {
   const { params } = useParametrage();
-  const [donnees, setDonnees] = useState({ mois: [], trimestres: [] });
+  const [donnees, setDonnees] = useState({ mois: [], trimestres: [], annees: [] });
   const [libellesAide, setLibellesAide] = useState({});
   const [loading, setLoading] = useState(true);
   const [genere, setGenere] = useState(null);
@@ -53,6 +53,25 @@ export default function RapportsPage() {
         }))
         .sort((a, b) => b.periode.localeCompare(a.periode));
 
+      // Agrégation annuelle — même principe que trimestrielle, juste
+      // regroupée par année plutôt que par groupe de 3 mois.
+      const parAnnee = {};
+      mois.forEach((m) => {
+        const annee = m.periode.slice(0, 4);
+        if (!parAnnee[annee]) parAnnee[annee] = { du: 0, paye: 0, total: 0, regles: 0 };
+        parAnnee[annee].du += m.du;
+        parAnnee[annee].paye += m.paye;
+        parAnnee[annee].total += m.total;
+        parAnnee[annee].regles += m.regles;
+      });
+
+      const annees = Object.entries(parAnnee)
+        .map(([periode, v]) => ({
+          periode, ...v,
+          taux: v.total ? Math.round((v.regles / v.total) * 100) : 0,
+        }))
+        .sort((a, b) => b.periode.localeCompare(a.periode));
+
       // Agrégation trimestrielle
       const parTrim = {};
       mois.forEach((m) => {
@@ -72,7 +91,7 @@ export default function RapportsPage() {
         }))
         .sort((a, b) => b.periode.localeCompare(a.periode));
 
-      setDonnees({ mois, trimestres });
+      setDonnees({ mois, trimestres, annees });
       setLoading(false);
     }
     if (!params.organisation_id) return;
@@ -230,7 +249,101 @@ export default function RapportsPage() {
     setGenere(null);
   }
 
-  const liste = onglet === "mensuel" ? donnees.mois : donnees.trimestres;
+  // Le socle (membres, finances, assemblées) est commun à toutes les
+  // organisations — les modules au-delà (tombola, tontine, prêts,
+  // parts sociales, projets) ne sont volontairement pas couverts ici :
+  // chacun a son propre schéma à vérifier avant d'agréger des chiffres,
+  // plutôt que de deviner et risquer un total silencieusement faux dans
+  // un document présenté en assemblée.
+  async function genererAnnuel(annee) {
+    setGenere(annee);
+    setErreur("");
+
+    try {
+      const debut = `${annee}-01-01`;
+      const fin = `${annee}-12-31`;
+
+      const [membresRes, operationsRes, assembleesRes] = await Promise.all([
+        supabase.from("membres")
+          .select("id, statut_cotisation, date_adhesion, actif")
+          .eq("organisation_id", params.organisation_id),
+        supabase.from("operations_diverses")
+          .select("sens, montant")
+          .eq("organisation_id", params.organisation_id)
+          .gte("date_operation", debut).lte("date_operation", fin),
+        supabase.from("assemblees")
+          .select("id")
+          .eq("organisation_id", params.organisation_id)
+          .gte("date_prevue", `${debut}T00:00:00`).lte("date_prevue", `${fin}T23:59:59`),
+      ]);
+
+      const membresActifs = (membresRes.data || []).filter((m) => m.actif !== false);
+      const totalMembres = membresActifs.length;
+      const membresAJour = membresActifs.filter((m) => m.statut_cotisation === "a_jour").length;
+      const membresEnRetard = totalMembres - membresAJour;
+      const nouveauxMembres = membresActifs.filter((m) => {
+        if (!m.date_adhesion) return false;
+        const d = String(m.date_adhesion).slice(0, 10);
+        return d >= debut && d <= fin;
+      }).length;
+
+      const cotAnnee = donnees.mois.filter((m) => m.periode.startsWith(annee));
+      const totalCotisations = cotAnnee.reduce((s, m) => s + m.paye, 0);
+
+      const operations = operationsRes.data || [];
+      const totalRecettesDiverses = operations.filter((o) => o.sens === "recette").reduce((s, o) => s + (o.montant || 0), 0);
+      const totalDepenses = operations.filter((o) => o.sens === "depense").reduce((s, o) => s + (o.montant || 0), 0);
+      const totalRecettes = totalCotisations + totalRecettesDiverses;
+      const solde = totalRecettes - totalDepenses;
+
+      const nombreAssemblees = (assembleesRes.data || []).length;
+
+      const doc = enTete(params, "RAPPORT ANNUEL", annee);
+
+      let y = 60;
+      y = sectionAnnuelle(doc, "MEMBRES", y, [
+        ["Membres actifs", String(totalMembres)],
+        ["A jour de cotisation", String(membresAJour)],
+        ["En retard de cotisation", String(membresEnRetard)],
+        ["Nouveaux membres dans l'annee", String(nouveauxMembres)],
+      ]);
+
+      y += 6;
+      y = sectionAnnuelle(doc, "FINANCES", y, [
+        ["Cotisations encaissees", montant(totalCotisations) + " F"],
+        ["Autres recettes", montant(totalRecettesDiverses) + " F"],
+        ["Total des recettes", montant(totalRecettes) + " F"],
+        ["Total des depenses", montant(totalDepenses) + " F"],
+      ]);
+
+      y += 4;
+      doc.setFillColor(13, 71, 161);
+      doc.roundedRect(15, y, 180, 22, 4, 4, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text("Solde de l'exercice", 20, y + 9);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text(montant(solde) + " F", 20, y + 18);
+      y += 32;
+
+      y = sectionAnnuelle(doc, "VIE ASSOCIATIVE", y, [
+        ["Assemblees generales tenues dans l'annee", String(nombreAssemblees)],
+      ]);
+
+      piedDePage(doc, params);
+      doc.save(`rapport-annuel-${motCle(params.nom_mutuelle)}-${annee}.pdf`);
+    } catch (e) {
+      setErreur("Erreur lors de la génération : " + e.message);
+    }
+    setGenere(null);
+  }
+
+  const liste = onglet === "mensuel" ? donnees.mois
+    : onglet === "trimestriel" ? donnees.trimestres
+    : donnees.annees;
+
 
   if (loading) {
     return (
@@ -273,6 +386,13 @@ export default function RapportsPage() {
           <CalendarRange size={16} /> Trimestriels
           <span className="rp-badge">{donnees.trimestres.length}</span>
         </button>
+        <button
+          className={`rp-onglet ${onglet === "annuel" ? "is-on" : ""}`}
+          onClick={() => setOnglet("annuel")}
+        >
+          <BarChart3 size={16} /> Annuels
+          <span className="rp-badge">{donnees.annees.length}</span>
+        </button>
       </nav>
 
       {liste.length === 0 ? (
@@ -295,7 +415,9 @@ export default function RapportsPage() {
                   </span>
                   <div className="rp-carte-id">
                     <div className="rp-carte-titre">
-                      {onglet === "mensuel" ? formatPeriode(p.periode) : libelleTrimestre(p.periode)}
+                      {onglet === "mensuel" ? formatPeriode(p.periode)
+                        : onglet === "trimestriel" ? libelleTrimestre(p.periode)
+                        : p.periode}
                     </div>
                     <div className="rp-carte-sous">
                       {p.regles}/{p.total} cotisation{p.total > 1 ? "s" : ""} réglée{p.regles > 1 ? "s" : ""}
@@ -305,9 +427,9 @@ export default function RapportsPage() {
                     className="rp-btn"
                     disabled={enCours}
                     onClick={() =>
-                      onglet === "mensuel"
-                        ? genererMensuel(p.periode)
-                        : genererTrimestriel(p.periode)
+                      onglet === "mensuel" ? genererMensuel(p.periode)
+                        : onglet === "trimestriel" ? genererTrimestriel(p.periode)
+                        : genererAnnuel(p.periode)
                     }
                   >
                     {enCours
@@ -399,6 +521,31 @@ function encadreChiffres(doc, entrees) {
     doc.setFontSize(11);
     doc.text(valeur, x, y + 7);
   });
+}
+
+// Disposition verticale plutôt que la grille compacte de
+// encadreChiffres — le rapport annuel a trop de lignes pour tenir dans
+// une grille à 6 cases fixes.
+function sectionAnnuelle(doc, titre, y, lignes) {
+  doc.setFillColor(255, 243, 224);
+  doc.rect(15, y - 6, 180, 10, "F");
+  doc.setTextColor(13, 71, 161);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text(sansAccents(titre), 20, y + 1);
+  y += 14;
+
+  lignes.forEach(([libelle, valeur]) => {
+    doc.setTextColor(26, 26, 23);
+    doc.setFontSize(10.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(sansAccents(libelle), 20, y);
+    doc.setFont("helvetica", "bold");
+    doc.text(valeur, 190, y, { align: "right" });
+    y += 9;
+  });
+
+  return y;
 }
 
 function tableauCotisations(doc, cotisations, yDepart) {

@@ -157,18 +157,20 @@ function Shell() {
   const venantDInscription = session && !isExploitant
     && sessionStorage.getItem("post_inscription_org") === "1";
 
-  // Le drapeau ne doit disparaître qu'une fois TOUT stabilisé, pas
-  // seulement orgActif : loadingMembre se résout séparément (un second
-  // appel réseau, déclenché en même temps mais pas forcément terminé au
-  // même instant), et le retirer trop tôt faisait perdre le message de
-  // félicitations avant même que l'écran final ne s'affiche.
-  const identiteStabilisee = orgActif !== null && !loadingMembre;
-
+  // Approche différente de l'essai précédent : plutôt que de deviner le
+  // moment où tout est "stabilisé" en croisant deux signaux qui se
+  // résolvent indépendamment (orgActif et loadingMembre, sans ordre
+  // garanti), le drapeau reste tant que l'organisation n'est pas
+  // RÉELLEMENT active. Tant qu'elle est en attente de validation, chaque
+  // affichage de cet écran montre le message de félicitations — combien
+  // de fois "Chargement…" repasse entre-temps n'a plus d'importance,
+  // il n'y a plus de course à gagner. Le drapeau ne disparaît qu'une
+  // fois, le jour où l'exploitant valide réellement l'organisation.
   useEffect(() => {
-    if (venantDInscription && identiteStabilisee) {
+    if (venantDInscription && orgActif === true) {
       sessionStorage.removeItem("post_inscription_org");
     }
-  }, [venantDInscription, identiteStabilisee]);
+  }, [venantDInscription, orgActif]);
 
   // Un administrateur ne peut basculer que s'il possède une fiche membre
   const peutBasculer = isAdmin && Boolean(membre);

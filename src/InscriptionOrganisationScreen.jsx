@@ -278,19 +278,21 @@ export default function InscriptionOrganisationScreen({ onBack }) {
     // Point corrigé : useParametrage() avait déjà résolu "aucune organisation"
     // juste après signUp() (avant que creer_organisation() n'ait fini), et
     // gardait ce résultat en cache indéfiniment — rien ne le rafraîchissait
-    // ensuite. Sans cet appel, Shell() restait bloqué sur "Chargement…"
-    // jusqu'à ce qu'un rechargement complet de page force une lecture
-    // neuve. Ici, on force explicitement cette lecture dès que l'organisation
-    // existe réellement, sans attendre le rechargement de secours plus bas.
-    await rafraichirIdentite();
-
+    // ensuite, d'où le blocage prolongé sur "Chargement…" observé plus tôt.
+    //
+    // Point à ne pas répéter : rafraîchir AVANT setEtape("succes") réglait
+    // ce blocage, mais faisait basculer Shell() (App.jsx) vers son propre
+    // écran si vite que celui-ci n'avait jamais l'occasion de s'afficher à
+    // l'écran — la personne ne voyait alors jamais "Félicitations". L'ordre
+    // compte : l'écran de succès s'affiche d'abord, le rafraîchissement est
+    // différé de façon à lui laisser le temps d'être réellement peint.
     setEtape("succes");
-    // Délai allongé (5s au lieu de 2,2s) pour laisser le temps de lire le
-    // rappel des conditions tarifaires, désormais affiché sur cet écran.
-    // Note : en pratique, l'ouverture de session par signUp() bascule
-    // généralement l'application vers l'écran "Espace non actif" (App.jsx)
-    // avant même ce délai — c'est cet écran-là qui sert de confirmation
-    // fiable, celui-ci n'étant vu que si la bascule tarde un peu.
+    setTimeout(() => { rafraichirIdentite(); }, 1200);
+    // Délai allongé (5s) pour laisser le temps de lire le rappel des
+    // conditions tarifaires affiché sur cet écran, et pour rester après
+    // la bascule de Shell() vers "Espace non actif" une fois l'identité
+    // rafraîchie ci-dessus — au cas où la personne reviendrait sur cet
+    // onglet avant que ce changement de page n'ait eu lieu.
     setTimeout(() => window.location.reload(), 5000);
   }
 

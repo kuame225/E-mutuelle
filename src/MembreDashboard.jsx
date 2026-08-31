@@ -4,7 +4,7 @@ import {
   Bell, LogOut, CreditCard, HandHeart, Gift, UserCircle2,
   CheckCircle2, Clock, AlertTriangle, CalendarDays, Wallet,
   Megaphone, Ticket, X, ChevronRight, Users, UserPlus, Users2, RefreshCw, Banknote,
-  GraduationCap, Briefcase, Handshake, FileBadge,
+  GraduationCap, Briefcase, Handshake, FileBadge, History,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import CarteMembreModal from "./CarteMembreModal";
@@ -30,6 +30,8 @@ function raccourcisPourType(mot) {
   return [
     { id: "cotisations",   icon: CreditCard,  l1: "Mes",      l2: mot("cotisations").toLowerCase(), color: C.primary },
     { id: "documents_membre", icon: FileBadge, l1: "Mes",      l2: "documents", color: C.success },
+    { id: "calendrier_membre", icon: CalendarDays, l1: "Mon",   l2: "calendrier", color: C.primaryLight },
+    { id: "historique_membre", icon: History, l1: "Mon",   l2: "historique", color: C.warning },
     { id: "aides",         icon: HandHeart,   l1: "Demander", l2: `${mot("aide").toLowerCase()}`,   color: C.success },
     { id: "tombola",       icon: Gift,        l1: "Tombola",  l2: "& récompenses", color: C.warning,
       module: "module_tombola" },

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import {
   LogOut, UserCircle2, ArrowLeft, PowerOff, ShieldOff, ShieldCheck, CheckCircle2,
+  Users2, GraduationCap,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
+import { notifierMembre } from "./notifier";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 import WelcomeScreen from "./WelcomeScreen";
@@ -477,6 +479,18 @@ function Shell() {
             {page === "documents_membre" && (
               <PageMembre onBack={() => setPage("accueil")}>
                 <MembreDocuments membre={membre} />
+              </PageMembre>
+            )}
+
+            {page === "calendrier_membre" && (
+              <PageMembre onBack={() => setPage("accueil")}>
+                <MembreCalendrier membre={membre} />
+              </PageMembre>
+            )}
+
+            {page === "historique_membre" && (
+              <PageMembre onBack={() => setPage("accueil")}>
+                <MembreHistorique membre={membre} />
               </PageMembre>
             )}
 
@@ -1167,6 +1181,195 @@ const PRODUITS_MEMBRE_LABELS = {
 // déverrouille l'accès de façon permanente : pas de re-paiement pour
 // régénérer le même document plus tard, il reflète toujours les
 // données actuelles.
+// Rassemble ce qui, jusqu'ici, était éparpillé module par module —
+// assemblées et formations pour cette première version. Tontine et
+// Prêts suivront une fois leurs échéances vérifiées : les prêts n'ont
+// pas de colonne d'échéance simple (probablement plusieurs par prêt),
+// pas question de deviner leur structure ici.
+function MembreCalendrier({ membre }) {
+  const [evenements, setEvenements] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  async function charger() {
+    const maintenant = new Date().toISOString();
+
+    const [{ data: assemblees }, { data: formations }] = await Promise.all([
+      supabase.from("assemblees")
+        .select("id, titre, date_prevue, lieu")
+        .eq("organisation_id", membre.organisation_id)
+        .gte("date_prevue", maintenant)
+        .order("date_prevue"),
+      supabase.from("formations")
+        .select("id, titre, date_debut, lieu")
+        .eq("organisation_id", membre.organisation_id)
+        .gte("date_debut", maintenant)
+        .order("date_debut"),
+    ]);
+
+    const liste = [
+      ...(assemblees || []).map((a) => ({
+        id: `assemblee-${a.id}`, type: "assemblee", titre: a.titre,
+        date: a.date_prevue, lieu: a.lieu,
+      })),
+      ...(formations || []).map((f) => ({
+        id: `formation-${f.id}`, type: "formation", titre: f.titre,
+        date: f.date_debut, lieu: f.lieu,
+      })),
+    ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    setEvenements(liste);
+    setLoading(false);
+  }
+
+  useEffect(() => { charger(); }, [membre.organisation_id]);
+
+  const ICONES_TYPE = { assemblee: Users2, formation: GraduationCap };
+  const LABELS_TYPE = { assemblee: "Assemblée générale", formation: "Formation" };
+  const COULEURS_TYPE = { assemblee: C.primary, formation: C.success };
+
+  if (loading) return <div style={{ color: C.textSubtle }}>Chargement…</div>;
+
+  return (
+    <div>
+      <h2 style={titrePage}>Mon calendrier</h2>
+
+      {evenements.length === 0 ? (
+        <div style={carteVide}>Rien de prévu pour le moment.</div>
+      ) : (
+        <div style={carteListe}>
+          {evenements.map((e, i) => {
+            const Icone = ICONES_TYPE[e.type];
+            const d = new Date(e.date);
+            return (
+              <div
+                key={e.id}
+                style={{
+                  display: "flex", alignItems: "flex-start", gap: 14,
+                  padding: "16px 18px",
+                  borderBottom: i < evenements.length - 1 ? `1px solid ${C.border}` : "none",
+                }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: `${COULEURS_TYPE[e.type]}18`, color: COULEURS_TYPE[e.type],
+                }}>
+                  <Icone size={19} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: COULEURS_TYPE[e.type] }}>
+                    {LABELS_TYPE[e.type]}
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: 14.5, marginTop: 2 }}>{e.titre}</div>
+                  <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 3 }}>
+                    {d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                    {" à "}
+                    {d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    {e.lieu && ` · ${e.lieu}`}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Son propre historique de participation — assemblées où sa présence a
+// été confirmée, formations suivies jusqu'au bout. Utile pour lui-même,
+// et recoupe ce qui existe déjà : une attestation ou un futur CV
+// associatif pourrait un jour s'appuyer sur les mêmes données.
+function MembreHistorique({ membre }) {
+  const [evenements, setEvenements] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  async function charger() {
+    const [{ data: assPresences }, { data: formPresences }] = await Promise.all([
+      supabase.from("assemblee_presences")
+        .select("present, emarge_le, assemblees(titre, date_prevue, lieu)")
+        .eq("membre_id", membre.id)
+        .eq("present", true),
+      supabase.from("formation_presences")
+        .select("statut, formations(titre, date_debut, lieu)")
+        .eq("membre_id", membre.id)
+        .eq("statut", "present"),
+    ]);
+
+    const liste = [
+      ...(assPresences || [])
+        .filter((p) => p.assemblees)
+        .map((p, i) => ({
+          id: `assemblee-${i}`, type: "assemblee", titre: p.assemblees.titre,
+          date: p.assemblees.date_prevue, lieu: p.assemblees.lieu,
+        })),
+      ...(formPresences || [])
+        .filter((p) => p.formations)
+        .map((p, i) => ({
+          id: `formation-${i}`, type: "formation", titre: p.formations.titre,
+          date: p.formations.date_debut, lieu: p.formations.lieu,
+        })),
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    setEvenements(liste);
+    setLoading(false);
+  }
+
+  useEffect(() => { charger(); }, [membre.id]);
+
+  const ICONES_TYPE = { assemblee: Users2, formation: GraduationCap };
+  const LABELS_TYPE = { assemblee: "Assemblée générale", formation: "Formation" };
+  const COULEURS_TYPE = { assemblee: C.primary, formation: C.success };
+
+  if (loading) return <div style={{ color: C.textSubtle }}>Chargement…</div>;
+
+  return (
+    <div>
+      <h2 style={titrePage}>Mon historique</h2>
+
+      {evenements.length === 0 ? (
+        <div style={carteVide}>Aucune participation enregistrée pour le moment.</div>
+      ) : (
+        <div style={carteListe}>
+          {evenements.map((e, i) => {
+            const Icone = ICONES_TYPE[e.type];
+            const d = new Date(e.date);
+            return (
+              <div
+                key={e.id}
+                style={{
+                  display: "flex", alignItems: "flex-start", gap: 14,
+                  padding: "16px 18px",
+                  borderBottom: i < evenements.length - 1 ? `1px solid ${C.border}` : "none",
+                }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: `${COULEURS_TYPE[e.type]}18`, color: COULEURS_TYPE[e.type],
+                }}>
+                  <Icone size={19} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: COULEURS_TYPE[e.type] }}>
+                    {LABELS_TYPE[e.type]}
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: 14.5, marginTop: 2 }}>{e.titre}</div>
+                  <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 3 }}>
+                    {d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                    {e.lieu && ` · ${e.lieu}`}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MembreDocuments({ membre }) {
   const { params } = useParametrage();
   const [produits, setProduits] = useState([]);
@@ -2166,6 +2369,28 @@ const COULEURS_STATUT = {
   rejetee: C.danger,
 };
 
+// Le membre ne doit pas avoir à revenir vérifier lui-même si sa demande
+// a avancé — un signal l'y ramène. "en_attente" n'y figure pas : c'est
+// l'état de départ, jamais une transition à notifier.
+const MESSAGES_STATUT_AIDE = {
+  en_examen: {
+    titre: "Demande en cours d'examen",
+    message: "Votre demande d'aide est en cours d'examen par le Bureau.",
+  },
+  validee: {
+    titre: "Demande d'aide validée",
+    message: "Votre demande a été acceptée. Le versement sera effectué prochainement.",
+  },
+  payee: {
+    titre: "Aide versée",
+    message: "Le versement de votre aide a été effectué.",
+  },
+  rejetee: {
+    titre: "Demande d'aide rejetée",
+    message: "Votre demande n'a pas pu être retenue.",
+  },
+};
+
 function AidesAdminPage() {
   const { params } = useParametrage();
   const [aides, setAides] = useState([]);
@@ -2282,6 +2507,23 @@ function AidesAdminPage() {
         aide_id: id,
         montant: complements.montant_valide,
       });
+    }
+
+    // Sans ceci, le membre n'a aucun moyen de savoir que sa demande a
+    // avancé sans revenir vérifier lui-même — voir MESSAGES_STATUT_AIDE
+    // ci-dessus. Échec non bloquant : une notification manquée ne doit
+    // jamais remettre en cause une décision déjà enregistrée.
+    const infoStatut = MESSAGES_STATUT_AIDE[statut];
+    if (infoStatut && cible?.membre_id) {
+      notifierMembre(cible.membre_id, {
+        type: "aide",
+        titre: infoStatut.titre,
+        message: complements.motif_rejet
+          ? `${infoStatut.message} Motif : ${complements.motif_rejet}`
+          : infoStatut.message,
+        url: "/",
+        organisationId: cible.organisation_id,
+      }).catch((e) => console.error("[AidesAdminPage] notifierMembre a échoué :", e));
     }
   }
 

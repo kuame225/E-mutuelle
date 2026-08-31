@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   LogOut, UserCircle2, ArrowLeft, PowerOff, ShieldOff, ShieldCheck, CheckCircle2,
-  Users2, GraduationCap,
+  Users2, GraduationCap, Award, FileBarChart2,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
@@ -1271,6 +1271,14 @@ const PRODUITS_MEMBRE_LABELS = {
   historique_cotisations: "Historique de cotisations",
 };
 
+// Un repère visuel distinct par document, plutôt qu'une simple ligne de
+// texte — chacun a son icône et sa couleur propres, comme un vrai
+// modèle de document plutôt qu'une liste indifférenciée.
+const PRODUITS_MEMBRE_VISUELS = {
+  attestation_adhesion: { Icon: Award, couleur: C.primary },
+  historique_cotisations: { Icon: FileBarChart2, couleur: C.success },
+};
+
 // Le paiement va vers Baamo lui-même, jamais vers l'organisation du
 // membre — un circuit séparé de celui des cotisations, mais sur le même
 // principe que DeclarationPaiementModal plus haut : pas de paiement en
@@ -1536,43 +1544,66 @@ function MembreDocuments({ membre }) {
       {produits.length === 0 ? (
         <div style={carteVide}>Aucun document disponible pour le moment.</div>
       ) : (
-        <div style={carteListe}>
-          {produits.map((p, i) => {
+        <div style={{
+          display: "grid", gap: 14,
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+        }}>
+          {produits.map((p) => {
             const achete = achats.includes(p.code);
             const enAttente = declarationsEnAttente.includes(p.code);
+            const visuel = PRODUITS_MEMBRE_VISUELS[p.code] || { Icon: Award, couleur: C.primary };
+            const VIcon = visuel.Icon;
+
             return (
               <div
                 key={p.code}
                 style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "14px 18px",
-                  borderBottom: i < produits.length - 1 ? `1px solid ${C.border}` : "none",
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: R.xl, overflow: "hidden", boxShadow: SHADOW.xs,
+                  display: "flex", flexDirection: "column",
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14.5 }}>
+                {/* En-tête visuelle — sert de repère au document, comme un
+                    modèle plutôt qu'une simple ligne de texte */}
+                <div style={{
+                  background: `linear-gradient(135deg, ${visuel.couleur}22, ${visuel.couleur}08)`,
+                  padding: "22px 18px 18px",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                }}>
+                  <div style={{
+                    width: 46, height: 46, borderRadius: 12,
+                    background: visuel.couleur, color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: `0 6px 16px -6px ${visuel.couleur}88`,
+                  }}>
+                    <VIcon size={22} />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 14.5, textAlign: "center" }}>
                     {PRODUITS_MEMBRE_LABELS[p.code] || p.libelle}
                   </div>
-                  <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 2 }}>
+                </div>
+
+                <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+                  <div style={{ fontSize: 12.5, color: C.textSubtle, textAlign: "center" }}>
                     {achete
                       ? "Déjà acheté — téléchargeable à tout moment"
                       : enAttente
                         ? "Paiement déclaré — en attente de confirmation"
                         : `${montant(p.prix)} FCFA`}
                   </div>
+                  <button
+                    onClick={() => achete ? telecharger(p.code) : setProduitADeclarer(p)}
+                    disabled={enCours === p.code || enAttente}
+                    style={{
+                      background: achete ? C.success : enAttente ? C.border : C.primary,
+                      border: "none", color: enAttente ? C.textSubtle : "#fff",
+                      borderRadius: 8, padding: "9px 16px", cursor: enAttente ? "default" : "pointer",
+                      fontFamily: "inherit", fontSize: 13, fontWeight: 600, width: "100%",
+                    }}
+                  >
+                    {enCours === p.code ? "…" : achete ? "Télécharger" : enAttente ? "En attente" : "J'ai payé"}
+                  </button>
                 </div>
-                <button
-                  onClick={() => achete ? telecharger(p.code) : setProduitADeclarer(p)}
-                  disabled={enCours === p.code || enAttente}
-                  style={{
-                    background: achete ? C.success : enAttente ? C.border : C.primary,
-                    border: "none", color: enAttente ? C.textSubtle : "#fff",
-                    borderRadius: 8, padding: "9px 16px", cursor: enAttente ? "default" : "pointer",
-                    fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-                  }}
-                >
-                  {enCours === p.code ? "…" : achete ? "Télécharger" : enAttente ? "En attente" : "J'ai payé"}
-                </button>
               </div>
             );
           })}

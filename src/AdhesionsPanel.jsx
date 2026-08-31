@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   FileCheck2, Check, X, Loader2, Mail, Phone, Briefcase,
-  Paperclip, Clock, CheckCircle2, XCircle, AlertTriangle, Inbox,
+  Clock, CheckCircle2, XCircle, AlertTriangle, Inbox,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
@@ -175,8 +175,8 @@ export default function AdhesionsPanel() {
               </div>
 
               <dl className="ad-infos">
-                <Info Icon={Briefcase} label="Poste" value={d.poste} />
-                <Info Icon={Briefcase} label="Service" value={d.service} />
+                {d.poste && <Info Icon={Briefcase} label="Profession ou activité" value={d.poste} />}
+                {d.service && <Info Icon={Briefcase} label="Précision" value={d.service} />}
                 <Info Icon={Phone} label="Téléphone" value={d.telephone} />
                 <Info
                   Icon={Mail}
@@ -185,12 +185,6 @@ export default function AdhesionsPanel() {
                   alerte={!d.email}
                 />
               </dl>
-
-              {d.a_justificatif && (
-                <div className="ad-justif">
-                  <Paperclip size={14} /> Pièce justificative annoncée par le candidat
-                </div>
-              )}
 
               {!d.email && d.statut === "en_attente" && (
                 <div className="ad-warn">

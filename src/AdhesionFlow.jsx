@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Check, Clock, User, Briefcase, ClipboardCheck, ArrowRight,
-  ArrowLeft, Loader2, AlertCircle, Mail, Phone, Paperclip,
+  ArrowLeft, Loader2, AlertCircle, Mail, Phone,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
@@ -15,13 +15,42 @@ const ETAPES = [
   { titre: "Validation", Icon: ClipboardCheck },
 ];
 
+// "Poste" et "Service" venaient d'une mutuelle d'employés (MAEPHDA) et
+// ne veulent rien dire pour une coopérative ou un groupe d'épargne —
+// les deux champs restent, mais avec un exemple adapté au type, et
+// facultatifs partout sauf en mutuelle, où la structure hiérarchique
+// (poste/service) reste réellement pertinente.
+const EXEMPLES_PROFESSION = {
+  mutuelle: "Ex : Infirmier, Sage-femme, Agent d'entretien…",
+  association: "Ex : Enseignant, Commerçant… (facultatif)",
+  cooperative: "Ex : Cultivateur de cacao, Éleveur…",
+  ong: "Votre activité (facultatif)",
+  avec: "Ex : Commerçante, Artisan… (facultatif)",
+  professionnelle: "Ex : Expert-comptable, Avocat, Architecte…",
+  federation: "Organisation que vous représentez (facultatif)",
+  reseau: "Organisation que vous représentez (facultatif)",
+  autre: "Votre activité (facultatif)",
+};
+
+const EXEMPLES_PRECISION = {
+  mutuelle: "Ex : Pédiatrie, Maternité, Laboratoire…",
+  association: "Précision (facultatif)",
+  cooperative: "Ex : Section maraîchage, coopérative locale…",
+  ong: "Précision (facultatif)",
+  avec: "Précision (facultatif)",
+  professionnelle: "Ex : Cabinet, ordre régional…",
+  federation: "Précision (facultatif)",
+  reseau: "Précision (facultatif)",
+  autre: "Précision (facultatif)",
+};
+
 export default function AdhesionFlow() {
   const { session } = useAuth();
   const { params } = useParametrage();
   const { mot, motMaj } = useVocabulaire();
   const [etape, setEtape] = useState(0);
   const [form, setForm] = useState({
-    nom: "", tel: "", email: "", poste: "", service: "", justificatif: false,
+    nom: "", tel: "", email: "", poste: "", service: "",
   });
   const [erreurs, setErreurs] = useState({});
   const [envoi, setEnvoi] = useState(false);
@@ -47,7 +76,7 @@ if (n === 0) {
     e.email = "Adresse e-mail invalide.";
 }
 
-    if (n === 1) {
+    if (n === 1 && params.type_organisation === "mutuelle") {
       if (!form.poste.trim()) e.poste = "Le poste est obligatoire.";
       if (!form.service.trim()) e.service = "Le service est obligatoire.";
     }
@@ -112,7 +141,6 @@ if (n === 0) {
       email: email || null,
       poste: form.poste.trim(),
       service: form.service.trim(),
-      a_justificatif: form.justificatif,
     });
 
     setEnvoi(false);
@@ -221,38 +249,26 @@ if (n === 0) {
         {/* ---- Étape 2 ---- */}
         {etape === 1 && (
           <div className="af-form">
-            <h2 className="af-card-titre">Votre fonction</h2>
+            <h2 className="af-card-titre">
+              {params.type_organisation === "mutuelle" ? "Votre fonction" : "Votre profession"}
+            </h2>
             <p className="af-card-sub">
-              Ces éléments permettent de vérifier votre rattachement à
-              l'établissement.
+              {params.type_organisation === "mutuelle"
+                ? "Ces éléments permettent de vérifier votre rattachement à l'établissement."
+                : "Ces éléments sont facultatifs — renseignez-les si vous le souhaitez."}
             </p>
 
             <Champ
-              label="Poste occupé" id="poste" erreur={erreurs.poste} Icon={Briefcase}
+              label="Profession ou activité" id="poste" erreur={erreurs.poste} Icon={Briefcase}
               value={form.poste} onChange={(v) => maj("poste", v)}
-              placeholder="Ex : Infirmier, Sage-femme, Agent d'entretien…"
+              placeholder={EXEMPLES_PROFESSION[params.type_organisation] || EXEMPLES_PROFESSION.autre}
             />
 
             <Champ
-              label="Service ou département" id="service" erreur={erreurs.service} Icon={Briefcase}
+              label="Précision" id="service" erreur={erreurs.service} Icon={Briefcase}
               value={form.service} onChange={(v) => maj("service", v)}
-              placeholder="Ex : Pédiatrie, Maternité, Laboratoire…"
+              placeholder={EXEMPLES_PRECISION[params.type_organisation] || EXEMPLES_PRECISION.autre}
             />
-
-            <label className="af-check">
-              <input
-                type="checkbox"
-                checked={form.justificatif}
-                onChange={(e) => maj("justificatif", e.target.checked)}
-              />
-              <span className="af-check-box">
-                {form.justificatif && <Check size={13} strokeWidth={3} />}
-              </span>
-              <span className="af-check-text">
-                <Paperclip size={14} /> Je dispose d'une pièce justificative d'emploi
-                <em>Elle vous sera demandée lors de la validation.</em>
-              </span>
-            </label>
           </div>
         )}
 
@@ -268,12 +284,8 @@ if (n === 0) {
               <RecapLigne label="Nom et prénoms" valeur={form.nom} />
               <RecapLigne label="Téléphone" valeur={form.tel} />
               <RecapLigne label="Adresse e-mail" valeur={form.email} />
-              <RecapLigne label="Poste" valeur={form.poste} />
-              <RecapLigne label="Service" valeur={form.service} />
-              <RecapLigne
-                label="Pièce justificative"
-                valeur={form.justificatif ? "Disponible" : "Non fournie"}
-              />
+              {form.poste.trim() && <RecapLigne label="Profession ou activité" valeur={form.poste} />}
+              {form.service.trim() && <RecapLigne label="Précision" valeur={form.service} />}
             </div>
 
             {erreurGlobale && (

@@ -46,6 +46,7 @@ import TontinePage from "./TontinePage";
 import PretsPage from "./PretsPage";
 import ParametragePage from "./ParametragePage";
 import RapportsPage from "./RapportsPage";
+import OffresBaamoPage from "./OffresBaamoPage";
 import DonsPage from "./DonsPage";
 import SanctionsPage from "./SanctionsPage";
 import SplashScreen from "./SplashScreen";
@@ -592,6 +593,7 @@ function Shell() {
           {page === "prets"         && <PretsPage />}
           {page === "parametrage"   && <ParametragePage />}
           {page === "rapports"      && <RapportsPage />}
+          {page === "offres_baamo"  && <OffresBaamoPage />}
           {page === "dons"          && <DonsPage />}
           {page === "journal"       && <JournalPage />}
           {page === "roles"         && <RolesPage />}
@@ -762,6 +764,7 @@ function PageMembre({ onBack, children }) {
 /* ---------------- Cotisations du membre ---------------- */
 
 function MembreCotisations({ membre }) {
+  const { params } = useParametrage();
   const [cotisations, setCotisations] = useState([]);
   const [moyens, setMoyens] = useState([]);
   const [declarations, setDeclarations] = useState([]);
@@ -771,6 +774,7 @@ function MembreCotisations({ membre }) {
   const [waveEnCours, setWaveEnCours] = useState(null); // cotisation.id ou "groupe"
   const [waveErreur, setWaveErreur] = useState("");
   const [selection, setSelection] = useState([]); // ids des cotisations cochées
+  const [telechargementHistorique, setTelechargementHistorique] = useState(false);
 
   async function charger() {
     const [{ data: cot }, { data: moy }, { data: decl }, { data: wave }] = await Promise.all([
@@ -788,6 +792,19 @@ function MembreCotisations({ membre }) {
   }
 
   useEffect(() => { charger(); }, [membre.id]);
+
+  // Gratuit — ne recoupe plus un produit payant. Le membre a déjà toutes
+  // ces données sous les yeux sur cet écran ; ce bouton n'en produit
+  // qu'une version PDF, portable, sans rien à débloquer.
+  async function telechargerHistorique() {
+    setTelechargementHistorique(true);
+    try {
+      await genererHistorique({ membre, cotisations, params });
+    } catch (e) {
+      setWaveErreur("Impossible de générer le document pour le moment.");
+    }
+    setTelechargementHistorique(false);
+  }
 
   async function payerAvecWave(cotisation) {
     setWaveEnCours(cotisation.id);
@@ -851,7 +868,24 @@ function MembreCotisations({ membre }) {
 
   return (
     <div>
-      <h2 style={titrePage}>Mes cotisations</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+        <h2 style={{ ...titrePage, marginBottom: 0 }}>Mes cotisations</h2>
+        {cotisations.length > 0 && (
+          <button
+            onClick={telechargerHistorique}
+            disabled={telechargementHistorique}
+            style={{
+              display: "flex", alignItems: "center", gap: 7,
+              background: "none", border: `1.5px solid ${C.border}`, color: C.textMuted,
+              borderRadius: 8, padding: "8px 14px", cursor: "pointer",
+              fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+            }}
+          >
+            <FileBarChart2 size={15} />
+            {telechargementHistorique ? "Génération…" : "Télécharger mon historique"}
+          </button>
+        )}
+      </div>
 
       {moyens.length > 0 && <MoyensPaiementApercu moyens={moyens} />}
 
@@ -988,6 +1022,16 @@ function MembreCotisations({ membre }) {
                             J'ai payé
                           </button>
                         )
+                      )}
+
+                      {/* Sans ce message, un membre dont l'organisation n'a
+                          encore configuré aucun moyen de paiement (ni Wave,
+                          ni manuel) se retrouvait face à une zone vide, sans
+                          la moindre indication de ce qu'il doit faire. */}
+                      {!waveActif && moyens.length === 0 && (
+                        <span style={{ fontSize: 12.5, color: C.textSubtle }}>
+                          Aucun moyen de paiement configuré pour le moment — contactez le Bureau.
+                        </span>
                       )}
                     </div>
                   )}

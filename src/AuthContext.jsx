@@ -54,6 +54,17 @@ export function AuthProvider({ children }) {
     return supabase.auth.signInWithPassword({ email, password });
   }
 
+  // Un seul champ, côté écran de connexion — la détection e-mail/téléphone
+  // se fait ici, pas dans l'écran lui-même. "@" suffit à distinguer les
+  // deux : aucun numéro de téléphone valable n'en contient.
+  async function signInWithIdentifiant(identifiant, password) {
+    const valeur = identifiant.trim();
+    if (valeur.includes("@")) {
+      return supabase.auth.signInWithPassword({ email: valeur, password });
+    }
+    return supabase.auth.signInWithPassword({ phone: valeur, password });
+  }
+
   async function signUpWithEmail(email, password) {
     return supabase.auth.signUp({ email, password });
   }
@@ -77,7 +88,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         session, roles, loading, hasRole, isAdmin, isExploitant,
-        signInWithEmail, signUpWithEmail, signInWithPhone, verifyPhoneOtp, signOut,
+        signInWithEmail, signInWithIdentifiant, signUpWithEmail,
+        signInWithPhone, verifyPhoneOtp, signOut,
       }}
     >
       {children}

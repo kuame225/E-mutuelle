@@ -105,9 +105,18 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
       const libellesAide = {};
       (baremeRes.data || []).forEach((b) => { libellesAide[b.type_aide] = b.libelle; });
 
-      // Cumul annuel
+      // Cumul annuel — projeté sur 12 mois à partir du taux de la
+      // cotisation la plus récente, pas la simple somme des lignes déjà
+      // générées. Les cotisations sont créées mois par mois par une
+      // tâche automatique, pas les douze d'un coup en début d'année :
+      // sommer les seules lignes existantes donnerait un total partiel
+      // (souvent un seul mois) sous un libellé "Année 2026" qui laisse
+      // pourtant entendre un total sur l'année entière.
+      const tauxMensuel = cotisations.length > 0
+        ? cotisations[cotisations.length - 1].montant_du
+        : 0;
       setAnnuel({
-        du: cotisations.reduce((s, c) => s + c.montant_du, 0),
+        du: tauxMensuel * 12,
         paye: cotisations.reduce((s, c) => s + c.montant_paye, 0),
       });
 

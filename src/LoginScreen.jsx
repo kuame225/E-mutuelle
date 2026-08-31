@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  Mail, Smartphone, ArrowRight, ArrowLeft, ShieldCheck,
+  ArrowRight, ArrowLeft, ShieldCheck,
   HandHeart, Users, Loader2, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
@@ -12,19 +12,15 @@ import { C, S, R, SHADOW, PALETTE } from "./theme";
 export default function LoginScreen({ onAdhesion, onBack }) {
   const { params } = useParametrage();
   const { mot } = useVocabulaire();
-  const [mode, setMode] = useState("email");
-  const [email, setEmail] = useState("");
+  const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingLink, setLoadingLink] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
 
-  const { signInWithEmail, signInWithPhone, verifyPhoneOtp } = useAuth();
+  const { signInWithIdentifiant } = useAuth();
 
   const sigle = params.nom_mutuelle;
   const denomination = params.adresse;
@@ -36,37 +32,32 @@ export default function LoginScreen({ onAdhesion, onBack }) {
   const organisationLa = mot("organisation_la");
   const organisationLaMaj = organisationLa.charAt(0).toUpperCase() + organisationLa.slice(1);
 
+  // "Mot de passe oublié" n'a de sens que pour une identification par
+  // e-mail — resetPasswordForEmail n'a aucun équivalent téléphone ici.
+  const ressembleAUnEmail = identifiant.includes("@");
+
   const reset = () => { setError(""); setNotice(""); };
 
-  async function handleEmailLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault();
     reset(); setLoading(true);
-    const { error } = await signInWithEmail(email, password);
+    const { error } = await signInWithIdentifiant(identifiant, password);
     setLoading(false);
     if (error) setError(traduireErreur(error.message));
   }
 
   async function handleForgotPassword() {
-    if (!email) { setError("Saisissez d'abord votre adresse e-mail."); return; }
+    if (!identifiant.trim()) { setError("Saisissez d'abord votre adresse e-mail."); return; }
     reset(); setLoadingLink(true);
 
     // Aucun redirectTo précisé : comme pour les autres appels, Supabase
     // utilise la « Site URL » configurée dans son tableau de bord plutôt
     // que l'adresse locale du poste depuis lequel la demande est faite.
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(identifiant.trim());
 
     setLoadingLink(false);
     if (error) setError(traduireErreur(error.message));
     else setNotice("E-mail de réinitialisation envoyé. Consultez votre boîte e-mail.");
-  }
-
-  async function handleSendOtp(e) {
-    e.preventDefault();
-    reset(); setLoading(true);
-    const { error } = await signInWithPhone(phone);
-    setLoading(false);
-    if (error) setError(traduireErreur(error.message));
-    else setOtpSent(true);
   }
 
   async function handleGoogleLogin() {
@@ -81,19 +72,11 @@ export default function LoginScreen({ onAdhesion, onBack }) {
     // à faire ici, le retour se fera sur une nouvelle page.
   }
 
-  async function handleVerifyOtp(e) {
-    e.preventDefault();
-    reset(); setLoading(true);
-    const { error } = await verifyPhoneOtp(phone, otp);
-    setLoading(false);
-    if (error) setError(traduireErreur(error.message));
-  }
-
   return (
     <div className="auth-shell">
       <style>{CSS}</style>
 
-      {/* ---------- Panneau de marque ---------- */}
+      {/* ---------- Panneau de marque — masqué sur téléphone ---------- */}
       <aside className="auth-brand">
         <div className="brand-glow brand-glow-1" />
         <div className="brand-glow brand-glow-2" />
@@ -152,52 +135,32 @@ export default function LoginScreen({ onAdhesion, onBack }) {
             <p className="card-subtitle">Accédez à votre espace mutualiste</p>
           </header>
 
-          <div className="segmented" role="tablist">
-            <button
-              role="tab"
-              aria-selected={mode === "email"}
-              className={`segment ${mode === "email" ? "is-active" : ""}`}
-              onClick={() => { setMode("email"); reset(); }}
-            >
-              <Mail size={16} /> E-mail
+          <form onSubmit={handleLogin} className="form">
+            <Field label="E-mail ou téléphone" htmlFor="identifiant">
+              <input
+                id="identifiant" type="text" required autoComplete="username"
+                value={identifiant} onChange={(e) => setIdentifiant(e.target.value)}
+                placeholder="Entrez votre email ou numéro de téléphone" className="input"
+              />
+            </Field>
+
+            <Field label="Mot de passe" htmlFor="password">
+              <input
+                id="password" type="password" required autoComplete="current-password"
+                value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••" className="input"
+              />
+            </Field>
+
+            <Alerts error={error} notice={notice} />
+
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading
+                ? <><Loader2 size={18} className="spin" /> Connexion…</>
+                : <>Se connecter <ArrowRight size={18} /></>}
             </button>
-            <button
-              role="tab"
-              aria-selected={mode === "phone"}
-              className={`segment ${mode === "phone" ? "is-active" : ""}`}
-              onClick={() => { setMode("phone"); reset(); setOtpSent(false); }}
-            >
-              <Smartphone size={16} /> Téléphone
-            </button>
-          </div>
 
-          {/* --- E-mail --- */}
-          {mode === "email" && (
-            <form onSubmit={handleEmailLogin} className="form">
-              <Field label="Adresse e-mail" htmlFor="email">
-                <input
-                  id="email" type="email" required autoComplete="email"
-                  value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="vous@exemple.com" className="input"
-                />
-              </Field>
-
-              <Field label="Mot de passe" htmlFor="password">
-                <input
-                  id="password" type="password" required autoComplete="current-password"
-                  value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" className="input"
-                />
-              </Field>
-
-              <Alerts error={error} notice={notice} />
-
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading
-                  ? <><Loader2 size={18} className="spin" /> Connexion…</>
-                  : <>Se connecter <ArrowRight size={18} /></>}
-              </button>
-
+            {ressembleAUnEmail && (
               <button
                 type="button" className="lien-mdp-oublie"
                 onClick={handleForgotPassword} disabled={loadingLink}
@@ -206,74 +169,19 @@ export default function LoginScreen({ onAdhesion, onBack }) {
                   ? <><Loader2 size={13} className="spin" /> Envoi…</>
                   : "Mot de passe oublié ?"}
               </button>
+            )}
 
-              <div className="divider"><span>ou</span></div>
+            <div className="divider"><span>ou</span></div>
 
-              <button
-                type="button" className="btn btn-google"
-                onClick={handleGoogleLogin} disabled={loadingGoogle}
-              >
-                {loadingGoogle
-                  ? <><Loader2 size={18} className="spin" /> Redirection…</>
-                  : <><GoogleIcon /> Continuer avec Google</>}
-              </button>
-            </form>
-          )}
-
-          {/* --- Téléphone : numéro --- */}
-          {mode === "phone" && !otpSent && (
-            <form onSubmit={handleSendOtp} className="form">
-              <Field label="Numéro de téléphone" htmlFor="phone">
-                <input
-                  id="phone" type="tel" required autoComplete="tel"
-                  value={phone} onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+225 07 12 34 56 78" className="input"
-                />
-              </Field>
-              <p className="hint">Un code à 6 chiffres vous sera envoyé par SMS.</p>
-
-              <Alerts error={error} notice={notice} />
-
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading
-                  ? <><Loader2 size={18} className="spin" /> Envoi…</>
-                  : <>Recevoir le code <ArrowRight size={18} /></>}
-              </button>
-            </form>
-          )}
-
-          {/* --- Téléphone : code --- */}
-          {mode === "phone" && otpSent && (
-            <form onSubmit={handleVerifyOtp} className="form">
-              <button
-                type="button" className="back-link"
-                onClick={() => { setOtpSent(false); reset(); }}
-              >
-                <ArrowLeft size={15} /> Modifier le numéro
-              </button>
-
-              <p className="hint hint-strong">
-                Code envoyé au <strong>{phone}</strong>
-              </p>
-
-              <Field label="Code de vérification" htmlFor="otp">
-                <input
-                  id="otp" type="text" inputMode="numeric" required
-                  maxLength={6} value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  placeholder="000000" className="input input-otp"
-                />
-              </Field>
-
-              <Alerts error={error} notice={notice} />
-
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading
-                  ? <><Loader2 size={18} className="spin" /> Vérification…</>
-                  : <>Valider le code <ArrowRight size={18} /></>}
-              </button>
-            </form>
-          )}
+            <button
+              type="button" className="btn btn-google"
+              onClick={handleGoogleLogin} disabled={loadingGoogle}
+            >
+              {loadingGoogle
+                ? <><Loader2 size={18} className="spin" /> Redirection…</>
+                : <><GoogleIcon /> Continuer avec Google</>}
+            </button>
+          </form>
 
           <footer className="card-footer">
             Pas encore {mot("membre_singulier").toLowerCase()} ?{" "}
@@ -350,18 +258,15 @@ const CSS = `
 @media (min-width:960px){ .auth-shell{ grid-template-columns:1.05fr 1fr; } }
 
 /* ---- Marque ---- */
-/* Visible désormais à toutes les tailles — condensé sous 960px plutôt
-   que masqué. Sur mobile, il s'affiche au-dessus du formulaire (l'ordre
-   naturel de la grille à une colonne) au lieu de disparaître, pour que
-   l'argumentaire touche aussi les visiteurs sur téléphone, probablement
-   la majorité des visiteurs réels. */
+/* Sur téléphone : masqué, formulaire seul visible — demande explicite
+   pour l'écran de connexion, contrairement au reste du parcours. Le
+   panneau ne réapparaît qu'à partir de 960px. */
 .auth-brand{
-  display:flex; flex-direction:column; justify-content:center;
-  position:relative; overflow:hidden;
+  display:none; position:relative; overflow:hidden;
   background:linear-gradient(150deg, ${PALETTE.blue900} 0%, ${PALETTE.blue800} 55%, ${PALETTE.blue600} 130%);
-  color:#fff; padding:${S.xl}px ${S.lg}px;
+  color:#fff; padding:${S.xxxl}px;
 }
-@media (min-width:960px){ .auth-brand{ align-items:center; padding:${S.xxxl}px; } }
+@media (min-width:960px){ .auth-brand{ display:flex; flex-direction:column; justify-content:center; align-items:center; } }
 .brand-glow{ position:absolute; border-radius:50%; filter:blur(4px); }
 .brand-glow-1{ width:280px; height:280px; right:-90px; top:-90px; background:rgba(255,255,255,.06); }
 .brand-glow-2{ width:200px; height:200px; left:-70px; bottom:-60px; background:rgba(255,255,255,.05); }
@@ -370,34 +275,25 @@ const CSS = `
   .brand-glow-2{ width:300px; height:300px; left:-100px; bottom:-90px; }
 }
 .brand-content{ position:relative; z-index:1; max-width:440px; margin:0 auto; width:100%; }
-.brand-mark{ display:flex; align-items:center; gap:${S.sm}px; margin-bottom:${S.lg}px; }
-@media (min-width:960px){ .brand-mark{ gap:${S.md}px; margin-bottom:${S.xxxl}px; } }
+.brand-mark{ display:flex; align-items:center; gap:${S.md}px; margin-bottom:${S.xxxl}px; }
 .brand-logo-img{
-  width:40px; height:40px; object-fit:contain; flex-shrink:0;
-  background:#fff; border-radius:${R.md}px; padding:5px;
+  width:52px; height:52px; object-fit:contain; flex-shrink:0;
+  background:#fff; border-radius:${R.md}px; padding:6px;
   box-shadow:0 2px 10px rgba(0,0,0,.12);
 }
-@media (min-width:960px){ .brand-logo-img{ width:52px; height:52px; padding:6px; } }
 .brand-name{
-  font-size:16px; font-weight:700; letter-spacing:.02em; line-height:1.1;
+  font-size:20px; font-weight:700; letter-spacing:.02em; line-height:1.1;
   overflow-wrap:anywhere;
 }
-@media (min-width:960px){ .brand-name{ font-size:20px; } }
-.brand-tagline{ font-size:12px; opacity:.75; max-width:26ch; line-height:1.4; }
-@media (min-width:960px){ .brand-tagline{ font-size:13px; } }
-.brand-title{ font-size:24px; font-weight:700; line-height:1.2; letter-spacing:-.02em; margin:0 0 ${S.sm}px; }
-@media (min-width:960px){ .brand-title{ font-size:40px; margin-bottom:${S.lg}px; } }
-.brand-subtitle{ font-size:14px; line-height:1.55; opacity:.85; margin:0 0 ${S.lg}px; max-width:38ch; }
-@media (min-width:960px){ .brand-subtitle{ font-size:17px; margin-bottom:${S.xxxl}px; } }
-.brand-features{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:${S.sm}px; }
-@media (min-width:960px){ .brand-features{ gap:${S.lg}px; } }
-.brand-features li{ display:flex; align-items:center; gap:${S.sm}px; font-size:13px; opacity:.92; }
-@media (min-width:960px){ .brand-features li{ gap:${S.md}px; font-size:15px; } }
+.brand-tagline{ font-size:13px; opacity:.75; max-width:26ch; line-height:1.4; }
+.brand-title{ font-size:40px; font-weight:700; line-height:1.2; letter-spacing:-.02em; margin:0 0 ${S.lg}px; }
+.brand-subtitle{ font-size:17px; line-height:1.55; opacity:.85; margin:0 0 ${S.xxxl}px; max-width:38ch; }
+.brand-features{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:${S.lg}px; }
+.brand-features li{ display:flex; align-items:center; gap:${S.md}px; font-size:15px; opacity:.92; }
 .feature-icon{
-  width:30px; height:30px; border-radius:${R.sm}px; flex-shrink:0;
+  width:38px; height:38px; border-radius:${R.sm}px; flex-shrink:0;
   background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center;
 }
-@media (min-width:960px){ .feature-icon{ width:38px; height:38px; } }
 
 /* ---- Formulaire ---- */
 .auth-main{
@@ -423,21 +319,6 @@ const CSS = `
 .card-title{ font-size:28px; font-weight:700; letter-spacing:-.02em; margin:0 0 6px; }
 .card-subtitle{ font-size:15px; color:${C.textSubtle}; margin:0; }
 
-.segmented{
-  display:grid; grid-template-columns:1fr 1fr; gap:4px;
-  background:${C.bg}; border:1px solid ${C.border};
-  border-radius:${R.md}px; padding:4px; margin-bottom:${S.xl}px;
-}
-.segment{
-  display:flex; align-items:center; justify-content:center; gap:7px;
-  border:none; background:transparent; cursor:pointer;
-  padding:11px 0; border-radius:${R.sm}px;
-  font-family:inherit; font-size:14px; font-weight:600; color:${C.textSubtle};
-  transition:all .18s ease;
-}
-.segment:hover{ color:${C.primary}; }
-.segment.is-active{ background:${C.surface}; color:${C.primary}; box-shadow:${SHADOW.xs}; }
-
 .form{ display:flex; flex-direction:column; gap:${S.lg}px; }
 .field{ display:flex; flex-direction:column; gap:7px; }
 .label{ font-size:14px; font-weight:600; color:${C.textMuted}; }
@@ -451,12 +332,6 @@ const CSS = `
 .input::placeholder{ color:${PALETTE.grey300}; }
 .input:hover{ border-color:${PALETTE.grey300}; }
 .input:focus{ border-color:${C.primary}; box-shadow:${SHADOW.focus}; }
-.input-otp{
-  text-align:center; font-size:24px; font-weight:700;
-  letter-spacing:.4em; padding-left:.4em;
-}
-.hint{ font-size:14px; color:${C.textSubtle}; margin:-6px 0 0; }
-.hint-strong{ margin:0; }
 
 .btn{
   display:flex; align-items:center; justify-content:center; gap:8px;
@@ -494,11 +369,6 @@ const CSS = `
 .alert-error{ background:${C.dangerSoft}; color:${C.danger}; border:1px solid ${C.danger}22; }
 .alert-success{ background:${C.successSoft}; color:${C.success}; border:1px solid ${C.success}22; }
 
-.back-link{
-  display:flex; align-items:center; gap:6px; align-self:flex-start;
-  background:none; border:none; padding:0; cursor:pointer;
-  font-family:inherit; font-size:14px; font-weight:600; color:${C.primary};
-}
 .card-footer{
   margin-top:${S.xl}px; padding-top:${S.lg}px;
   border-top:1px solid ${C.border};

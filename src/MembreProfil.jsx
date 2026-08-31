@@ -1,8 +1,8 @@
-import React, { useState, } from "react";
+import React, { useState, useRef } from "react";
 import {
   ArrowLeft, User, Phone, Mail, Briefcase, CalendarDays,
   Lock, LogOut, Check, Loader2, AlertCircle, Pencil, X,
-  CheckCircle2, Clock, AlertTriangle, ShieldCheck, UserPlus,
+  CheckCircle2, Clock, AlertTriangle, ShieldCheck, UserPlus, Camera,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage, construireMatricule } from "./useParametrage";
@@ -31,6 +31,8 @@ export default function MembreProfil({ membre, onBack, onSignOut }) {
   const [succes, setSucces] = useState("");
   const [erreur, setErreur] = useState("");
   const [deconnexion, setDeconnexion] = useState(false);
+  const fileRef = useRef(null);
+  const [uploadPhoto, setUploadPhoto] = useState(false);
 
   const st = STATUT[fiche.statut_cotisation] || STATUT.a_jour;
   const initiales = fiche.nom.split(" ").map((w) => w[0]).slice(-2).join("").toUpperCase();
@@ -40,6 +42,51 @@ export default function MembreProfil({ membre, onBack, onSignOut }) {
     setSucces(message);
     setErreur("");
     setTimeout(() => setSucces(""), 3500);
+  }
+
+  // Même bucket, même convention de nom de fichier que côté admin
+  // (MembresPage.jsx) — la photo reste cohérente des deux côtés,
+  // qu'elle soit ajoutée par le membre lui-même ou par le Bureau.
+  async function televerserPhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErreur("Le fichier doit être une image.");
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      setErreur("Image trop lourde (3 Mo maximum).");
+      return;
+    }
+
+    setUploadPhoto(true);
+    setErreur("");
+
+    const ext = file.name.split(".").pop().toLowerCase();
+    const chemin = `${fiche.id}.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from("photos-membres")
+      .upload(chemin, file, { upsert: true, contentType: file.type });
+
+    if (upErr) {
+      setUploadPhoto(false);
+      setErreur("Échec du téléversement : " + upErr.message);
+      return;
+    }
+
+    const { data } = supabase.storage.from("photos-membres").getPublicUrl(chemin);
+    const url = `${data.publicUrl}?v=${Date.now()}`;
+
+    const { error: dbErr } = await supabase
+      .from("membres").update({ photo_url: url }).eq("id", fiche.id);
+
+    setUploadPhoto(false);
+    if (dbErr) { setErreur(dbErr.message); return; }
+
+    setFiche({ ...fiche, photo_url: url });
+    notifier("Votre photo a été mise à jour.");
   }
 
   async function enregistrerProfil() {
@@ -101,11 +148,25 @@ export default function MembreProfil({ membre, onBack, onSignOut }) {
 
       {/* ---- Identité ---- */}
       <section className="pf-identite">
-        {fiche.photo_url ? (
-          <img src={fiche.photo_url} alt={fiche.nom} className="pf-photo" />
-        ) : (
-          <div className="pf-photo pf-photo-init">{initiales}</div>
-        )}
+        <div className="pf-photo-zone">
+          {fiche.photo_url ? (
+            <img src={fiche.photo_url} alt={fiche.nom} className="pf-photo" />
+          ) : (
+            <div className="pf-photo pf-photo-init">{initiales}</div>
+          )}
+          <button
+            className="pf-photo-btn"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploadPhoto}
+            aria-label="Changer la photo"
+          >
+            {uploadPhoto ? <Loader2 size={15} className="pf-spin" /> : <Camera size={15} />}
+          </button>
+          <input
+            ref={fileRef} type="file" accept="image/*" hidden
+            onChange={televerserPhoto}
+          />
+        </div>
 
         <h1 className="pf-nom">{fiche.nom}</h1>
         <p className="pf-poste">{fiche.poste || "—"}</p>
@@ -342,6 +403,16 @@ const CSS = `
   border:3px solid ${C.surface}; box-shadow:${SHADOW.md};
   background:${PALETTE.grey200};
 }
+.pf-photo-zone{ position:relative; width:96px; height:96px; }
+.pf-photo-btn{
+  position:absolute; right:-2px; bottom:-2px;
+  width:32px; height:32px; border-radius:50%;
+  background:${C.primary}; color:#fff; border:3px solid ${C.surface};
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:${SHADOW.sm}; transition:background .16s ease;
+}
+.pf-photo-btn:hover:not(:disabled){ background:${C.primaryDark}; }
+.pf-photo-btn:disabled{ opacity:.7; cursor:not-allowed; }
 .pf-photo-init{
   display:flex; align-items:center; justify-content:center;
   background:linear-gradient(135deg, ${PALETTE.blue800}, ${PALETTE.blue600});

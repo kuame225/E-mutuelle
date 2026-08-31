@@ -767,21 +767,23 @@ function MembreCotisations({ membre }) {
   const [declarations, setDeclarations] = useState([]);
   const [waveActif, setWaveActif] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [declarationOuverte, setDeclarationOuverte] = useState(null); // cotisation ciblée
-  const [waveEnCours, setWaveEnCours] = useState(null); // cotisation.id en cours de redirection
+  const [declarationOuverte, setDeclarationOuverte] = useState(null); // cotisation ou tableau de cotisations
+  const [waveEnCours, setWaveEnCours] = useState(null); // cotisation.id ou "groupe"
   const [waveErreur, setWaveErreur] = useState("");
+  const [selection, setSelection] = useState([]); // ids des cotisations cochées
 
   async function charger() {
     const [{ data: cot }, { data: moy }, { data: decl }, { data: wave }] = await Promise.all([
       supabase.from("cotisations").select("*").eq("membre_id", membre.id).order("periode", { ascending: false }),
       supabase.from("moyens_paiement").select("*").eq("organisation_id", membre.organisation_id).eq("actif", true).order("ordre"),
-      supabase.from("declarations_paiement").select("cotisation_id, statut").eq("membre_id", membre.id).eq("statut", "en_attente"),
+      supabase.from("declarations_paiement").select("cotisation_id, cotisation_ids, statut").eq("membre_id", membre.id).eq("statut", "en_attente"),
       supabase.from("integrations_paiement").select("actif").eq("organisation_id", membre.organisation_id).eq("fournisseur", "wave").maybeSingle(),
     ]);
     setCotisations(cot || []);
     setMoyens(moy || []);
     setDeclarations(decl || []);
     setWaveActif(Boolean(wave?.actif));
+    setSelection([]);
     setLoading(false);
   }
 
@@ -808,10 +810,44 @@ function MembreCotisations({ membre }) {
     window.location.href = data.wave_launch_url;
   }
 
+  // Même principe que payerAvecWave, sur plusieurs cotisations à la
+  // fois — voir creer-session-wave, qui accepte désormais cotisationIds
+  // en plus de cotisationId.
+  async function payerSelectionAvecWave() {
+    setWaveEnCours("groupe");
+    setWaveErreur("");
+
+    const { data, error } = await supabase.functions.invoke("creer-session-wave", {
+      body: {
+        organisationId: membre.organisation_id,
+        cotisationIds: selection,
+        origine: window.location.origin,
+      },
+    });
+
+    if (error || !data?.wave_launch_url) {
+      setWaveEnCours(null);
+      setWaveErreur(data?.error || "Impossible de démarrer le paiement Wave pour le moment.");
+      return;
+    }
+
+    window.location.href = data.wave_launch_url;
+  }
+
+  function basculerSelection(id) {
+    setSelection((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  }
+
   if (loading) return <div style={{ color: C.textSubtle }}>Chargement…</div>;
 
   const declarationEnAttentePour = (cotisationId) =>
-    declarations.some((d) => d.cotisation_id === cotisationId);
+    declarations.some((d) => d.cotisation_id === cotisationId || d.cotisation_ids?.includes(cotisationId));
+
+  const cotisationsImpayees = cotisations.filter((c) => c.statut !== "paye" && !declarationEnAttentePour(c.id));
+  const cotisationsSelectionnees = cotisations.filter((c) => selection.includes(c.id));
+  const totalSelection = cotisationsSelectionnees.reduce(
+    (s, c) => s + ((c.montant_du || 0) - (c.montant_paye || 0)), 0
+  );
 
   return (
     <div>
@@ -822,6 +858,53 @@ function MembreCotisations({ membre }) {
       {waveErreur && (
         <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>
           {waveErreur}
+        </div>
+      )}
+
+      {/* Barre de sélection groupée — visible dès qu'au moins deux
+          échéances sont sélectionnables, pour ne pas alourdir l'écran
+          quand il n'y a qu'un seul mois en retard. */}
+      {cotisationsImpayees.length > 1 && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
+          background: selection.length > 0 ? PALETTE.blue50 : C.bg,
+          border: `1px solid ${selection.length > 0 ? PALETTE.blue100 : C.border}`,
+          borderRadius: 12, padding: "12px 16px", marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 13, color: C.textMuted }}>
+            {selection.length === 0
+              ? "Cochez plusieurs échéances pour les régler en une seule fois."
+              : <>{selection.length} échéance{selection.length > 1 ? "s" : ""} sélectionnée{selection.length > 1 ? "s" : ""} — <strong style={{ color: C.text }}>{montant(totalSelection)} FCFA</strong></>}
+          </div>
+          {selection.length > 0 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {waveActif && (
+                <button
+                  onClick={payerSelectionAvecWave}
+                  disabled={waveEnCours === "groupe"}
+                  style={{
+                    background: C.primary, border: "none", color: "#fff",
+                    borderRadius: 8, padding: "8px 14px", cursor: "pointer",
+                    fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+                  }}
+                >
+                  {waveEnCours === "groupe" ? "Redirection…" : "Payer avec Wave"}
+                </button>
+              )}
+              {moyens.length > 0 && (
+                <button
+                  onClick={() => setDeclarationOuverte(cotisationsSelectionnees)}
+                  style={{
+                    background: "none", border: `1.5px solid ${C.primary}`,
+                    color: C.primary, borderRadius: 8, padding: "8px 14px", cursor: "pointer",
+                    fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+                  }}
+                >
+                  J'ai payé
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -836,66 +919,79 @@ function MembreCotisations({ membre }) {
                 ? { bg: C.warningSoft, fg: C.warning, label: "Partiel" }
                 : { bg: C.dangerSoft, fg: C.danger, label: "En attente" };
             const enAttente = declarationEnAttentePour(c.id);
+            const selectionnable = c.statut !== "paye" && !enAttente;
 
             return (
               <div
                 key={c.id}
                 style={{
+                  display: "flex", gap: 12,
                   padding: "14px 18px",
                   borderBottom: i < cotisations.length - 1
                     ? `1px solid ${C.border}` : "none",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14.5 }}>
-                      {formatPeriode(c.periode)}
+                {cotisationsImpayees.length > 1 && (
+                  <input
+                    type="checkbox"
+                    checked={selection.includes(c.id)}
+                    onChange={() => basculerSelection(c.id)}
+                    disabled={!selectionnable}
+                    style={{ marginTop: 3, width: 16, height: 16, accentColor: C.primary, flexShrink: 0, visibility: selectionnable ? "visible" : "hidden" }}
+                  />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14.5 }}>
+                        {formatPeriode(c.periode)}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 2 }}>
+                        {montant(c.montant_paye)} / {montant(c.montant_du)} FCFA
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 2 }}>
-                      {montant(c.montant_paye)} / {montant(c.montant_du)} FCFA
-                    </div>
+                    <span style={{ ...badge, background: st.bg, color: st.fg }}>
+                      {st.label}
+                    </span>
                   </div>
-                  <span style={{ ...badge, background: st.bg, color: st.fg }}>
-                    {st.label}
-                  </span>
-                </div>
 
-                {c.statut !== "paye" && (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                    {waveActif && (
-                      <button
-                        onClick={() => payerAvecWave(c)}
-                        disabled={waveEnCours === c.id}
-                        style={{
-                          background: C.primary, border: "none", color: "#fff",
-                          borderRadius: 8, padding: "7px 13px", cursor: "pointer",
-                          fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
-                        }}
-                      >
-                        {waveEnCours === c.id ? "Redirection…" : "Payer avec Wave"}
-                      </button>
-                    )}
-
-                    {moyens.length > 0 && (
-                      enAttente ? (
-                        <span style={{ fontSize: 12.5, color: C.textSubtle, alignSelf: "center" }}>
-                          Déclaration envoyée, en attente de confirmation.
-                        </span>
-                      ) : (
+                  {c.statut !== "paye" && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                      {waveActif && (
                         <button
-                          onClick={() => setDeclarationOuverte(c)}
+                          onClick={() => payerAvecWave(c)}
+                          disabled={waveEnCours === c.id}
                           style={{
-                            background: "none", border: `1.5px solid ${C.primary}`,
-                            color: C.primary, borderRadius: 8, padding: "7px 13px", cursor: "pointer",
+                            background: C.primary, border: "none", color: "#fff",
+                            borderRadius: 8, padding: "7px 13px", cursor: "pointer",
                             fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
                           }}
                         >
-                          J'ai payé
+                          {waveEnCours === c.id ? "Redirection…" : "Payer avec Wave"}
                         </button>
-                      )
-                    )}
-                  </div>
-                )}
+                      )}
+
+                      {moyens.length > 0 && (
+                        enAttente ? (
+                          <span style={{ fontSize: 12.5, color: C.textSubtle, alignSelf: "center" }}>
+                            Déclaration envoyée, en attente de confirmation.
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setDeclarationOuverte(c)}
+                            style={{
+                              background: "none", border: `1.5px solid ${C.primary}`,
+                              color: C.primary, borderRadius: 8, padding: "7px 13px", cursor: "pointer",
+                              fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+                            }}
+                          >
+                            J'ai payé
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -904,7 +1000,8 @@ function MembreCotisations({ membre }) {
 
       {declarationOuverte && (
         <DeclarationPaiementModal
-          cotisation={declarationOuverte}
+          cotisation={Array.isArray(declarationOuverte) ? null : declarationOuverte}
+          cotisations={Array.isArray(declarationOuverte) ? declarationOuverte : null}
           membre={membre}
           moyens={moyens}
           onClose={() => setDeclarationOuverte(null)}
@@ -1693,8 +1790,15 @@ function MoyensPaiementApercu({ moyens }) {
 // réel : seulement une demande que le Bureau confirme ou rejette dans
 // "Paiements déclarés", exactement comme aujourd'hui pour un règlement
 // signalé par un autre canal, sans la ressaisie manuelle.
-function DeclarationPaiementModal({ cotisation, membre, moyens, onClose, onDone }) {
-  const restant = (cotisation.montant_du || 0) - (cotisation.montant_paye || 0);
+// Accepte soit une cotisation unique (cotisation), soit un tableau
+// (cotisations) — jamais les deux à la fois. Le second cas insère une
+// seule déclaration avec cotisation_ids renseigné et cotisation_id
+// laissé vide, plutôt que plusieurs déclarations distinctes à
+// confirmer une par une côté Bureau.
+function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onClose, onDone }) {
+  const liste = cotisations || (cotisation ? [cotisation] : []);
+  const groupe = liste.length > 1;
+  const restant = liste.reduce((s, c) => s + ((c.montant_du || 0) - (c.montant_paye || 0)), 0);
   const [moyenId, setMoyenId] = useState(moyens[0]?.id || "");
   const [montantSaisi, setMontantSaisi] = useState(String(restant));
   const [reference, setReference] = useState("");
@@ -1712,7 +1816,8 @@ function DeclarationPaiementModal({ cotisation, membre, moyens, onClose, onDone 
     const { error } = await supabase.from("declarations_paiement").insert({
       organisation_id: membre.organisation_id,
       membre_id: membre.id,
-      cotisation_id: cotisation.id,
+      cotisation_id: groupe ? null : liste[0].id,
+      cotisation_ids: groupe ? liste.map((c) => c.id) : null,
       moyen_paiement_id: moyenId || null,
       montant: m,
       reference: reference.trim() || null,
@@ -1739,7 +1844,10 @@ function DeclarationPaiementModal({ cotisation, membre, moyens, onClose, onDone 
       >
         <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>J'ai payé</h3>
         <p style={{ fontSize: 13, color: C.textSubtle, margin: "0 0 16px" }}>
-          {formatPeriode(cotisation.periode)} — reste dû {montant(restant)} FCFA
+          {groupe
+            ? `${liste.length} échéances (${liste.map((c) => formatPeriode(c.periode)).join(", ")})`
+            : formatPeriode(liste[0].periode)}
+          {" — reste dû "}{montant(restant)} FCFA
         </p>
 
         {moyens.length > 0 && (

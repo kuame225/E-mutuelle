@@ -12,6 +12,14 @@ function montant(v) {
   return (v || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
+function formatPeriode(periode) {
+  const mois = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+  const [annee, m] = String(periode).split("-");
+  const index = parseInt(m, 10) - 1;
+  return mois[index] ? `${mois[index]} ${annee}` : periode;
+}
+
 const TYPES_LABEL = {
   wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money",
   moov_money: "Moov Money", autre: "Autre",
@@ -31,6 +39,7 @@ export default function DeclarationsPaiementPage() {
   const [loading, setLoading] = useState(true);
   const [filtre, setFiltre] = useState("en_attente");
   const [confirmationCible, setConfirmationCible] = useState(null); // { declaration, cotisation, membre }
+  const [confirmationGroupee, setConfirmationGroupee] = useState(null); // { declaration, cotisations }
   const [rejetCible, setRejetCible] = useState(null);
   const [motifRejet, setMotifRejet] = useState("");
   const [enCours, setEnCours] = useState(false);
@@ -70,6 +79,23 @@ export default function DeclarationsPaiementPage() {
   }
 
   async function ouvrirConfirmation(d) {
+    if (d.cotisation_ids?.length) {
+      // Déclaration groupée — jamais via PaiementModal (bâti pour une
+      // seule cotisation). On récupère juste de quoi montrer un
+      // récapitulatif avant de confirmer, la répartition elle-même
+      // étant faite par enregistrer_paiement_groupe().
+      setEnCours(true);
+      const { data: cots, error } = await supabase
+        .from("cotisations")
+        .select("id, periode, montant_du, montant_paye")
+        .in("id", d.cotisation_ids);
+      setEnCours(false);
+
+      if (error) { setMessage({ type: "err", texte: error.message }); return; }
+      setConfirmationGroupee({ declaration: d, cotisations: cots || [] });
+      return;
+    }
+
     if (!d.cotisation_id) {
       // Pas d'échéance précisée par le membre : on ne peut pas rattacher
       // automatiquement à une cotisation. On marque confirmée pour la
@@ -126,6 +152,35 @@ export default function DeclarationsPaiementPage() {
     // déclaration reste en attente, on ne recharge même pas la liste.
   }
 
+  // Même principe qu'apresFermetureModal, mais sans PaiementModal : la
+  // répartition est faite côté serveur par enregistrer_paiement_groupe(),
+  // qui rappelle enregistrer_paiement() une fois par cotisation.
+  async function confirmerGroupee() {
+    const { declaration } = confirmationGroupee;
+    setEnCours(true);
+
+    const { error } = await supabase.rpc("enregistrer_paiement_groupe", {
+      p_cotisation_ids: declaration.cotisation_ids,
+      p_montant_total: declaration.montant,
+      p_mode: declaration.moyens_paiement?.type || "autre",
+      p_reference: declaration.reference,
+    });
+
+    if (error) {
+      setEnCours(false);
+      setMessage({ type: "err", texte: error.message });
+      return;
+    }
+
+    const { error: majErr } = await marquerTraitee(declaration.id, "confirmee");
+    setEnCours(false);
+    setConfirmationGroupee(null);
+
+    if (majErr) { setMessage({ type: "err", texte: majErr.message }); return; }
+    notifier("Paiement enregistré et déclaration confirmée.");
+    charger();
+  }
+
   async function rejeter() {
     setEnCours(true);
     const { error } = await marquerTraitee(rejetCible.id, "rejetee", {
@@ -179,6 +234,7 @@ export default function DeclarationsPaiementPage() {
               <div className="dp-ligne-corps">
                 <div className="dp-ligne-titre">{d.membres?.nom || "—"}</div>
                 <div className="dp-ligne-meta">
+                  {d.cotisation_ids?.length > 1 && `${d.cotisation_ids.length} échéances · `}
                   {TYPES_LABEL[d.moyens_paiement?.type] || d.moyens_paiement?.libelle || "Moyen non précisé"}
                   {d.reference && ` · Réf. ${d.reference}`}
                   {" · "}{new Date(d.date_declaree).toLocaleDateString("fr-FR")}
@@ -216,6 +272,45 @@ export default function DeclarationsPaiementPage() {
           onClose={apresFermetureModal}
           onSuccess={() => {}}
         />
+      )}
+
+      {confirmationGroupee && (
+        <div className="dp-overlay" onClick={() => setConfirmationGroupee(null)}>
+          <div className="dp-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="dp-modal-titre">Confirmer ce paiement groupé ?</h3>
+            <ul style={{ margin: "0 0 16px", padding: 0, listStyle: "none" }}>
+              {confirmationGroupee.cotisations.map((c) => (
+                <li
+                  key={c.id}
+                  style={{
+                    display: "flex", justifyContent: "space-between",
+                    padding: "7px 0", fontSize: 13.5, color: C.textMuted,
+                    borderBottom: `1px solid ${C.border}`,
+                  }}
+                >
+                  <span>{formatPeriode(c.periode)}</span>
+                  <span>{montant(c.montant_du - c.montant_paye)} F restant</span>
+                </li>
+              ))}
+            </ul>
+            <p style={{ fontSize: 14, margin: "0 0 16px" }}>
+              Montant déclaré : <strong>{montant(confirmationGroupee.declaration.montant)} FCFA</strong>
+            </p>
+            <div className="dp-modal-actions">
+              <button className="dp-mbtn dp-mbtn-ghost" onClick={() => setConfirmationGroupee(null)} disabled={enCours}>
+                Annuler
+              </button>
+              <button
+                className="dp-mbtn"
+                style={{ flex: 2, background: C.success, color: "#fff" }}
+                onClick={confirmerGroupee}
+                disabled={enCours}
+              >
+                {enCours ? <><Loader2 size={16} className="dp-spin" /> Enregistrement…</> : "Confirmer"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {rejetCible && (

@@ -4,6 +4,7 @@ import {
   CalendarDays, Camera, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, Users, KeyRound, Copy, Check, ShieldCheck, UserPlus,
   Smartphone, Receipt, CalendarCheck, LogOut, Undo2, Info, Coins, Pencil,
+  Heart, Baby, UserRound, User,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage, construireMatricule, dateEligibilite, moduleActif } from "./useParametrage";
@@ -18,6 +19,19 @@ const STATUT = {
   retard:   { label: "En retard", color: C.danger,  soft: "#FEE2E2", Icon: AlertTriangle },
   suspendu: { label: "Suspendu",  color: C.danger,  soft: "#FEE2E2", Icon: AlertTriangle },
 };
+
+// Même catalogue que MembreBeneficiaires.jsx (espace membre) — l'admin
+// ne fait que consulter ici, jamais ajouter ni modifier : ce sont les
+// bénéficiaires déclarés par le membre lui-même, sous sa responsabilité.
+const LIENS_BENEFICIAIRE = [
+  { id: "conjoint", label: "Conjoint(e)", Icon: Heart,      color: C.danger },
+  { id: "enfant",   label: "Enfant",      Icon: Baby,       color: C.primaryLight },
+  { id: "pere",     label: "Père",        Icon: UserRound,  color: C.primary },
+  { id: "mere",     label: "Mère",        Icon: UserRound,  color: C.primary },
+  { id: "frere",    label: "Frère",       Icon: User,       color: C.success },
+  { id: "soeur",    label: "Sœur",        Icon: User,       color: C.success },
+  { id: "autre",    label: "Autre",       Icon: User,       color: C.textMuted },
+];
 
 const FILTRES = [
   { id: "tous",    label: "Tous" },
@@ -287,6 +301,25 @@ function FicheMembre({ membre, onBack, onUpdate }) {
   const [editValeurPart, setEditValeurPart] = useState(false);
   const [nouvelleValeurPart, setNouvelleValeurPart] = useState("");
   const [enregistreValeurPart, setEnregistreValeurPart] = useState(false);
+
+  // Bénéficiaires déclarés par le membre — lecture seule ici, l'admin
+  // ne les gère jamais lui-même.
+  const [beneficiaires, setBeneficiaires] = useState([]);
+  const [beneficiairesChargement, setBeneficiairesChargement] = useState(true);
+
+  useEffect(() => {
+    let actif = true;
+    setBeneficiairesChargement(true);
+    supabase
+      .from("beneficiaires")
+      .select("*")
+      .eq("membre_id", membre.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (actif) { setBeneficiaires(data || []); setBeneficiairesChargement(false); }
+      });
+    return () => { actif = false; };
+  }, [membre.id]);
 
   useEffect(() => {
     if (!partsActif) return;
@@ -885,6 +918,58 @@ function FicheMembre({ membre, onBack, onUpdate }) {
           <span>{mot("matricule")}</span>
           <strong>{matricule}</strong>
         </div>
+
+        {/* ---- Bénéficiaires déclarés — lecture seule ---- */}
+        <section className="mb-acces">
+          <header className="mb-acces-head">
+            <span className="mb-acces-icon"><Users size={18} /></span>
+            <div>
+              <h3 className="mb-acces-titre">Bénéficiaires déclarés</h3>
+              <p className="mb-acces-sub">
+                Proches renseignés par {mot("membre_singulier").toLowerCase()} lui-même, pouvant
+                être concernés par une demande {de(mot("aides").toLowerCase())}.
+              </p>
+            </div>
+          </header>
+
+          {beneficiairesChargement ? (
+            <div style={{ padding: "12px 0", color: C.textSubtle, fontSize: 13 }}>Chargement…</div>
+          ) : beneficiaires.length === 0 ? (
+            <p style={{ margin: "10px 0 0", fontSize: 13, color: C.textSubtle }}>
+              Aucun bénéficiaire déclaré pour le moment.
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", margin: "12px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              {beneficiaires.map((b) => {
+                const lien = LIENS_BENEFICIAIRE.find((l) => l.id === b.lien_parente) || LIENS_BENEFICIAIRE[6];
+                return (
+                  <li
+                    key={b.id}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      background: C.bg, borderRadius: R.md, padding: "10px 14px",
+                    }}
+                  >
+                    <span style={{
+                      width: 34, height: 34, borderRadius: R.sm, flexShrink: 0,
+                      background: lien.color + "14", color: lien.color,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <lien.Icon size={16} />
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{b.nom}</div>
+                      <div style={{ fontSize: 12, color: C.textSubtle, marginTop: 1 }}>
+                        {lien.label}
+                        {b.telephone && ` · ${b.telephone}`}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
         {/* ---- Droit d'adhésion (article 15) ---- */}
         {!sorti && (

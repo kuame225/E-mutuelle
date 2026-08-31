@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Users, Plus, X, Loader2, Calendar, MapPin, ClipboardList,
   QrCode, CheckCircle2, Circle, FileText, Upload, Copy, Check,
-  ChevronLeft, AlertCircle, ShieldCheck,
+  ChevronLeft, AlertCircle, ShieldCheck, PenLine,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
@@ -467,12 +467,94 @@ function FicheAssemblee({ assemblee, onBack, onRefresh }) {
 
       {erreur && <div className="ag-erreur"><AlertCircle size={15} /> {erreur}</div>}
 
+      {assemblee.statut === "cloturee" && assemblee.pv_texte && (
+        <SectionSignaturesPv assemblee={assemblee} />
+      )}
+
       {assemblee.statut !== "cloturee" && (
         <button className="btn-primary btn-full" onClick={cloturer} disabled={enCours}>
           <ShieldCheck size={16} /> Clôturer l'assemblée
         </button>
       )}
     </div>
+  );
+}
+
+// Signature électronique simple : une action authentifiée, horodatée
+// et tracée — pas un certificat ni une image de signature scannée
+// qu'on pourrait copier. Les membres présents émargent déjà via le
+// code d'émargement ; ici, c'est le Bureau qui certifie le contenu.
+function SectionSignaturesPv({ assemblee }) {
+  const [signatures, setSignatures] = useState([]);
+  const [dejaSigne, setDejaSigne] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [certifie, setCertifie] = useState(false);
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  async function charger() {
+    const { data: userData } = await supabase.auth.getUser();
+    const { data } = await supabase
+      .from("signatures_pv")
+      .select("*")
+      .eq("assemblee_id", assemblee.id)
+      .order("signe_le");
+    setSignatures(data || []);
+    setDejaSigne((data || []).some((s) => s.user_id === userData.user?.id));
+    setLoading(false);
+  }
+
+  useEffect(() => { charger(); }, [assemblee.id]);
+
+  async function signer() {
+    setEnCours(true);
+    setErreur("");
+    const { error } = await supabase.rpc("signer_pv", { p_assemblee_id: assemblee.id });
+    setEnCours(false);
+    if (error) { setErreur(error.message); return; }
+    setCertifie(false);
+    charger();
+  }
+
+  if (loading) return null;
+
+  return (
+    <section className="fa-card">
+      <h3 className="fa-card-titre"><PenLine size={16} /> Signatures du Bureau</h3>
+
+      {signatures.length === 0 ? (
+        <p className="fa-signatures-vide">Personne n'a encore signé ce procès-verbal.</p>
+      ) : (
+        <ul className="fa-signatures-liste">
+          {signatures.map((s) => (
+            <li key={s.id} className="fa-signature-ligne">
+              <CheckCircle2 size={15} color={C.success} />
+              <div>
+                <strong>{s.nom_signataire}</strong>
+                {s.role_signataire && <span className="fa-signature-role"> — {s.role_signataire}</span>}
+                <div className="fa-signature-date">
+                  Signé le {new Date(s.signe_le).toLocaleDateString("fr-FR")} à{" "}
+                  {new Date(s.signe_le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!dejaSigne && (
+        <div className="fa-signature-action">
+          <label className="fa-signature-check">
+            <input type="checkbox" checked={certifie} onChange={(e) => setCertifie(e.target.checked)} />
+            Je certifie avoir lu et j'approuve le contenu de ce procès-verbal.
+          </label>
+          {erreur && <div className="ag-erreur"><AlertCircle size={15} /> {erreur}</div>}
+          <button className="btn-primary" onClick={signer} disabled={!certifie || enCours}>
+            {enCours ? "Signature…" : "Signer ce procès-verbal"}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -538,6 +620,22 @@ const CSS = `
 }
 .fa-card-titre{ display:flex; align-items:center; gap:8px; margin:0; font-size:15px; font-weight:600; }
 .fa-ordre{ white-space:pre-line; font-size:14px; color:${C.textMuted}; line-height:1.6; margin:0; }
+
+.fa-signatures-vide{ font-size:13.5px; color:${C.textSubtle}; margin:0; }
+.fa-signatures-liste{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.fa-signature-ligne{ display:flex; align-items:flex-start; gap:9px; font-size:13.5px; }
+.fa-signature-role{ color:${C.textSubtle}; font-weight:400; }
+.fa-signature-date{ font-size:11.5px; color:${C.textSubtle}; margin-top:1px; }
+.fa-signature-action{
+  display:flex; flex-direction:column; gap:${S.sm}px;
+  padding-top:${S.sm}px; border-top:1px solid ${C.border};
+}
+.fa-signature-check{
+  display:flex; align-items:flex-start; gap:9px; font-size:13.5px;
+  color:${C.textMuted}; line-height:1.5; cursor:pointer;
+}
+.fa-signature-check input{ margin-top:2px; accent-color:${C.primary}; flex-shrink:0; }
+
 
 .fa-quorum-head{ display:flex; align-items:center; justify-content:space-between; gap:${S.md}px; flex-wrap:wrap; }
 .fa-quorum-badge{

@@ -42,6 +42,7 @@ const LABELS_MODULES = {
   module_services: "Services offerts",
   module_formations: "Formations",
   module_partenariats: "Partenariats",
+  module_dons: "Dons publics",
 };
 
 // Une icône par type, pour que le choix ne soit plus qu'un nom et une

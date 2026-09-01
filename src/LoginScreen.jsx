@@ -279,6 +279,13 @@ function IllustrationTableauBord() {
       </div>
 
       <div className="illus-phone">
+        <div className="illus-phone-statut">
+          <span>9:41</span>
+          <span className="illus-phone-statut-icones">
+            <span className="illus-phone-signal"><span /><span /><span /></span>
+            <span className="illus-phone-batterie" />
+          </span>
+        </div>
         <div className="illus-phone-ecran">
           <div className="illus-phone-salut">Bonjour Koffi 👋</div>
           <div className="illus-phone-notif">
@@ -293,6 +300,7 @@ function IllustrationTableauBord() {
             <div className="illus-phone-label">membres actifs</div>
           </div>
           <div className="illus-phone-bouton">Voir mes notifications</div>
+          <div className="illus-phone-nav" />
         </div>
       </div>
     </div>
@@ -369,7 +377,7 @@ const CSS = `
   .brand-glow-1{ width:420px; height:420px; right:-140px; top:-120px; }
   .brand-glow-2{ width:300px; height:300px; left:-100px; bottom:-90px; }
 }
-.brand-content{ position:relative; z-index:1; max-width:540px; margin:0 auto; width:100%; }
+.brand-content{ position:relative; z-index:1; max-width:600px; margin:0 auto; width:100%; }
 .brand-mark{ display:flex; align-items:center; gap:${S.md}px; margin-bottom:${S.xxxl}px; }
 .brand-logo-img{
   width:52px; height:52px; object-fit:contain; flex-shrink:0;
@@ -402,23 +410,25 @@ const CSS = `
 }
 @media (min-width:960px){ .illus-scene{ display:block; } }
 
-.illus-laptop{ position:absolute; left:0; bottom:0; width:440px; }
+.illus-laptop{
+  position:absolute; left:0; bottom:0; width:420px;
+  filter:drop-shadow(0 22px 40px rgba(0,0,0,.45));
+}
 .illus-laptop-ecran{
   position:relative; height:250px; background:#fff;
-  border:3px solid rgba(15,20,35,.9); border-radius:10px 10px 4px 4px;
+  border:3px solid #12172A; border-bottom:2px solid #2A3352;
+  border-radius:10px 10px 0 0;
   overflow:hidden; padding:16px 18px;
-  box-shadow:0 20px 45px -10px rgba(0,0,0,.5);
 }
 .illus-laptop-base{
-  position:relative; height:16px; margin:0 -16px;
-  background:linear-gradient(180deg, #E4E8EF, #C7CFDA);
-  border-radius:0 0 8px 8px;
-  box-shadow:0 6px 14px -4px rgba(0,0,0,.35);
+  position:relative; height:18px;
+  background:linear-gradient(180deg, #1E2648, #10142A);
+  border:3px solid #12172A; border-top:none;
+  border-radius:0 0 10px 10px;
 }
 .illus-laptop-base::after{
-  content:""; position:absolute; left:50%; top:0; transform:translateX(-50%);
-  width:56px; height:4px; background:#B7C0CC;
-  border-radius:0 0 5px 5px;
+  content:""; position:absolute; left:50%; top:4px; transform:translateX(-50%);
+  width:60px; height:3px; background:#3A4368; border-radius:2px;
 }
 .illus-barre-titre{ display:flex; gap:5px; margin-bottom:14px; }
 .illus-barre-titre span{
@@ -483,29 +493,53 @@ const CSS = `
 .illus-barres-legende{ display:flex; gap:36px; font-size:9.5px; color:${C.textSubtle}; }
 
 .illus-phone{
-  position:absolute; right:0; bottom:0; width:132px; height:232px;
-  background:#fff; border:3px solid rgba(15,20,35,.9);
-  border-radius:18px; padding:13px 11px; box-shadow:0 20px 44px -10px rgba(0,0,0,.5);
+  position:absolute; left:452px; bottom:0; width:118px; height:210px;
+  background:#fff; border:3px solid #12172A;
+  border-radius:20px; padding:8px 9px 14px;
+  box-shadow:0 22px 44px -10px rgba(0,0,0,.5);
+  display:flex; flex-direction:column;
 }
-.illus-phone-ecran{ display:flex; flex-direction:column; gap:10px; height:100%; }
-.illus-phone-salut{ font-size:11.5px; font-weight:700; color:${C.text}; }
+.illus-phone-statut{
+  display:flex; align-items:center; justify-content:space-between;
+  font-size:8px; font-weight:700; color:${C.text}; margin-bottom:8px; flex-shrink:0;
+}
+.illus-phone-statut-icones{ display:flex; align-items:center; gap:3px; }
+.illus-phone-signal{ display:flex; align-items:flex-end; gap:1.5px; height:7px; }
+.illus-phone-signal span{ width:2px; background:${C.text}; border-radius:1px; }
+.illus-phone-signal span:nth-child(1){ height:3px; }
+.illus-phone-signal span:nth-child(2){ height:5px; }
+.illus-phone-signal span:nth-child(3){ height:7px; }
+.illus-phone-batterie{
+  width:15px; height:7px; border:1px solid ${C.text}; border-radius:2px;
+  position:relative; margin-left:2px;
+}
+.illus-phone-batterie::after{
+  content:""; position:absolute; top:1px; left:1px; bottom:1px; width:70%;
+  background:${C.text}; border-radius:1px;
+}
+.illus-phone-ecran{ display:flex; flex-direction:column; gap:8px; flex:1; min-height:0; }
+.illus-phone-nav{
+  margin-top:auto; width:42px; height:3px; border-radius:2px;
+  background:${PALETTE.grey300}; align-self:center;
+}
+.illus-phone-salut{ font-size:10.5px; font-weight:700; color:${C.text}; }
 .illus-phone-notif{
-  display:flex; align-items:flex-start; gap:7px;
-  background:${PALETTE.blue50}; border-radius:9px; padding:8px 9px;
+  display:flex; align-items:flex-start; gap:6px;
+  background:${PALETTE.blue50}; border-radius:8px; padding:7px 8px;
 }
 .illus-phone-notif-icone{
-  width:18px; height:18px; border-radius:50%; flex-shrink:0;
-  background:${C.success}; color:#fff; font-size:10px; font-weight:700;
+  width:16px; height:16px; border-radius:50%; flex-shrink:0;
+  background:${C.success}; color:#fff; font-size:9px; font-weight:700;
   display:flex; align-items:center; justify-content:center;
 }
-.illus-phone-notif-titre{ font-size:9.5px; font-weight:700; color:${C.text}; }
-.illus-phone-notif-texte{ font-size:8px; color:${C.textSubtle}; margin-top:1px; line-height:1.35; }
+.illus-phone-notif-titre{ font-size:8.5px; font-weight:700; color:${C.text}; }
+.illus-phone-notif-texte{ font-size:7px; color:${C.textSubtle}; margin-top:1px; line-height:1.3; }
 .illus-phone-carte{
-  background:${C.bg}; border:1px solid ${C.border}; border-radius:9px; padding:10px;
+  background:${C.bg}; border:1px solid ${C.border}; border-radius:8px; padding:8px;
   display:flex; flex-direction:column; align-items:center; gap:2px;
 }
-.illus-phone-val{ font-size:21px; font-weight:700; color:${C.primary}; }
-.illus-phone-label{ font-size:9px; color:${C.textSubtle}; }
+.illus-phone-val{ font-size:18px; font-weight:700; color:${C.primary}; }
+.illus-phone-label{ font-size:8px; color:${C.textSubtle}; }
 .illus-phone-bouton{
   margin-top:auto; background:${C.primary}; color:#fff;
   border-radius:7px; padding:9px 0; text-align:center;

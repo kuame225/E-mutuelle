@@ -225,7 +225,7 @@ function IllustrationTableauBord() {
                 <span className="illus-stat-label">Membres</span>
               </div>
               <div className="illus-stat">
-                <span className="illus-stat-val">2,45M</span>
+                <span className="illus-stat-val">2 450 000</span>
                 <span className="illus-stat-label">FCFA</span>
               </div>
               <div className="illus-stat">
@@ -234,26 +234,24 @@ function IllustrationTableauBord() {
               </div>
             </div>
             <div className="illus-corps">
-              <svg viewBox="0 0 36 36" className="illus-donut">
-                <circle className="illus-donut-fond" cx="18" cy="18" r="15.5" />
-                <circle className="illus-donut-remplissage" cx="18" cy="18" r="15.5" />
-              </svg>
-              <div className="illus-barres">
-                <div className="illus-barre-1" />
-                <div className="illus-barre-2" />
-                <div className="illus-barre-3" />
-                <div className="illus-barre-4" />
+              <div className="illus-lignes">
+                <div className="illus-lignes-titre">Activités récentes</div>
+                <div className="illus-ligne"><span className="illus-puce illus-puce-verte" />Paiement cotisation — Mai 2026</div>
+                <div className="illus-ligne"><span className="illus-puce illus-puce-bleue" />Demande de promotion — K. Marie</div>
+                <div className="illus-ligne"><span className="illus-puce illus-puce-orange" />Réunion Conseil d'administration</div>
+              </div>
+              <div className="illus-donut-bloc">
+                <div className="illus-lignes-titre">Répartition</div>
+                <svg viewBox="0 0 36 36" className="illus-donut">
+                  <circle className="illus-donut-fond" cx="18" cy="18" r="15.5" />
+                  <circle className="illus-donut-remplissage" cx="18" cy="18" r="15.5" />
+                </svg>
               </div>
             </div>
           </div>
 
           <div className="illus-vue illus-vue-b">
-            <div className="illus-titre-ecran">Activité récente</div>
-            <div className="illus-lignes">
-              <div className="illus-ligne"><span className="illus-puce illus-puce-verte" />Paiement reçu — Section A</div>
-              <div className="illus-ligne"><span className="illus-puce illus-puce-bleue" />Nouvelle adhésion validée</div>
-              <div className="illus-ligne"><span className="illus-puce illus-puce-orange" />Assemblée convoquée</div>
-            </div>
+            <div className="illus-titre-ecran">Évolution des cotisations</div>
             <div className="illus-stats">
               <div className="illus-stat">
                 <span className="illus-stat-val">98%</span>
@@ -262,6 +260,17 @@ function IllustrationTableauBord() {
               <div className="illus-stat">
                 <span className="illus-stat-val">12</span>
                 <span className="illus-stat-label">Formations</span>
+              </div>
+            </div>
+            <div className="illus-barres-bloc">
+              <div className="illus-barres">
+                <div className="illus-barre-1" />
+                <div className="illus-barre-2" />
+                <div className="illus-barre-3" />
+                <div className="illus-barre-4" />
+              </div>
+              <div className="illus-barres-legende">
+                <span>2024</span><span>2025</span><span>2026</span>
               </div>
             </div>
           </div>
@@ -360,7 +369,7 @@ const CSS = `
   .brand-glow-1{ width:420px; height:420px; right:-140px; top:-120px; }
   .brand-glow-2{ width:300px; height:300px; left:-100px; bottom:-90px; }
 }
-.brand-content{ position:relative; z-index:1; max-width:440px; margin:0 auto; width:100%; }
+.brand-content{ position:relative; z-index:1; max-width:540px; margin:0 auto; width:100%; }
 .brand-mark{ display:flex; align-items:center; gap:${S.md}px; margin-bottom:${S.xxxl}px; }
 .brand-logo-img{
   width:52px; height:52px; object-fit:contain; flex-shrink:0;
@@ -382,39 +391,41 @@ const CSS = `
 }
 
 /* ---- Illustration animée (décorative, aucune vraie donnée) ---- */
-/* Écrans blancs, comme de vraies captures — pas de texte blanc sur fond
-   bleu translucide comme le premier essai. Seule la coque (bezel) reste
-   sombre, pour se détacher du panneau bleu derrière. */
+/* Écrans blancs, comme de vraies captures — coque sombre pour se
+   détacher du panneau bleu derrière. Les deux appareils sont ancrés au
+   même bas (bottom:0) plutôt que l'un depuis le haut et l'autre depuis
+   le bas : sans ça, garantir leur alignement exige un calcul de pixels
+   fragile, jamais vérifiable sans pouvoir observer le rendu réel. */
 .illus-scene{
-  position:relative; margin-top:${S.xxxl}px; height:220px;
+  position:relative; margin-top:${S.xxxl}px; height:300px;
   display:none;
 }
 @media (min-width:960px){ .illus-scene{ display:block; } }
 
-.illus-laptop{ position:absolute; left:0; top:0; width:340px; }
+.illus-laptop{ position:absolute; left:0; bottom:0; width:440px; }
 .illus-laptop-ecran{
-  position:relative; height:190px; background:#fff;
+  position:relative; height:250px; background:#fff;
   border:3px solid rgba(15,20,35,.9); border-radius:10px 10px 4px 4px;
-  overflow:hidden; padding:14px 16px;
+  overflow:hidden; padding:16px 18px;
   box-shadow:0 20px 45px -10px rgba(0,0,0,.5);
 }
 .illus-laptop-base{
-  position:relative; height:14px; margin:0 -14px;
+  position:relative; height:16px; margin:0 -16px;
   background:linear-gradient(180deg, #E4E8EF, #C7CFDA);
   border-radius:0 0 8px 8px;
   box-shadow:0 6px 14px -4px rgba(0,0,0,.35);
 }
 .illus-laptop-base::after{
   content:""; position:absolute; left:50%; top:0; transform:translateX(-50%);
-  width:46px; height:4px; background:#B7C0CC;
+  width:56px; height:4px; background:#B7C0CC;
   border-radius:0 0 5px 5px;
 }
-.illus-barre-titre{ display:flex; gap:5px; margin-bottom:10px; }
+.illus-barre-titre{ display:flex; gap:5px; margin-bottom:14px; }
 .illus-barre-titre span{
-  width:7px; height:7px; border-radius:50%; background:${PALETTE.grey200};
+  width:8px; height:8px; border-radius:50%; background:${PALETTE.grey200};
 }
 
-.illus-vue{ position:absolute; inset:36px 16px 14px; }
+.illus-vue{ position:absolute; inset:42px 18px 16px; }
 .illus-vue-a{ animation:illusVueA 10s ease-in-out infinite; }
 .illus-vue-b{ animation:illusVueB 10s ease-in-out infinite; }
 @keyframes illusVueA{
@@ -424,14 +435,28 @@ const CSS = `
   0%,40%{ opacity:0; } 50%,90%{ opacity:1; } 100%{ opacity:0; }
 }
 
-.illus-titre-ecran{ font-size:12px; font-weight:700; margin-bottom:10px; color:${C.text}; }
-.illus-stats{ display:flex; gap:16px; margin-bottom:12px; }
+.illus-titre-ecran{ font-size:15px; font-weight:700; margin-bottom:14px; color:${C.text}; }
+.illus-stats{ display:flex; gap:26px; margin-bottom:16px; }
 .illus-stat{ display:flex; flex-direction:column; }
-.illus-stat-val{ font-size:15px; font-weight:700; color:${C.primary}; }
-.illus-stat-label{ font-size:9px; color:${C.textSubtle}; }
+.illus-stat-val{ font-size:19px; font-weight:700; color:${C.primary}; }
+.illus-stat-label{ font-size:11px; color:${C.textSubtle}; }
 
-.illus-corps{ display:flex; align-items:center; gap:16px; }
-.illus-donut{ width:50px; height:50px; flex-shrink:0; }
+.illus-corps{ display:flex; gap:20px; align-items:flex-start; }
+.illus-lignes-titre{ font-size:11px; font-weight:700; color:${C.text}; margin-bottom:9px; }
+.illus-lignes{ flex:1.3; min-width:0; }
+.illus-ligne{
+  display:flex; align-items:center; gap:7px; font-size:10.5px; color:${C.textMuted};
+  padding:5px 0; border-bottom:1px solid ${C.border};
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.illus-ligne:last-child{ border-bottom:none; }
+.illus-puce{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.illus-puce-verte{ background:${C.success}; }
+.illus-puce-bleue{ background:${C.primary}; }
+.illus-puce-orange{ background:${C.warning}; }
+
+.illus-donut-bloc{ flex:1; display:flex; flex-direction:column; align-items:center; }
+.illus-donut{ width:78px; height:78px; }
 .illus-donut-fond{ fill:none; stroke:${PALETTE.grey200}; stroke-width:3; }
 .illus-donut-remplissage{
   fill:none; stroke:${C.primary}; stroke-width:3; stroke-linecap:round;
@@ -442,52 +467,49 @@ const CSS = `
 @keyframes illusDonut{
   0%{ stroke-dashoffset:97.4; } 60%{ stroke-dashoffset:34; } 100%{ stroke-dashoffset:34; }
 }
-.illus-barres{ flex:1; display:flex; align-items:flex-end; gap:5px; height:40px; }
-.illus-barres > div{ flex:1; background:${C.primary}; border-radius:2px 2px 0 0; opacity:.85; }
+
+.illus-barres-bloc{ display:flex; flex-direction:column; gap:8px; }
+.illus-barres{ display:flex; align-items:flex-end; gap:10px; height:80px; }
+.illus-barres > div{ width:26px; background:${C.primary}; border-radius:3px 3px 0 0; opacity:.85; }
+.illus-barre-4{ opacity:1; }
 .illus-barre-1{ animation:illusB1 3s ease-in-out infinite; }
 .illus-barre-2{ animation:illusB2 3s ease-in-out infinite .1s; }
 .illus-barre-3{ animation:illusB3 3s ease-in-out infinite .2s; }
-.illus-barre-4{ animation:illusB4 3s ease-in-out infinite .3s; opacity:1; }
+.illus-barre-4{ animation:illusB4 3s ease-in-out infinite .3s; }
 @keyframes illusB1{ 0%{ height:0; } 60%,100%{ height:40%; } }
 @keyframes illusB2{ 0%{ height:0; } 60%,100%{ height:75%; } }
 @keyframes illusB3{ 0%{ height:0; } 60%,100%{ height:55%; } }
 @keyframes illusB4{ 0%{ height:0; } 60%,100%{ height:100%; } }
-
-.illus-lignes{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
-.illus-ligne{ display:flex; align-items:center; gap:7px; font-size:10.5px; color:${C.textMuted}; }
-.illus-puce{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.illus-puce-verte{ background:${C.success}; }
-.illus-puce-bleue{ background:${C.primary}; }
-.illus-puce-orange{ background:${C.warning}; }
+.illus-barres-legende{ display:flex; gap:36px; font-size:9.5px; color:${C.textSubtle}; }
 
 .illus-phone{
-  position:absolute; right:10px; bottom:-20px; width:96px; height:190px;
+  position:absolute; right:0; bottom:0; width:132px; height:232px;
   background:#fff; border:3px solid rgba(15,20,35,.9);
-  border-radius:16px; padding:10px 8px; box-shadow:0 18px 40px -10px rgba(0,0,0,.5);
+  border-radius:18px; padding:13px 11px; box-shadow:0 20px 44px -10px rgba(0,0,0,.5);
 }
-.illus-phone-ecran{ display:flex; flex-direction:column; gap:8px; height:100%; }
-.illus-phone-salut{ font-size:9.5px; font-weight:700; color:${C.text}; }
+.illus-phone-ecran{ display:flex; flex-direction:column; gap:10px; height:100%; }
+.illus-phone-salut{ font-size:11.5px; font-weight:700; color:${C.text}; }
 .illus-phone-notif{
-  display:flex; align-items:flex-start; gap:6px;
-  background:${PALETTE.blue50}; border-radius:8px; padding:7px 8px;
+  display:flex; align-items:flex-start; gap:7px;
+  background:${PALETTE.blue50}; border-radius:9px; padding:8px 9px;
 }
 .illus-phone-notif-icone{
-  width:15px; height:15px; border-radius:50%; flex-shrink:0;
-  background:${C.success}; color:#fff; font-size:8.5px; font-weight:700;
+  width:18px; height:18px; border-radius:50%; flex-shrink:0;
+  background:${C.success}; color:#fff; font-size:10px; font-weight:700;
   display:flex; align-items:center; justify-content:center;
 }
-.illus-phone-notif-titre{ font-size:8px; font-weight:700; color:${C.text}; }
-.illus-phone-notif-texte{ font-size:6.5px; color:${C.textSubtle}; margin-top:1px; line-height:1.35; }
+.illus-phone-notif-titre{ font-size:9.5px; font-weight:700; color:${C.text}; }
+.illus-phone-notif-texte{ font-size:8px; color:${C.textSubtle}; margin-top:1px; line-height:1.35; }
 .illus-phone-carte{
-  background:${C.bg}; border:1px solid ${C.border}; border-radius:8px; padding:8px;
+  background:${C.bg}; border:1px solid ${C.border}; border-radius:9px; padding:10px;
   display:flex; flex-direction:column; align-items:center; gap:2px;
 }
-.illus-phone-val{ font-size:18px; font-weight:700; color:${C.primary}; }
-.illus-phone-label{ font-size:8px; color:${C.textSubtle}; }
+.illus-phone-val{ font-size:21px; font-weight:700; color:${C.primary}; }
+.illus-phone-label{ font-size:9px; color:${C.textSubtle}; }
 .illus-phone-bouton{
   margin-top:auto; background:${C.primary}; color:#fff;
-  border-radius:6px; padding:7px 0; text-align:center;
-  font-size:8.5px; font-weight:700;
+  border-radius:7px; padding:9px 0; text-align:center;
+  font-size:9.5px; font-weight:700;
 }
 
 /* ---- Formulaire ---- */

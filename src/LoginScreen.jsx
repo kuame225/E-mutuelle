@@ -134,7 +134,9 @@ export default function LoginScreen({ onAdhesion, onBack }) {
 
           <header className="card-header">
             <h2 className="card-title">Connexion</h2>
-            <p className="card-subtitle">Accédez à votre espace mutualiste</p>
+            <p className="card-subtitle">
+              Accédez à votre espace {mot("membre_singulier").toLowerCase()}
+            </p>
           </header>
 
           <form onSubmit={handleLogin} className="form">

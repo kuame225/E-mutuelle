@@ -163,6 +163,8 @@ function PageInscription({ children }) {
               2 mois d'essai complet, sans engagement
             </li>
           </ul>
+
+          <IllustrationTableauBord />
         </div>
       </aside>
 
@@ -184,6 +186,103 @@ function PageInscription({ children }) {
  * échoue (sigle déjà pris, par exemple), la personne garde sa session :
  * on lui redemande seulement un sigle, sans repasser par le mot de passe.
  */
+function IllustrationTableauBord() {
+  return (
+    <div className="illus-scene" aria-hidden="true">
+      <div className="illus-laptop">
+        <div className="illus-laptop-ecran">
+          <div className="illus-barre-titre"><span /><span /><span /></div>
+
+          <div className="illus-vue illus-vue-a">
+            <div className="illus-titre-ecran">Tableau de bord</div>
+            <div className="illus-stats">
+              <div className="illus-stat">
+                <span className="illus-stat-val">250</span>
+                <span className="illus-stat-label">Membres</span>
+              </div>
+              <div className="illus-stat">
+                <span className="illus-stat-val">2 450 000</span>
+                <span className="illus-stat-label">FCFA</span>
+              </div>
+              <div className="illus-stat">
+                <span className="illus-stat-val">15</span>
+                <span className="illus-stat-label">Prestations</span>
+              </div>
+            </div>
+            <div className="illus-corps">
+              <div className="illus-lignes">
+                <div className="illus-lignes-titre">Activités récentes</div>
+                <div className="illus-ligne"><span className="illus-puce illus-puce-verte" />Paiement cotisation — Mai 2026</div>
+                <div className="illus-ligne"><span className="illus-puce illus-puce-bleue" />Demande de promotion — K. Marie</div>
+                <div className="illus-ligne"><span className="illus-puce illus-puce-orange" />Réunion Conseil d'administration</div>
+              </div>
+              <div className="illus-donut-bloc">
+                <div className="illus-lignes-titre">Répartition</div>
+                <svg viewBox="0 0 36 36" className="illus-donut">
+                  <circle className="illus-donut-fond" cx="18" cy="18" r="15.5" />
+                  <circle className="illus-donut-remplissage" cx="18" cy="18" r="15.5" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="illus-vue illus-vue-b">
+            <div className="illus-titre-ecran">Évolution des cotisations</div>
+            <div className="illus-stats">
+              <div className="illus-stat">
+                <span className="illus-stat-val">98%</span>
+                <span className="illus-stat-label">À jour</span>
+              </div>
+              <div className="illus-stat">
+                <span className="illus-stat-val">12</span>
+                <span className="illus-stat-label">Formations</span>
+              </div>
+            </div>
+            <div className="illus-barres-bloc">
+              <div className="illus-barres">
+                <div className="illus-barre-1" />
+                <div className="illus-barre-2" />
+                <div className="illus-barre-3" />
+                <div className="illus-barre-4" />
+              </div>
+              <div className="illus-barres-legende">
+                <span>2024</span><span>2025</span><span>2026</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="illus-laptop-base" />
+      </div>
+
+      <div className="illus-phone">
+        <div className="illus-phone-statut">
+          <span>9:41</span>
+          <span className="illus-phone-statut-icones">
+            <span className="illus-phone-signal"><span /><span /><span /></span>
+            <span className="illus-phone-batterie" />
+          </span>
+        </div>
+        <div className="illus-phone-ecran">
+          <div className="illus-phone-salut">Bonjour Koffi 👋</div>
+          <div className="illus-phone-notif">
+            <div className="illus-phone-notif-icone">✓</div>
+            <div>
+              <div className="illus-phone-notif-titre">Demande validée</div>
+              <div className="illus-phone-notif-texte">Votre aide sociale a été acceptée</div>
+            </div>
+          </div>
+          <div className="illus-phone-carte">
+            <div className="illus-phone-val">250</div>
+            <div className="illus-phone-label">membres actifs</div>
+          </div>
+          <div className="illus-phone-bouton">Voir mes notifications</div>
+          <div className="illus-phone-nav" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function InscriptionOrganisationScreen({ onBack }) {
   // Le choix du type vient en premier : il détermine le vocabulaire et les
   // modules de toute l'organisation, et donne au formulaire suivant des
@@ -781,7 +880,7 @@ const CSS = `
   .io-marque-glow-1{ width:420px; height:420px; right:-140px; top:-120px; }
   .io-marque-glow-2{ width:300px; height:300px; left:-100px; bottom:-90px; }
 }
-.io-marque-contenu{ position:relative; z-index:1; max-width:400px; margin:0 auto; width:100%; }
+.io-marque-contenu{ position:relative; z-index:1; max-width:600px; margin:0 auto; width:100%; }
 .io-marque-mark{ display:flex; align-items:center; gap:10px; margin-bottom:${S.lg}px; }
 @media (min-width:960px){ .io-marque-mark{ margin-bottom:${S.xxxl}px; } }
 .io-marque-logo{
@@ -801,6 +900,155 @@ const CSS = `
   width:28px; height:28px; border-radius:${R.sm}px; flex-shrink:0;
   background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center;
 }
+
+/* ---- Illustration animée (décorative, aucune vraie donnée) ---- */
+/* Écrans blancs, comme de vraies captures — coque sombre pour se
+   détacher du panneau bleu derrière. Les deux appareils sont ancrés au
+   même bas (bottom:0) plutôt que l'un depuis le haut et l'autre depuis
+   le bas : sans ça, garantir leur alignement exige un calcul de pixels
+   fragile, jamais vérifiable sans pouvoir observer le rendu réel. */
+.illus-scene{
+  position:relative; margin-top:${S.xxxl}px; height:300px;
+  display:none;
+}
+@media (min-width:960px){ .illus-scene{ display:block; } }
+
+.illus-laptop{
+  position:absolute; left:0; bottom:0; width:420px;
+  filter:drop-shadow(0 22px 40px rgba(0,0,0,.45));
+}
+.illus-laptop-ecran{
+  position:relative; height:250px; background:#fff;
+  border:3px solid #12172A; border-bottom:2px solid #2A3352;
+  border-radius:10px 10px 0 0;
+  overflow:hidden; padding:16px 18px;
+}
+.illus-laptop-base{
+  position:relative; height:20px; margin:0 -16px;
+  background:linear-gradient(180deg, #1E2648, #10142A);
+  border:3px solid #12172A; border-top:none;
+  border-radius:6px 6px 18px 18px;
+}
+.illus-laptop-base::after{
+  content:""; position:absolute; left:50%; top:5px; transform:translateX(-50%);
+  width:60px; height:3px; background:#3A4368; border-radius:2px;
+}
+.illus-barre-titre{ display:flex; gap:5px; margin-bottom:14px; }
+.illus-barre-titre span{
+  width:8px; height:8px; border-radius:50%; background:${PALETTE.grey200};
+}
+
+.illus-vue{ position:absolute; inset:42px 18px 16px; }
+.illus-vue-a{ animation:illusVueA 10s ease-in-out infinite; }
+.illus-vue-b{ animation:illusVueB 10s ease-in-out infinite; }
+@keyframes illusVueA{
+  0%,40%{ opacity:1; } 50%,90%{ opacity:0; } 100%{ opacity:1; }
+}
+@keyframes illusVueB{
+  0%,40%{ opacity:0; } 50%,90%{ opacity:1; } 100%{ opacity:0; }
+}
+
+.illus-titre-ecran{ font-size:15px; font-weight:700; margin-bottom:14px; color:${C.text}; }
+.illus-stats{ display:flex; gap:26px; margin-bottom:16px; }
+.illus-stat{ display:flex; flex-direction:column; }
+.illus-stat-val{ font-size:19px; font-weight:700; color:${C.primary}; }
+.illus-stat-label{ font-size:11px; color:${C.textSubtle}; }
+
+.illus-corps{ display:flex; gap:20px; align-items:flex-start; }
+.illus-lignes-titre{ font-size:11px; font-weight:700; color:${C.text}; margin-bottom:9px; }
+.illus-lignes{ flex:1.3; min-width:0; }
+.illus-ligne{
+  display:flex; align-items:center; gap:7px; font-size:10.5px; color:${C.textMuted};
+  padding:5px 0; border-bottom:1px solid ${C.border};
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.illus-ligne:last-child{ border-bottom:none; }
+.illus-puce{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.illus-puce-verte{ background:${C.success}; }
+.illus-puce-bleue{ background:${C.primary}; }
+.illus-puce-orange{ background:${C.warning}; }
+
+.illus-donut-bloc{ flex:1; display:flex; flex-direction:column; align-items:center; }
+.illus-donut{ width:78px; height:78px; }
+.illus-donut-fond{ fill:none; stroke:${PALETTE.grey200}; stroke-width:3; }
+.illus-donut-remplissage{
+  fill:none; stroke:${C.primary}; stroke-width:3; stroke-linecap:round;
+  stroke-dasharray:97.4; stroke-dashoffset:97.4;
+  transform:rotate(-90deg); transform-origin:50% 50%;
+  animation:illusDonut 3s ease-in-out infinite;
+}
+@keyframes illusDonut{
+  0%{ stroke-dashoffset:97.4; } 60%{ stroke-dashoffset:34; } 100%{ stroke-dashoffset:34; }
+}
+
+.illus-barres-bloc{ display:flex; flex-direction:column; gap:8px; }
+.illus-barres{ display:flex; align-items:flex-end; gap:10px; height:80px; }
+.illus-barres > div{ width:26px; background:${C.primary}; border-radius:3px 3px 0 0; opacity:.85; }
+.illus-barre-4{ opacity:1; }
+.illus-barre-1{ animation:illusB1 3s ease-in-out infinite; }
+.illus-barre-2{ animation:illusB2 3s ease-in-out infinite .1s; }
+.illus-barre-3{ animation:illusB3 3s ease-in-out infinite .2s; }
+.illus-barre-4{ animation:illusB4 3s ease-in-out infinite .3s; }
+@keyframes illusB1{ 0%{ height:0; } 60%,100%{ height:40%; } }
+@keyframes illusB2{ 0%{ height:0; } 60%,100%{ height:75%; } }
+@keyframes illusB3{ 0%{ height:0; } 60%,100%{ height:55%; } }
+@keyframes illusB4{ 0%{ height:0; } 60%,100%{ height:100%; } }
+.illus-barres-legende{ display:flex; gap:36px; font-size:9.5px; color:${C.textSubtle}; }
+
+.illus-phone{
+  position:absolute; left:452px; bottom:0; width:118px; height:242px;
+  background:#fff; border:3px solid #12172A;
+  border-radius:20px; padding:8px 9px 14px;
+  box-shadow:0 22px 44px -10px rgba(0,0,0,.5);
+  display:flex; flex-direction:column;
+}
+.illus-phone-statut{
+  display:flex; align-items:center; justify-content:space-between;
+  font-size:8px; font-weight:700; color:${C.text}; margin-bottom:8px; flex-shrink:0;
+}
+.illus-phone-statut-icones{ display:flex; align-items:center; gap:3px; }
+.illus-phone-signal{ display:flex; align-items:flex-end; gap:1.5px; height:7px; }
+.illus-phone-signal span{ width:2px; background:${C.text}; border-radius:1px; }
+.illus-phone-signal span:nth-child(1){ height:3px; }
+.illus-phone-signal span:nth-child(2){ height:5px; }
+.illus-phone-signal span:nth-child(3){ height:7px; }
+.illus-phone-batterie{
+  width:15px; height:7px; border:1px solid ${C.text}; border-radius:2px;
+  position:relative; margin-left:2px;
+}
+.illus-phone-batterie::after{
+  content:""; position:absolute; top:1px; left:1px; bottom:1px; width:70%;
+  background:${C.text}; border-radius:1px;
+}
+.illus-phone-ecran{ display:flex; flex-direction:column; gap:8px; flex:1; min-height:0; }
+.illus-phone-nav{
+  margin-top:auto; width:42px; height:3px; border-radius:2px;
+  background:${PALETTE.grey300}; align-self:center;
+}
+.illus-phone-salut{ font-size:10.5px; font-weight:700; color:${C.text}; }
+.illus-phone-notif{
+  display:flex; align-items:flex-start; gap:6px;
+  background:${PALETTE.blue50}; border-radius:8px; padding:7px 8px;
+}
+.illus-phone-notif-icone{
+  width:16px; height:16px; border-radius:50%; flex-shrink:0;
+  background:${C.success}; color:#fff; font-size:9px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+.illus-phone-notif-titre{ font-size:8.5px; font-weight:700; color:${C.text}; }
+.illus-phone-notif-texte{ font-size:7px; color:${C.textSubtle}; margin-top:1px; line-height:1.3; }
+.illus-phone-carte{
+  background:${C.bg}; border:1px solid ${C.border}; border-radius:8px; padding:8px;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.illus-phone-val{ font-size:18px; font-weight:700; color:${C.primary}; }
+.illus-phone-label{ font-size:8px; color:${C.textSubtle}; }
+.illus-phone-bouton{
+  margin-top:auto; background:${C.primary}; color:#fff;
+  border-radius:7px; padding:9px 0; text-align:center;
+  font-size:9.5px; font-weight:700;
+}
+
 
 .io-contenu{
   min-height:100%; display:flex; align-items:center; justify-content:center;

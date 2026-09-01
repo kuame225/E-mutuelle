@@ -383,18 +383,25 @@ const CSS = `
 
 .illus-laptop{ position:absolute; left:0; top:0; width:340px; }
 .illus-laptop-ecran{
-  position:relative; height:190px; background:rgba(255,255,255,.08);
-  border:2px solid rgba(255,255,255,.25); border-radius:10px 10px 0 0;
+  position:relative; height:190px; background:rgba(255,255,255,.16);
+  border:2px solid rgba(255,255,255,.55); border-radius:10px 10px 4px 4px;
   overflow:hidden; padding:14px 16px;
+  box-shadow:0 18px 40px -10px rgba(0,0,0,.45);
 }
 .illus-laptop-base{
-  height:10px; background:rgba(255,255,255,.2);
-  border-radius:0 0 6px 6px;
-  box-shadow:0 2px 6px rgba(0,0,0,.15);
+  position:relative; height:14px; margin:0 -14px;
+  background:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.2));
+  border-radius:0 0 8px 8px;
+  box-shadow:0 6px 14px -4px rgba(0,0,0,.35);
+}
+.illus-laptop-base::after{
+  content:""; position:absolute; left:50%; top:0; transform:translateX(-50%);
+  width:46px; height:4px; background:rgba(255,255,255,.55);
+  border-radius:0 0 5px 5px;
 }
 .illus-barre-titre{ display:flex; gap:5px; margin-bottom:10px; }
 .illus-barre-titre span{
-  width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.3);
+  width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.4);
 }
 
 .illus-vue{ position:absolute; inset:36px 16px 14px; }
@@ -445,8 +452,8 @@ const CSS = `
 
 .illus-phone{
   position:absolute; right:10px; bottom:-20px; width:96px; height:190px;
-  background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.3);
-  border-radius:16px; padding:10px 8px; box-shadow:0 10px 30px -8px rgba(0,0,0,.35);
+  background:rgba(255,255,255,.16); border:2px solid rgba(255,255,255,.55);
+  border-radius:16px; padding:10px 8px; box-shadow:0 18px 40px -10px rgba(0,0,0,.5);
 }
 .illus-phone-ecran{ display:flex; flex-direction:column; gap:10px; height:100%; }
 .illus-phone-salut{ font-size:9.5px; font-weight:700; }

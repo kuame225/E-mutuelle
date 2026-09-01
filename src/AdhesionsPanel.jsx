@@ -24,11 +24,12 @@ export default function AdhesionsPanel() {
 
   async function charger() {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("adhesions")
       .select("*")
       .eq("organisation_id", params.organisation_id)
       .order("created_at", { ascending: false });
+    if (error) console.error("[AdhesionsPanel] chargement échoué :", error);
     setDemandes(data || []);
     setLoading(false);
   }

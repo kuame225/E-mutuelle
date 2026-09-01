@@ -4,7 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
-  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake, Heart,
+  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake, Heart, Eye,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -32,6 +32,7 @@ export const NAV_GROUPS = [
   {
     titre: "Pilotage",
     items: [
+      { id: "vue_ensemble", label: "Vue d'ensemble", icon: Eye },
       { id: "dashboard", label: "Tableau de bord", icon: LayoutGrid },
       { id: "rapports",  label: "Rapports",        icon: BarChart3 },
     ],
@@ -116,7 +117,8 @@ function resoudre(valeur, mot) {
 // du vocabulaire, donc recalculé quand le type d'organisation change.
 function sousTitresPour(mot) {
   return {
-    dashboard:     `Vue d'ensemble ${mot("organisation_de")}`,
+    vue_ensemble:  "Ce qui a besoin de votre attention aujourd'hui",
+    dashboard:     "Suivi financier détaillé",
     rapports:      "Générer et télécharger les rapports",
     adhesions:     "Demandes en attente de validation",
     membres:       "Annuaire et fiches individuelles",

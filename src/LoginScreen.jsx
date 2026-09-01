@@ -117,6 +117,8 @@ export default function LoginScreen({ onAdhesion, onBack }) {
               </li>
             ))}
           </ul>
+
+          <IllustrationTableauBord />
         </div>
       </aside>
 
@@ -203,6 +205,83 @@ export default function LoginScreen({ onAdhesion, onBack }) {
 }
 
 /* ---------------- Sous-composants ---------------- */
+
+// Illustration décorative — deux aperçus de tableau de bord qui
+// s'enchaînent en boucle, uniquement pour donner vie au panneau de
+// marque sur grand écran. Chiffres et graphique fictifs, jamais de
+// vraie donnée : purement visuel, jamais connecté à la base.
+function IllustrationTableauBord() {
+  return (
+    <div className="illus-scene" aria-hidden="true">
+      <div className="illus-laptop">
+        <div className="illus-laptop-ecran">
+          <div className="illus-barre-titre"><span /><span /><span /></div>
+
+          <div className="illus-vue illus-vue-a">
+            <div className="illus-titre-ecran">Tableau de bord</div>
+            <div className="illus-stats">
+              <div className="illus-stat">
+                <span className="illus-stat-val">250</span>
+                <span className="illus-stat-label">Membres</span>
+              </div>
+              <div className="illus-stat">
+                <span className="illus-stat-val">2,45M</span>
+                <span className="illus-stat-label">FCFA</span>
+              </div>
+              <div className="illus-stat">
+                <span className="illus-stat-val">15</span>
+                <span className="illus-stat-label">Prestations</span>
+              </div>
+            </div>
+            <div className="illus-corps">
+              <svg viewBox="0 0 36 36" className="illus-donut">
+                <circle className="illus-donut-fond" cx="18" cy="18" r="15.5" />
+                <circle className="illus-donut-remplissage" cx="18" cy="18" r="15.5" />
+              </svg>
+              <div className="illus-barres">
+                <div className="illus-barre-1" />
+                <div className="illus-barre-2" />
+                <div className="illus-barre-3" />
+                <div className="illus-barre-4" />
+              </div>
+            </div>
+          </div>
+
+          <div className="illus-vue illus-vue-b">
+            <div className="illus-titre-ecran">Activité récente</div>
+            <div className="illus-lignes">
+              <div className="illus-ligne"><span className="illus-puce illus-puce-verte" />Paiement reçu — Section A</div>
+              <div className="illus-ligne"><span className="illus-puce illus-puce-bleue" />Nouvelle adhésion validée</div>
+              <div className="illus-ligne"><span className="illus-puce illus-puce-orange" />Assemblée convoquée</div>
+            </div>
+            <div className="illus-stats">
+              <div className="illus-stat">
+                <span className="illus-stat-val">98%</span>
+                <span className="illus-stat-label">À jour</span>
+              </div>
+              <div className="illus-stat">
+                <span className="illus-stat-val">12</span>
+                <span className="illus-stat-label">Formations</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="illus-laptop-base" />
+      </div>
+
+      <div className="illus-phone">
+        <div className="illus-phone-ecran">
+          <div className="illus-phone-salut">Bonjour Koffi 👋</div>
+          <div className="illus-phone-carte">
+            <div className="illus-phone-val">250</div>
+            <div className="illus-phone-label">membres actifs</div>
+          </div>
+          <div className="illus-phone-bouton">Voir le tableau de bord</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function GoogleIcon() {
   return (
@@ -293,6 +372,94 @@ const CSS = `
 .feature-icon{
   width:38px; height:38px; border-radius:${R.sm}px; flex-shrink:0;
   background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center;
+}
+
+/* ---- Illustration animée (décorative, aucune vraie donnée) ---- */
+.illus-scene{
+  position:relative; margin-top:${S.xxxl}px; height:220px;
+  display:none;
+}
+@media (min-width:960px){ .illus-scene{ display:block; } }
+
+.illus-laptop{ position:absolute; left:0; top:0; width:340px; }
+.illus-laptop-ecran{
+  position:relative; height:190px; background:rgba(255,255,255,.08);
+  border:2px solid rgba(255,255,255,.25); border-radius:10px 10px 0 0;
+  overflow:hidden; padding:14px 16px;
+}
+.illus-laptop-base{
+  height:10px; background:rgba(255,255,255,.2);
+  border-radius:0 0 6px 6px;
+  box-shadow:0 2px 6px rgba(0,0,0,.15);
+}
+.illus-barre-titre{ display:flex; gap:5px; margin-bottom:10px; }
+.illus-barre-titre span{
+  width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.3);
+}
+
+.illus-vue{ position:absolute; inset:36px 16px 14px; }
+.illus-vue-a{ animation:illusVueA 10s ease-in-out infinite; }
+.illus-vue-b{ animation:illusVueB 10s ease-in-out infinite; }
+@keyframes illusVueA{
+  0%,40%{ opacity:1; } 50%,90%{ opacity:0; } 100%{ opacity:1; }
+}
+@keyframes illusVueB{
+  0%,40%{ opacity:0; } 50%,90%{ opacity:1; } 100%{ opacity:0; }
+}
+
+.illus-titre-ecran{ font-size:12px; font-weight:700; margin-bottom:10px; opacity:.9; }
+.illus-stats{ display:flex; gap:16px; margin-bottom:12px; }
+.illus-stat{ display:flex; flex-direction:column; }
+.illus-stat-val{ font-size:15px; font-weight:700; }
+.illus-stat-label{ font-size:9px; opacity:.7; }
+
+.illus-corps{ display:flex; align-items:center; gap:16px; }
+.illus-donut{ width:50px; height:50px; flex-shrink:0; }
+.illus-donut-fond{ fill:none; stroke:rgba(255,255,255,.15); stroke-width:3; }
+.illus-donut-remplissage{
+  fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round;
+  stroke-dasharray:97.4; stroke-dashoffset:97.4;
+  transform:rotate(-90deg); transform-origin:50% 50%;
+  animation:illusDonut 3s ease-in-out infinite;
+}
+@keyframes illusDonut{
+  0%{ stroke-dashoffset:97.4; } 60%{ stroke-dashoffset:34; } 100%{ stroke-dashoffset:34; }
+}
+.illus-barres{ flex:1; display:flex; align-items:flex-end; gap:5px; height:40px; }
+.illus-barres > div{ flex:1; background:rgba(255,255,255,.55); border-radius:2px 2px 0 0; }
+.illus-barre-1{ animation:illusB1 3s ease-in-out infinite; }
+.illus-barre-2{ animation:illusB2 3s ease-in-out infinite .1s; }
+.illus-barre-3{ animation:illusB3 3s ease-in-out infinite .2s; }
+.illus-barre-4{ animation:illusB4 3s ease-in-out infinite .3s; }
+@keyframes illusB1{ 0%{ height:0; } 60%,100%{ height:40%; } }
+@keyframes illusB2{ 0%{ height:0; } 60%,100%{ height:75%; } }
+@keyframes illusB3{ 0%{ height:0; } 60%,100%{ height:55%; } }
+@keyframes illusB4{ 0%{ height:0; } 60%,100%{ height:100%; } }
+
+.illus-lignes{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+.illus-ligne{ display:flex; align-items:center; gap:7px; font-size:10.5px; opacity:.9; }
+.illus-puce{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.illus-puce-verte{ background:#4ADE80; }
+.illus-puce-bleue{ background:#60A5FA; }
+.illus-puce-orange{ background:#FB923C; }
+
+.illus-phone{
+  position:absolute; right:10px; bottom:-20px; width:96px; height:190px;
+  background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.3);
+  border-radius:16px; padding:10px 8px; box-shadow:0 10px 30px -8px rgba(0,0,0,.35);
+}
+.illus-phone-ecran{ display:flex; flex-direction:column; gap:10px; height:100%; }
+.illus-phone-salut{ font-size:9.5px; font-weight:700; }
+.illus-phone-carte{
+  background:rgba(255,255,255,.12); border-radius:8px; padding:8px;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.illus-phone-val{ font-size:18px; font-weight:700; }
+.illus-phone-label{ font-size:8px; opacity:.75; }
+.illus-phone-bouton{
+  margin-top:auto; background:#fff; color:${C.primary};
+  border-radius:6px; padding:7px 0; text-align:center;
+  font-size:8.5px; font-weight:700;
 }
 
 /* ---- Formulaire ---- */

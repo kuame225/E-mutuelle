@@ -41,6 +41,7 @@ import MoyensPaiementPage from "./MoyensPaiementPage";
 import DeclarationsPaiementPage from "./DeclarationsPaiementPage";
 import AgendaPage from "./AgendaPage";
 import CommunicationPage from "./CommunicationPage";
+import VueEnsemblePage from "./VueEnsemblePage";
 import AssembleesPage from "./AssembleesPage";
 import TontinePage from "./TontinePage";
 import PretsPage from "./PretsPage";
@@ -566,6 +567,7 @@ function Shell() {
         </div>
       ) : (
         <>
+          {page === "vue_ensemble"  && <VueEnsemblePage onNaviguer={setPage} />}
           {page === "dashboard"     && <TableauBordFinancier />}
           {page === "adhesions"     && <AdhesionsPanel />}
           {page === "membres"       && <MembresPage />}

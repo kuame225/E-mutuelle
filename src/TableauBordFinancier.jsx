@@ -14,12 +14,63 @@ import { C, R, S, SHADOW, PALETTE } from "./theme";
 export default function TableauBordFinancier() {
   const { params } = useParametrage();
   const [stats, setStats] = useState(null);
+  const [statsCoop, setStatsCoop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // La coopérative n'a pas de cotisations — voir vocabulaire.js, décision
+  // prise plus tôt cette nuit — donc pas le même tableau de bord : montrer
+  // un bandeau à 0 % et des graphiques vides n'aiderait personne. Le
+  // reste de l'écran (hero, KPI cotisations, graphiques, retardataires)
+  // ne s'applique qu'aux autres types.
+  const estCooperative = params.type_organisation === "cooperative";
 
   async function charger() {
     setLoading(true);
     setError("");
+    try {
+      if (estCooperative) {
+        const [mouvementsRes, pretsRes] = await Promise.all([
+          supabase.from("parts_sociales_mouvements")
+            .select("membre_id, type_mouvement, nombre_parts, montant")
+            .eq("organisation_id", params.organisation_id),
+          supabase.from("prets")
+            .select("membre_id, statut, montant_principal, montant_total_a_rembourser")
+            .eq("organisation_id", params.organisation_id),
+        ]);
+
+        const mouvements = mouvementsRes.data || [];
+        const prets = pretsRes.data || [];
+
+        const capitalSocial = mouvements.reduce(
+          (s, m) => s + (m.type_mouvement === "souscription" ? m.montant : -m.montant), 0
+        );
+
+        const partsParMembre = {};
+        mouvements.forEach((m) => {
+          const delta = m.type_mouvement === "souscription" ? m.nombre_parts : -m.nombre_parts;
+          partsParMembre[m.membre_id] = (partsParMembre[m.membre_id] || 0) + delta;
+        });
+        const societaires = Object.values(partsParMembre).filter((n) => n > 0).length;
+
+        const pretsEnCours = prets.filter((p) => p.statut === "approuve");
+        const pretsEnAttente = prets.filter((p) => p.statut === "en_attente").length;
+        const encoursPrets = pretsEnCours.reduce((s, p) => s + (p.montant_principal || 0), 0);
+
+        setStatsCoop({
+          capitalSocial, societaires,
+          nombrePretsEnCours: pretsEnCours.length, encoursPrets, pretsEnAttente,
+        });
+      } else {
+        await chargerCotisations();
+      }
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  }
+
+  async function chargerCotisations() {
     try {
       const [membresRes, cotisRes, aidesRes, ticketsRes] = await Promise.all([
         supabase.from("membres")
@@ -131,6 +182,62 @@ export default function TableauBordFinancier() {
     );
   }
 
+  // Coopérative : pas de bandeau "à jour" ni de graphique d'encaissement,
+  // ces notions n'existent pas sans cotisations — un tableau de bord
+  // centré sur le capital social et les prêts, ce que la coopérative
+  // suit réellement.
+  if (estCooperative) {
+    return (
+      <div className="tb-wrap">
+        <style>{CSS}</style>
+
+        <section className="hero">
+          <div className="hero-glow" />
+          <div className="hero-inner">
+            <div className="hero-left">
+              <div className="hero-label">
+                <Wallet size={14} /> Capital social
+              </div>
+              <div className="hero-value">
+                {montant(statsCoop.capitalSocial)}<span className="hero-pct">F</span>
+              </div>
+              <div className="hero-detail">
+                {statsCoop.societaires} sociétaire{statsCoop.societaires > 1 ? "s" : ""} détenant des parts
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="kpi-grid">
+          <Kpi
+            label="Sociétaires actifs"
+            value={statsCoop.societaires}
+            unit=""
+            hint="Détenant au moins une part sociale"
+            Icon={Users}
+            color={C.primary}
+          />
+          <Kpi
+            label="Encours de prêts"
+            value={montant(statsCoop.encoursPrets)}
+            unit="FCFA"
+            hint={`${statsCoop.nombrePretsEnCours} prêt${statsCoop.nombrePretsEnCours > 1 ? "s" : ""} en cours`}
+            Icon={TrendingUp}
+            color={C.success}
+          />
+          <Kpi
+            label="Prêts en attente"
+            value={statsCoop.pretsEnAttente}
+            unit=""
+            hint="Demandes à instruire"
+            Icon={HandHeart}
+            color={C.warning}
+          />
+        </section>
+      </div>
+    );
+  }
+
   const objectif = params.objectif_recouvrement || 90;
   const atteint = stats.taux >= objectif;
 
@@ -207,14 +314,16 @@ export default function TableauBordFinancier() {
           Icon={ArrowUpRight}
           color={C.success}
         />
-        <Kpi
-          label="Aides versées"
-          value={montant(stats.totalAides)}
-          unit="FCFA"
-          hint={`${stats.aidesEnCours} demande${stats.aidesEnCours > 1 ? "s" : ""} en cours`}
-          Icon={HandHeart}
-          color={C.warning}
-        />
+        {moduleActif(params, "module_aides") && (
+          <Kpi
+            label="Aides versées"
+            value={montant(stats.totalAides)}
+            unit="FCFA"
+            hint={`${stats.aidesEnCours} demande${stats.aidesEnCours > 1 ? "s" : ""} en cours`}
+            Icon={HandHeart}
+            color={C.warning}
+          />
+        )}
         {moduleActif(params, "module_tombola") && (
           <Kpi
             label="Cagnotte tombola"

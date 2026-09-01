@@ -233,11 +233,15 @@ export default function DeclarationsPaiementPage() {
             <li key={d.id} className="dp-ligne">
               <div className="dp-ligne-corps">
                 <div className="dp-ligne-titre">{d.membres?.nom || "—"}</div>
+                <div className="dp-ligne-date">
+                  {new Date(d.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                  {" à "}
+                  {new Date(d.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                </div>
                 <div className="dp-ligne-meta">
                   {d.cotisation_ids?.length > 1 && `${d.cotisation_ids.length} échéances · `}
                   {TYPES_LABEL[d.moyens_paiement?.type] || d.moyens_paiement?.libelle || "Moyen non précisé"}
                   {d.reference && ` · Réf. ${d.reference}`}
-                  {" · "}{new Date(d.date_declaree).toLocaleDateString("fr-FR")}
                 </div>
                 {d.note && <div className="dp-ligne-note">{d.note}</div>}
                 {d.statut === "rejetee" && d.motif_rejet && (
@@ -378,6 +382,7 @@ const CSS = `
 .dp-ligne:last-child{ border-bottom:none; }
 .dp-ligne-corps{ flex:1; min-width:180px; }
 .dp-ligne-titre{ font-size:14.5px; font-weight:600; }
+.dp-ligne-date{ font-size:13px; font-weight:600; color:${C.primary}; margin-top:3px; }
 .dp-ligne-meta{ font-size:12.5px; color:${C.textSubtle}; margin-top:2px; }
 .dp-ligne-note{ font-size:13px; color:${C.textMuted}; margin-top:4px; }
 .dp-ligne-motif{ font-size:12.5px; color:${C.danger}; margin-top:4px; }

@@ -272,11 +272,18 @@ function IllustrationTableauBord() {
       <div className="illus-phone">
         <div className="illus-phone-ecran">
           <div className="illus-phone-salut">Bonjour Koffi 👋</div>
+          <div className="illus-phone-notif">
+            <div className="illus-phone-notif-icone">✓</div>
+            <div>
+              <div className="illus-phone-notif-titre">Demande validée</div>
+              <div className="illus-phone-notif-texte">Votre aide sociale a été acceptée</div>
+            </div>
+          </div>
           <div className="illus-phone-carte">
             <div className="illus-phone-val">250</div>
             <div className="illus-phone-label">membres actifs</div>
           </div>
-          <div className="illus-phone-bouton">Voir le tableau de bord</div>
+          <div className="illus-phone-bouton">Voir mes notifications</div>
         </div>
       </div>
     </div>
@@ -375,6 +382,9 @@ const CSS = `
 }
 
 /* ---- Illustration animée (décorative, aucune vraie donnée) ---- */
+/* Écrans blancs, comme de vraies captures — pas de texte blanc sur fond
+   bleu translucide comme le premier essai. Seule la coque (bezel) reste
+   sombre, pour se détacher du panneau bleu derrière. */
 .illus-scene{
   position:relative; margin-top:${S.xxxl}px; height:220px;
   display:none;
@@ -383,25 +393,25 @@ const CSS = `
 
 .illus-laptop{ position:absolute; left:0; top:0; width:340px; }
 .illus-laptop-ecran{
-  position:relative; height:190px; background:rgba(255,255,255,.16);
-  border:2px solid rgba(255,255,255,.55); border-radius:10px 10px 4px 4px;
+  position:relative; height:190px; background:#fff;
+  border:3px solid rgba(15,20,35,.9); border-radius:10px 10px 4px 4px;
   overflow:hidden; padding:14px 16px;
-  box-shadow:0 18px 40px -10px rgba(0,0,0,.45);
+  box-shadow:0 20px 45px -10px rgba(0,0,0,.5);
 }
 .illus-laptop-base{
   position:relative; height:14px; margin:0 -14px;
-  background:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.2));
+  background:linear-gradient(180deg, #E4E8EF, #C7CFDA);
   border-radius:0 0 8px 8px;
   box-shadow:0 6px 14px -4px rgba(0,0,0,.35);
 }
 .illus-laptop-base::after{
   content:""; position:absolute; left:50%; top:0; transform:translateX(-50%);
-  width:46px; height:4px; background:rgba(255,255,255,.55);
+  width:46px; height:4px; background:#B7C0CC;
   border-radius:0 0 5px 5px;
 }
 .illus-barre-titre{ display:flex; gap:5px; margin-bottom:10px; }
 .illus-barre-titre span{
-  width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.4);
+  width:7px; height:7px; border-radius:50%; background:${PALETTE.grey200};
 }
 
 .illus-vue{ position:absolute; inset:36px 16px 14px; }
@@ -414,17 +424,17 @@ const CSS = `
   0%,40%{ opacity:0; } 50%,90%{ opacity:1; } 100%{ opacity:0; }
 }
 
-.illus-titre-ecran{ font-size:12px; font-weight:700; margin-bottom:10px; opacity:.9; }
+.illus-titre-ecran{ font-size:12px; font-weight:700; margin-bottom:10px; color:${C.text}; }
 .illus-stats{ display:flex; gap:16px; margin-bottom:12px; }
 .illus-stat{ display:flex; flex-direction:column; }
-.illus-stat-val{ font-size:15px; font-weight:700; }
-.illus-stat-label{ font-size:9px; opacity:.7; }
+.illus-stat-val{ font-size:15px; font-weight:700; color:${C.primary}; }
+.illus-stat-label{ font-size:9px; color:${C.textSubtle}; }
 
 .illus-corps{ display:flex; align-items:center; gap:16px; }
 .illus-donut{ width:50px; height:50px; flex-shrink:0; }
-.illus-donut-fond{ fill:none; stroke:rgba(255,255,255,.15); stroke-width:3; }
+.illus-donut-fond{ fill:none; stroke:${PALETTE.grey200}; stroke-width:3; }
 .illus-donut-remplissage{
-  fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round;
+  fill:none; stroke:${C.primary}; stroke-width:3; stroke-linecap:round;
   stroke-dasharray:97.4; stroke-dashoffset:97.4;
   transform:rotate(-90deg); transform-origin:50% 50%;
   animation:illusDonut 3s ease-in-out infinite;
@@ -433,38 +443,49 @@ const CSS = `
   0%{ stroke-dashoffset:97.4; } 60%{ stroke-dashoffset:34; } 100%{ stroke-dashoffset:34; }
 }
 .illus-barres{ flex:1; display:flex; align-items:flex-end; gap:5px; height:40px; }
-.illus-barres > div{ flex:1; background:rgba(255,255,255,.55); border-radius:2px 2px 0 0; }
+.illus-barres > div{ flex:1; background:${C.primary}; border-radius:2px 2px 0 0; opacity:.85; }
 .illus-barre-1{ animation:illusB1 3s ease-in-out infinite; }
 .illus-barre-2{ animation:illusB2 3s ease-in-out infinite .1s; }
 .illus-barre-3{ animation:illusB3 3s ease-in-out infinite .2s; }
-.illus-barre-4{ animation:illusB4 3s ease-in-out infinite .3s; }
+.illus-barre-4{ animation:illusB4 3s ease-in-out infinite .3s; opacity:1; }
 @keyframes illusB1{ 0%{ height:0; } 60%,100%{ height:40%; } }
 @keyframes illusB2{ 0%{ height:0; } 60%,100%{ height:75%; } }
 @keyframes illusB3{ 0%{ height:0; } 60%,100%{ height:55%; } }
 @keyframes illusB4{ 0%{ height:0; } 60%,100%{ height:100%; } }
 
 .illus-lignes{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
-.illus-ligne{ display:flex; align-items:center; gap:7px; font-size:10.5px; opacity:.9; }
+.illus-ligne{ display:flex; align-items:center; gap:7px; font-size:10.5px; color:${C.textMuted}; }
 .illus-puce{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.illus-puce-verte{ background:#4ADE80; }
-.illus-puce-bleue{ background:#60A5FA; }
-.illus-puce-orange{ background:#FB923C; }
+.illus-puce-verte{ background:${C.success}; }
+.illus-puce-bleue{ background:${C.primary}; }
+.illus-puce-orange{ background:${C.warning}; }
 
 .illus-phone{
   position:absolute; right:10px; bottom:-20px; width:96px; height:190px;
-  background:rgba(255,255,255,.16); border:2px solid rgba(255,255,255,.55);
+  background:#fff; border:3px solid rgba(15,20,35,.9);
   border-radius:16px; padding:10px 8px; box-shadow:0 18px 40px -10px rgba(0,0,0,.5);
 }
-.illus-phone-ecran{ display:flex; flex-direction:column; gap:10px; height:100%; }
-.illus-phone-salut{ font-size:9.5px; font-weight:700; }
+.illus-phone-ecran{ display:flex; flex-direction:column; gap:8px; height:100%; }
+.illus-phone-salut{ font-size:9.5px; font-weight:700; color:${C.text}; }
+.illus-phone-notif{
+  display:flex; align-items:flex-start; gap:6px;
+  background:${PALETTE.blue50}; border-radius:8px; padding:7px 8px;
+}
+.illus-phone-notif-icone{
+  width:15px; height:15px; border-radius:50%; flex-shrink:0;
+  background:${C.success}; color:#fff; font-size:8.5px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+.illus-phone-notif-titre{ font-size:8px; font-weight:700; color:${C.text}; }
+.illus-phone-notif-texte{ font-size:6.5px; color:${C.textSubtle}; margin-top:1px; line-height:1.35; }
 .illus-phone-carte{
-  background:rgba(255,255,255,.12); border-radius:8px; padding:8px;
+  background:${C.bg}; border:1px solid ${C.border}; border-radius:8px; padding:8px;
   display:flex; flex-direction:column; align-items:center; gap:2px;
 }
-.illus-phone-val{ font-size:18px; font-weight:700; }
-.illus-phone-label{ font-size:8px; opacity:.75; }
+.illus-phone-val{ font-size:18px; font-weight:700; color:${C.primary}; }
+.illus-phone-label{ font-size:8px; color:${C.textSubtle}; }
 .illus-phone-bouton{
-  margin-top:auto; background:#fff; color:${C.primary};
+  margin-top:auto; background:${C.primary}; color:#fff;
   border-radius:6px; padding:7px 0; text-align:center;
   font-size:8.5px; font-weight:700;
 }

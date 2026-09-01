@@ -24,11 +24,6 @@ export default function AdhesionsPanel() {
 
   async function charger() {
     setLoading(true);
-    // Diagnostic temporaire — à retirer une fois le problème résolu.
-    const { data: userData } = await supabase.auth.getUser();
-    console.log("[AdhesionsPanel] user_id de la session actuelle :", userData?.user?.id);
-    console.log("[AdhesionsPanel] organisation_id interrogée :", params.organisation_id);
-
     const { data, error } = await supabase
       .from("adhesions")
       .select("*")

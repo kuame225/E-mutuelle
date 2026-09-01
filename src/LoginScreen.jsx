@@ -421,13 +421,13 @@ const CSS = `
   overflow:hidden; padding:16px 18px;
 }
 .illus-laptop-base{
-  position:relative; height:18px;
+  position:relative; height:20px; margin:0 -16px;
   background:linear-gradient(180deg, #1E2648, #10142A);
   border:3px solid #12172A; border-top:none;
-  border-radius:0 0 10px 10px;
+  border-radius:6px 6px 18px 18px;
 }
 .illus-laptop-base::after{
-  content:""; position:absolute; left:50%; top:4px; transform:translateX(-50%);
+  content:""; position:absolute; left:50%; top:5px; transform:translateX(-50%);
   width:60px; height:3px; background:#3A4368; border-radius:2px;
 }
 .illus-barre-titre{ display:flex; gap:5px; margin-bottom:14px; }
@@ -493,7 +493,7 @@ const CSS = `
 .illus-barres-legende{ display:flex; gap:36px; font-size:9.5px; color:${C.textSubtle}; }
 
 .illus-phone{
-  position:absolute; left:452px; bottom:0; width:118px; height:210px;
+  position:absolute; left:452px; bottom:0; width:118px; height:242px;
   background:#fff; border:3px solid #12172A;
   border-radius:20px; padding:8px 9px 14px;
   box-shadow:0 22px 44px -10px rgba(0,0,0,.5);

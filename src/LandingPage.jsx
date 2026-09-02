@@ -3,7 +3,7 @@ import {
   Building2, ArrowRight, AlertTriangle, Sigma, Eye, RefreshCw, Users,
   CreditCard, HandHeart, ClipboardList, Wallet, Megaphone, ShieldCheck,
   KeyRound, Sliders, ScrollText, Download, CheckCircle2,
-  PiggyBank, ShoppingCart, FolderKanban, GraduationCap,
+  PiggyBank, ShoppingCart, FolderKanban, GraduationCap, Lock, Gift,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
@@ -54,7 +54,7 @@ const TYPES_LANDING = {
     eyebrow: "Pour les groupes d'épargne et de crédit villageois",
     cta: "Inscrire mon groupe",
     heroNom: "groupe",
-    lead: "Tontine, prêts et épargne : tout ce que votre Bureau suit aujourd'hui à la main, calculé, notifié et archivé automatiquement, avec les règles propres à vos statuts.",
+    lead: "Parts variables, fonds social et crédit interne : tout ce que votre Bureau suit aujourd'hui à la main, sécurisé par plusieurs clés et vérifié à chaque réunion.",
   },
   professionnelle: {
     label: "Organisation professionnelle", genre: "f",
@@ -106,12 +106,14 @@ const FONCTIONNALITES = [
   { Icon: Megaphone, titre: "Communications", texte: "Annonces et rappels d'échéance, notification individuelle au bon moment.", couleur: "green", types: TOUS_TYPES },
   { Icon: ShieldCheck, titre: "Rôles du Bureau", texte: "Président, trésorier, secrétaire général : chacun accède à ce que sa fonction exige.", couleur: "orange", types: TOUS_TYPES },
   { Icon: ClipboardList, titre: "Assemblées générales", texte: "Convocation, émargement, quorum en direct, procès-verbal archivé.", couleur: "navy", payant: true, types: TOUS_TYPES.filter((t) => t !== "avec") },
-  { Icon: RefreshCw, titre: "Tontine", texte: "Ordre de passage fixé, versements suivis tour par tour, notification au bénéficiaire.", couleur: "green", payant: true, types: ["avec"] },
-  { Icon: KeyRound, titre: "Prêts et avances", texte: "Demande par le membre ou saisie directe du Bureau, échéances suivies une à une.", couleur: "orange", payant: true, types: ["cooperative", "avec"] },
+  { Icon: RefreshCw, titre: "Tontine", texte: "Ordre de passage fixé, versements suivis tour par tour, notification au bénéficiaire.", couleur: "green", payant: true, types: [] },
+  { Icon: Lock, titre: "Épargne AVEC sécurisée", texte: "Parts variables par réunion, fonds social, crédit interne à éligibilité automatique — sécurisé par plusieurs clés, vérifié à chaque clôture de caisse.", couleur: "navy", payant: true, types: ["avec"] },
+  { Icon: KeyRound, titre: "Prêts et avances", texte: "Demande par le membre ou saisie directe du Bureau, échéances suivies une à une.", couleur: "orange", payant: true, types: ["cooperative"] },
   { Icon: PiggyBank, titre: "Parts sociales et capital", texte: "Souscriptions, remboursements, capital détenu par chaque membre suivi à tout moment.", couleur: "navy", types: ["cooperative"] },
   { Icon: ShoppingCart, titre: "Activité économique", texte: "Achats, ventes et stock suivis, partage des bénéfices calculé en fin d'exercice.", couleur: "green", types: ["cooperative"] },
   { Icon: FolderKanban, titre: "Projets et bailleurs", texte: "Budgets, dépenses et indicateurs de suivi par projet, bailleur par bailleur.", couleur: "orange", types: ["ong", "association", "federation", "reseau"] },
   { Icon: GraduationCap, titre: "Services, formations et partenariats", texte: "Catalogue de services, calendrier de formations et annuaire de partenaires.", couleur: "navy", types: ["professionnelle"] },
+  { Icon: Gift, titre: "Dons publics", texte: "Une page de collecte partageable, sans création de compte — le paiement va directement vers votre organisation.", couleur: "orange", types: ["association", "ong", "federation", "reseau"] },
 ];
 
 const ETAPES = [

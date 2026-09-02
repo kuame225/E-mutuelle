@@ -79,6 +79,94 @@ const TYPES_LANDING = {
   },
 };
 
+// La carte de démonstration dans le hero change selon le type
+// sélectionné, comme le reste de la page — plutôt qu'une liste de
+// cotisations figée quel que soit le type choisi, une donnée
+// réellement représentative de ce que cette organisation suit.
+const DEMOS = {
+  defaut: {
+    titre: "Cotisations — ce mois", badge: "78% à jour",
+    lignes: [
+      { nom: "Membre 1", valeur: "5 000 F", ok: true, label: "À jour" },
+      { nom: "Membre 2", valeur: "3 000 F", ok: false, label: "Partiel" },
+      { nom: "Membre 3", valeur: "5 000 F", ok: true, label: "À jour" },
+      { nom: "Membre 4", valeur: "0 F", ok: false, label: "En attente" },
+    ],
+  },
+  mutuelle: {
+    titre: "Cotisations — ce mois", badge: "78% à jour",
+    lignes: [
+      { nom: "Membre 1", valeur: "5 000 F", ok: true, label: "À jour" },
+      { nom: "Aide sociale — décès", valeur: "150 000 F", ok: true, label: "Versée" },
+      { nom: "Membre 3", valeur: "5 000 F", ok: true, label: "À jour" },
+      { nom: "Membre 4", valeur: "0 F", ok: false, label: "En attente" },
+    ],
+  },
+  association: {
+    titre: "Activité — ce mois", badge: "12 nouvelles adhésions",
+    lignes: [
+      { nom: "Don public reçu", valeur: "10 000 F", ok: true, label: "Encaissé" },
+      { nom: "Nouvelle adhésion", valeur: "—", ok: true, label: "Acceptée" },
+      { nom: "Projet — Rentrée scolaire", valeur: "450 000 F", ok: true, label: "Financé" },
+      { nom: "Cotisation — S. Koffi", valeur: "2 000 F", ok: false, label: "En attente" },
+    ],
+  },
+  cooperative: {
+    titre: "Parts sociales — cycle en cours", badge: "2 450 000 F cumulés",
+    lignes: [
+      { nom: "Sociétaire A", valeur: "12 parts", ok: true, label: "À jour" },
+      { nom: "Prêt interne — C. Awa", valeur: "50 000 F", ok: true, label: "En cours" },
+      { nom: "Vente — activité économique", valeur: "180 000 F", ok: true, label: "Encaissée" },
+      { nom: "Sociétaire D", valeur: "3 parts", ok: true, label: "À jour" },
+    ],
+  },
+  ong: {
+    titre: "Projets — ce trimestre", badge: "3 en cours",
+    lignes: [
+      { nom: "Projet Eau potable", valeur: "1 200 000 F", ok: true, label: "Financé" },
+      { nom: "Aide sociale — famille B.", valeur: "35 000 F", ok: true, label: "Versée" },
+      { nom: "Don public reçu", valeur: "15 000 F", ok: true, label: "Encaissé" },
+      { nom: "Rapport bailleur", valeur: "—", ok: false, label: "À produire" },
+    ],
+  },
+  avec: {
+    titre: "Réunion — cycle en cours", badge: "3 gardiens confirmés",
+    lignes: [
+      { nom: "Achat de parts — Fatou", valeur: "2 500 F", ok: true, label: "Encaissé" },
+      { nom: "Crédit interne — Koffi", valeur: "15 000 F", ok: true, label: "Accordé" },
+      { nom: "Fonds social — Awa", valeur: "500 F", ok: true, label: "À jour" },
+      { nom: "Vérification de caisse", valeur: "0 F d'écart", ok: true, label: "Juste" },
+    ],
+  },
+  professionnelle: {
+    titre: "Activité — ce mois", badge: "45 membres actifs",
+    lignes: [
+      { nom: "Cotisation annuelle — Dr K.", valeur: "50 000 F", ok: true, label: "À jour" },
+      { nom: "Formation — Éthique", valeur: "18 inscrits", ok: true, label: "Complet" },
+      { nom: "Service — Conseil juridique", valeur: "—", ok: true, label: "Actif" },
+      { nom: "Partenariat renouvelé", valeur: "—", ok: true, label: "Signé" },
+    ],
+  },
+  federation: {
+    titre: "Organisations membres", badge: "18 affiliées",
+    lignes: [
+      { nom: "Cotisation — Section Abidjan", valeur: "80 000 F", ok: true, label: "À jour" },
+      { nom: "Projet commun", valeur: "3", ok: true, label: "En cours" },
+      { nom: "Document diffusé", valeur: "—", ok: true, label: "Envoyé" },
+      { nom: "Section Bouaké", valeur: "45 000 F", ok: false, label: "En attente" },
+    ],
+  },
+  reseau: {
+    titre: "Organisations membres", badge: "18 affiliées",
+    lignes: [
+      { nom: "Cotisation — Section Abidjan", valeur: "80 000 F", ok: true, label: "À jour" },
+      { nom: "Projet commun", valeur: "3", ok: true, label: "En cours" },
+      { nom: "Document diffusé", valeur: "—", ok: true, label: "Envoyé" },
+      { nom: "Section Bouaké", valeur: "45 000 F", ok: false, label: "En attente" },
+    ],
+  },
+};
+
 const ORDRE_TYPES = ["mutuelle", "association", "cooperative", "ong", "avec", "professionnelle", "federation", "reseau"];
 
 // Trois organisations réelles seulement (MAEPHDA, FDSD, LES QUETEUSES) —
@@ -138,6 +226,7 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
   });
 
   const cfg = TYPES_LANDING[type] || TYPES_LANDING.defaut;
+  const demo = DEMOS[type] || DEMOS.defaut;
   const fonctionnalitesVisibles = type
     ? FONCTIONNALITES.filter((f) => f.types.includes(type))
     : FONCTIONNALITES;
@@ -237,16 +326,19 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
             </div>
           </div>
 
-          <div className="lp-demo">
+          <div className="lp-demo" key={type || "defaut"}>
             <div className="lp-demo-head">
-              <span className="lp-demo-t">Cotisations — ce mois</span>
-              <span className="lp-demo-s">78% à jour</span>
+              <span className="lp-demo-t">{demo.titre}</span>
+              <span className="lp-demo-s">{demo.badge}</span>
             </div>
             <div className="lp-demo-rows">
-              <div className="lp-drow" style={{ animationDelay: ".05s" }}><span>Membre 1</span><span className="lp-amt">5 000 F</span><span className="lp-st lp-st-ok">À jour</span></div>
-              <div className="lp-drow" style={{ animationDelay: ".15s" }}><span>Membre 2</span><span className="lp-amt">3 000 F</span><span className="lp-st lp-st-wait">Partiel</span></div>
-              <div className="lp-drow" style={{ animationDelay: ".25s" }}><span>Membre 3</span><span className="lp-amt">5 000 F</span><span className="lp-st lp-st-ok">À jour</span></div>
-              <div className="lp-drow" style={{ animationDelay: ".35s" }}><span>Membre 4</span><span className="lp-amt">0 F</span><span className="lp-st lp-st-wait">En attente</span></div>
+              {demo.lignes.map((l, i) => (
+                <div className="lp-drow" style={{ animationDelay: `${.05 + i * .1}s` }} key={l.nom}>
+                  <span>{l.nom}</span>
+                  <span className="lp-amt">{l.valeur}</span>
+                  <span className={`lp-st ${l.ok ? "lp-st-ok" : "lp-st-wait"}`}>{l.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

@@ -8,11 +8,11 @@ export default defineConfig(({ mode }) => {
   // le manifeste ci-dessous, le titre de la page et l'écran de démarrage.
   const env = loadEnv(mode, process.cwd(), 'VITE_')
 
-  const nom = env.VITE_NOM_PLATEFORME || 'Mutuelle'
-  const nomCourt = env.VITE_NOM_COURT || 'Mutuelle'
+  const nom = env.VITE_NOM_PLATEFORME || 'Babamoo'
+  const nomCourt = env.VITE_NOM_COURT || 'Babamoo'
   const description =
     env.VITE_DESCRIPTION_PLATEFORME ||
-    'La gestion de votre mutuelle, dans votre poche.'
+    'La gestion de votre organisation, dans votre poche.'
 
   return {
      build: {

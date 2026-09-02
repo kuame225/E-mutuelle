@@ -3,7 +3,7 @@ import {
   Building2, ArrowRight, AlertTriangle, Sigma, Eye, RefreshCw, Users,
   CreditCard, HandHeart, ClipboardList, Wallet, Megaphone, ShieldCheck,
   KeyRound, Sliders, ScrollText, Download, CheckCircle2,
-  PiggyBank, ShoppingCart, FolderKanban, GraduationCap, Lock, Gift,
+  PiggyBank, ShoppingCart, FolderKanban, GraduationCap, Lock, Gift, Target, Coins,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
@@ -83,87 +83,49 @@ const TYPES_LANDING = {
 // sélectionné, comme le reste de la page — plutôt qu'une liste de
 // cotisations figée quel que soit le type choisi, une donnée
 // réellement représentative de ce que cette organisation suit.
+// La carte de démonstration reproduit fidèlement le vrai tableau de
+// bord de l'application (TableauBordFinancier.jsx / EpargneAvecPage.jsx)
+// plutôt qu'une liste inventée — trois variantes, une par structure
+// d'écran réellement différente : standard (bandeau "Membres à jour"),
+// coopérative (capital social, sans cotisations), AVEC (capital cumulé
+// du cycle). Les KPI conditionnels (aides) ne s'affichent que pour les
+// types où le module l'est réellement par défaut.
 const DEMOS = {
   defaut: {
-    titre: "Cotisations — ce mois", badge: "78% à jour",
-    lignes: [
-      { nom: "Membre 1", valeur: "5 000 F", ok: true, label: "À jour" },
-      { nom: "Membre 2", valeur: "3 000 F", ok: false, label: "Partiel" },
-      { nom: "Membre 3", valeur: "5 000 F", ok: true, label: "À jour" },
-      { nom: "Membre 4", valeur: "0 F", ok: false, label: "En attente" },
-    ],
+    variante: "standard", pourcentage: 78, membresAJour: 39, membresTotal: 50,
+    solde: "1 240 000", encaisse: "1 850 000", aides: "180 000", aidesActif: true,
   },
   mutuelle: {
-    titre: "Cotisations — ce mois", badge: "78% à jour",
-    lignes: [
-      { nom: "Membre 1", valeur: "5 000 F", ok: true, label: "À jour" },
-      { nom: "Aide sociale — décès", valeur: "150 000 F", ok: true, label: "Versée" },
-      { nom: "Membre 3", valeur: "5 000 F", ok: true, label: "À jour" },
-      { nom: "Membre 4", valeur: "0 F", ok: false, label: "En attente" },
-    ],
+    variante: "standard", pourcentage: 78, membresAJour: 39, membresTotal: 50,
+    solde: "1 240 000", encaisse: "1 850 000", aides: "180 000", aidesActif: true,
   },
   association: {
-    titre: "Activité — ce mois", badge: "12 nouvelles adhésions",
-    lignes: [
-      { nom: "Don public reçu", valeur: "10 000 F", ok: true, label: "Encaissé" },
-      { nom: "Nouvelle adhésion", valeur: "—", ok: true, label: "Acceptée" },
-      { nom: "Projet — Rentrée scolaire", valeur: "450 000 F", ok: true, label: "Financé" },
-      { nom: "Cotisation — S. Koffi", valeur: "2 000 F", ok: false, label: "En attente" },
-    ],
-  },
-  cooperative: {
-    titre: "Parts sociales — cycle en cours", badge: "2 450 000 F cumulés",
-    lignes: [
-      { nom: "Sociétaire A", valeur: "12 parts", ok: true, label: "À jour" },
-      { nom: "Prêt interne — C. Awa", valeur: "50 000 F", ok: true, label: "En cours" },
-      { nom: "Vente — activité économique", valeur: "180 000 F", ok: true, label: "Encaissée" },
-      { nom: "Sociétaire D", valeur: "3 parts", ok: true, label: "À jour" },
-    ],
+    variante: "standard", pourcentage: 82, membresAJour: 41, membresTotal: 50,
+    solde: "620 000", encaisse: "980 000", aidesActif: false,
   },
   ong: {
-    titre: "Projets — ce trimestre", badge: "3 en cours",
-    lignes: [
-      { nom: "Projet Eau potable", valeur: "1 200 000 F", ok: true, label: "Financé" },
-      { nom: "Aide sociale — famille B.", valeur: "35 000 F", ok: true, label: "Versée" },
-      { nom: "Don public reçu", valeur: "15 000 F", ok: true, label: "Encaissé" },
-      { nom: "Rapport bailleur", valeur: "—", ok: false, label: "À produire" },
-    ],
-  },
-  avec: {
-    titre: "Réunion — cycle en cours", badge: "3 gardiens confirmés",
-    lignes: [
-      { nom: "Achat de parts — Fatou", valeur: "2 500 F", ok: true, label: "Encaissé" },
-      { nom: "Crédit interne — Koffi", valeur: "15 000 F", ok: true, label: "Accordé" },
-      { nom: "Fonds social — Awa", valeur: "500 F", ok: true, label: "À jour" },
-      { nom: "Vérification de caisse", valeur: "0 F d'écart", ok: true, label: "Juste" },
-    ],
+    variante: "standard", pourcentage: 65, membresAJour: 13, membresTotal: 20,
+    solde: "3 100 000", encaisse: "4 400 000", aides: "540 000", aidesActif: true,
   },
   professionnelle: {
-    titre: "Activité — ce mois", badge: "45 membres actifs",
-    lignes: [
-      { nom: "Cotisation annuelle — Dr K.", valeur: "50 000 F", ok: true, label: "À jour" },
-      { nom: "Formation — Éthique", valeur: "18 inscrits", ok: true, label: "Complet" },
-      { nom: "Service — Conseil juridique", valeur: "—", ok: true, label: "Actif" },
-      { nom: "Partenariat renouvelé", valeur: "—", ok: true, label: "Signé" },
-    ],
+    variante: "standard", pourcentage: 90, membresAJour: 45, membresTotal: 50,
+    solde: "2 800 000", encaisse: "3 250 000", aidesActif: false,
   },
   federation: {
-    titre: "Organisations membres", badge: "18 affiliées",
-    lignes: [
-      { nom: "Cotisation — Section Abidjan", valeur: "80 000 F", ok: true, label: "À jour" },
-      { nom: "Projet commun", valeur: "3", ok: true, label: "En cours" },
-      { nom: "Document diffusé", valeur: "—", ok: true, label: "Envoyé" },
-      { nom: "Section Bouaké", valeur: "45 000 F", ok: false, label: "En attente" },
-    ],
+    variante: "standard", pourcentage: 72, membresAJour: 13, membresTotal: 18,
+    solde: "980 000", encaisse: "1 460 000", aidesActif: false,
   },
   reseau: {
-    titre: "Organisations membres", badge: "18 affiliées",
-    lignes: [
-      { nom: "Cotisation — Section Abidjan", valeur: "80 000 F", ok: true, label: "À jour" },
-      { nom: "Projet commun", valeur: "3", ok: true, label: "En cours" },
-      { nom: "Document diffusé", valeur: "—", ok: true, label: "Envoyé" },
-      { nom: "Section Bouaké", valeur: "45 000 F", ok: false, label: "En attente" },
-    ],
+    variante: "standard", pourcentage: 72, membresAJour: 13, membresTotal: 18,
+    solde: "980 000", encaisse: "1 460 000", aidesActif: false,
+  },
+  cooperative: {
+    variante: "cooperative", capitalSocial: "2 450 000", societaires: 34,
+    encoursPrets: "680 000", pretsEnAttente: 2,
+  },
+  avec: {
+    variante: "avec", capitalCumule: "540 000", societaires: 22,
+    fondsSocial: "44 000", valeurPart: "1 000",
   },
 };
 
@@ -326,21 +288,49 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
             </div>
           </div>
 
-          <div className="lp-demo" key={type || "defaut"}>
-            <div className="lp-demo-head">
-              <span className="lp-demo-t">{demo.titre}</span>
-              <span className="lp-demo-s">{demo.badge}</span>
+          {demo.variante === "standard" ? (
+            <div className="lp-dash" key={type || "defaut"}>
+              <div className="lp-dash-hero">
+                <div className="lp-dash-hero-label"><Target size={12} /> MEMBRES À JOUR</div>
+                <div className="lp-dash-hero-pct">{demo.pourcentage}<span>%</span></div>
+                <div className="lp-dash-hero-sub">{demo.membresAJour} membre à jour sur {demo.membresTotal}</div>
+                <div className="lp-dash-bar"><div style={{ width: `${demo.pourcentage}%` }} /></div>
+              </div>
+              <div className="lp-dash-kpis">
+                <div className="lp-dash-kpi"><span>Solde de la caisse</span><strong>{demo.solde} F</strong></div>
+                <div className="lp-dash-kpi"><span>Total encaissé</span><strong>{demo.encaisse} F</strong></div>
+                {demo.aidesActif && (
+                  <div className="lp-dash-kpi"><span>Aides versées</span><strong>{demo.aides} F</strong></div>
+                )}
+              </div>
             </div>
-            <div className="lp-demo-rows">
-              {demo.lignes.map((l, i) => (
-                <div className="lp-drow" style={{ animationDelay: `${.05 + i * .1}s` }} key={l.nom}>
-                  <span>{l.nom}</span>
-                  <span className="lp-amt">{l.valeur}</span>
-                  <span className={`lp-st ${l.ok ? "lp-st-ok" : "lp-st-wait"}`}>{l.label}</span>
-                </div>
-              ))}
+          ) : demo.variante === "cooperative" ? (
+            <div className="lp-dash" key={type || "defaut"}>
+              <div className="lp-dash-hero lp-dash-hero-alt">
+                <div className="lp-dash-hero-label"><Wallet size={12} /> CAPITAL SOCIAL</div>
+                <div className="lp-dash-hero-pct">{demo.capitalSocial}<span className="lp-dash-hero-unite"> F</span></div>
+                <div className="lp-dash-hero-sub">{demo.societaires} sociétaires détenant des parts</div>
+              </div>
+              <div className="lp-dash-kpis">
+                <div className="lp-dash-kpi"><span>Sociétaires actifs</span><strong>{demo.societaires}</strong></div>
+                <div className="lp-dash-kpi"><span>Encours de prêts</span><strong>{demo.encoursPrets} F</strong></div>
+                <div className="lp-dash-kpi"><span>Prêts en attente</span><strong>{demo.pretsEnAttente}</strong></div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="lp-dash" key={type || "defaut"}>
+              <div className="lp-dash-hero lp-dash-hero-alt">
+                <div className="lp-dash-hero-label"><Coins size={12} /> CAPITAL CUMULÉ</div>
+                <div className="lp-dash-hero-pct">{demo.capitalCumule}<span className="lp-dash-hero-unite"> F</span></div>
+                <div className="lp-dash-hero-sub">{demo.societaires} sociétaires — cycle en cours</div>
+              </div>
+              <div className="lp-dash-kpis">
+                <div className="lp-dash-kpi"><span>Sociétaires actifs</span><strong>{demo.societaires}</strong></div>
+                <div className="lp-dash-kpi"><span>Fonds social</span><strong>{demo.fondsSocial} F</strong></div>
+                <div className="lp-dash-kpi"><span>Valeur de la part</span><strong>{demo.valeurPart} F</strong></div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -522,16 +512,27 @@ section{ padding:88px 0; }
 .lp-note-membre{ font-style:italic; }
 .lp-dot{ width:7px; height:7px; border-radius:50%; background:${C.success}; flex-shrink:0; }
 
-.lp-demo{ background:${C.surface}; border:1px solid ${C.border}; border-radius:${R.xxl}px; padding:24px; box-shadow:${SHADOW.md}; }
-.lp-demo-head{ display:flex; justify-content:space-between; margin-bottom:16px; font-size:13px; font-weight:600; }
-.lp-demo-s{ color:${C.success}; background:${C.successSoft}; padding:4px 10px; border-radius:999px; font-size:11.5px; }
-.lp-demo-rows{ display:flex; flex-direction:column; gap:8px; }
-.lp-drow{ display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center; padding:11px 14px; border-radius:${R.md}px; background:${C.bg}; opacity:0; animation:lpRowIn .5s ease forwards; }
-.lp-amt{ font-weight:600; font-size:13.5px; }
-.lp-st{ font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px; }
-.lp-st-ok{ background:${C.successSoft}; color:${C.success}; }
-.lp-st-wait{ background:${C.warningSoft}; color:${C.warning}; }
-@keyframes lpRowIn{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:none; } }
+.lp-dash{ background:${C.surface}; border:1px solid ${C.border}; border-radius:${R.xxl}px; overflow:hidden; box-shadow:${SHADOW.md}; animation:lpFade .4s ease; }
+.lp-dash-hero{
+  background:linear-gradient(135deg, ${C.primary}, ${C.primaryDark});
+  color:#fff; padding:20px 22px;
+}
+.lp-dash-hero-alt{ background:linear-gradient(135deg, ${C.accent}, ${C.accentDark}); }
+.lp-dash-hero-label{
+  display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700;
+  letter-spacing:.05em; opacity:.85; margin-bottom:10px;
+}
+.lp-dash-hero-pct{ font-size:34px; font-weight:800; line-height:1; }
+.lp-dash-hero-pct span{ font-size:18px; font-weight:600; opacity:.85; margin-left:2px; }
+.lp-dash-hero-unite{ font-size:16px !important; }
+.lp-dash-hero-sub{ font-size:12.5px; opacity:.85; margin-top:6px; }
+.lp-dash-bar{ height:6px; border-radius:999px; background:rgba(255,255,255,.25); margin-top:14px; overflow:hidden; }
+.lp-dash-bar div{ height:100%; background:#fff; border-radius:999px; transition:width .6s ease; }
+.lp-dash-kpis{ display:flex; gap:1px; background:${C.border}; }
+.lp-dash-kpi{ flex:1; background:${C.surface}; padding:14px 16px; display:flex; flex-direction:column; gap:4px; }
+.lp-dash-kpi span{ font-size:10.5px; color:${C.textSubtle}; font-weight:600; }
+.lp-dash-kpi strong{ font-size:14px; font-weight:700; color:${C.text}; }
+@keyframes lpFade{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:none; } }
 
 .lp-problem{ background:${C.surface}; border-top:1px solid ${C.border}; border-bottom:1px solid ${C.border}; }
 .lp-problem-head{ text-align:center; max-width:620px; margin:0 auto 48px; }

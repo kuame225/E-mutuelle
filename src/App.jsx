@@ -63,7 +63,7 @@ import RolesPage from "./RolesPage";
 import ExploitantConsole from "./ExploitantConsole";
 import { consigner, EVENEMENTS } from "./journal";
 import { pinEstDefini } from "./pinLock";
-import { useParametrage, moduleActif, LOGO_DEFAUT } from "./useParametrage";
+import { useParametrage, moduleActif, LOGO_DEFAUT, mesOrganisationsAdministrees, mesOrganisationsMembre, changerOrganisationActive } from "./useParametrage";
 import { genererAttestation } from "./AttestationAdhesion";
 import { genererHistorique } from "./HistoriqueCotisations";
 import { usePermissions } from "./usePermissions";
@@ -92,6 +92,8 @@ function Shell() {
   const [pinEtat, setPinEtat] = useState({ pret: false, configure: false });
   const [espaceAdmin, setEspaceAdmin] = useState(true);
   const [orgActif, setOrgActif] = useState(null); // null = pas encore vérifié
+  const [autresOrgsActives, setAutresOrgsActives] = useState([]);
+  const [bascule, setBascule] = useState(false);
 
   const userId = session?.user?.id ?? null;
 
@@ -113,6 +115,43 @@ function Shell() {
       .maybeSingle()
       .then(({ data }) => setOrgActif(data ? data.actif : null));
   }, [session, isExploitant, params.organisation_id]);
+
+  // Un compte peut administrer ou appartenir à plusieurs organisations —
+  // si celle actuellement résolue est inactive, on vérifie s'il en a une
+  // autre déjà active, pour lui proposer d'y basculer plutôt que de le
+  // bloquer sans issue derrière "Espace non actif".
+  useEffect(() => {
+    if (orgActif !== false) { setAutresOrgsActives([]); return; }
+
+    Promise.all([mesOrganisationsAdministrees(), mesOrganisationsMembre()]).then(
+      async ([admin, membre]) => {
+        const toutes = [...admin, ...membre].filter(
+          (o) => o.organisation_id !== params.organisation_id
+        );
+        const ids = [...new Set(toutes.map((o) => o.organisation_id))];
+        if (ids.length === 0) { setAutresOrgsActives([]); return; }
+
+        const { data } = await supabase
+          .from("organisations").select("id, actif").in("id", ids);
+
+        const actives = ids
+          .map((id) => {
+            const org = toutes.find((o) => o.organisation_id === id);
+            const statut = (data || []).find((d) => d.id === id);
+            return statut?.actif ? { organisation_id: id, sigle: org.sigle, nom: org.nom } : null;
+          })
+          .filter(Boolean);
+
+        setAutresOrgsActives(actives);
+      }
+    );
+  }, [orgActif, params.organisation_id]);
+
+  async function basculerVers(id) {
+    setBascule(true);
+    await changerOrganisationActive(id);
+    setBascule(false);
+  }
 
   // Charger la fiche membre. Les administrateurs sont d'abord des adhérents :
   // on charge leur fiche aussi, pour leur permettre de consulter leur espace.
@@ -292,6 +331,35 @@ function Shell() {
             de cet essai.
           </p>
         </div>
+
+        {!venantDInscription && autresOrgsActives.length > 0 && (
+          <div
+            style={{
+              marginTop: 18, width: "100%", maxWidth: "36ch",
+              display: "flex", flexDirection: "column", gap: 8,
+            }}
+          >
+            <p style={{ margin: "0 0 2px", fontSize: 12.5, color: C.textSubtle }}>
+              Vous administrez aussi une organisation active :
+            </p>
+            {autresOrgsActives.map((o) => (
+              <button
+                key={o.organisation_id}
+                onClick={() => basculerVers(o.organisation_id)}
+                disabled={bascule}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  background: C.primary, color: "#fff", border: "none",
+                  borderRadius: 10, padding: "11px 16px", cursor: "pointer",
+                  fontFamily: "inherit", fontSize: 13.5, fontWeight: 600,
+                }}
+              >
+                {bascule ? "Changement…" : `Basculer vers ${o.sigle || o.nom}`}
+              </button>
+            ))}
+          </div>
+        )}
+
         <button
           onClick={signOut}
           style={{

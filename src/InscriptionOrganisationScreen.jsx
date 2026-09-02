@@ -137,7 +137,9 @@ function PageInscription({ children }) {
 
         <div className="io-marque-contenu">
           <div className="io-marque-mark">
-            <div className="io-marque-logo"><Building2 size={20} /></div>
+            <div className="io-marque-logo">
+              <img src="/logo-babamoo.png" alt="Babamoo" />
+            </div>
             <span className="io-marque-nom">Babamoo</span>
           </div>
 
@@ -885,8 +887,9 @@ const CSS = `
 @media (min-width:960px){ .io-marque-mark{ margin-bottom:${S.xxxl}px; } }
 .io-marque-logo{
   width:36px; height:36px; border-radius:${R.md}px; flex-shrink:0;
-  background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center;
+  background:#fff; display:flex; align-items:center; justify-content:center; padding:4px;
 }
+.io-marque-logo img{ width:100%; height:100%; object-fit:contain; }
 .io-marque-nom{ font-size:16px; font-weight:700; letter-spacing:.02em; }
 .io-marque-titre{ font-size:22px; font-weight:700; line-height:1.25; letter-spacing:-.02em; margin:0 0 ${S.sm}px; }
 @media (min-width:960px){ .io-marque-titre{ font-size:34px; margin-bottom:${S.lg}px; } }

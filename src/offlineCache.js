@@ -6,7 +6,7 @@
 // refusée, etc.) — sans quoi une vraie erreur pourrait se masquer
 // derrière des données périmées.
 
-const PREFIXE = "baamo_cache";
+const PREFIXE = "babamoo_cache";
 
 function cle(id) {
   return `${PREFIXE}_${id}`;

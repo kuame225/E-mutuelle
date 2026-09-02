@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
-const NOM_PLATEFORME = import.meta.env.VITE_NOM_PLATEFORME || "Baamo";
+const NOM_PLATEFORME = import.meta.env.VITE_NOM_PLATEFORME || "Babamoo";
 
 // Contenu qui change selon le type d'organisation choisi par le visiteur —
 // via le sélecteur sur la page, ou un paramètre d'URL (?type=cooperative)

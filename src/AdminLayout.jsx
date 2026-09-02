@@ -90,7 +90,7 @@ export const NAV_GROUPS = [
     items: [
       { id: "journal",     label: "Journal d'activité",             icon: ScrollText },
       { id: "roles",       label: (mot) => `Rôles ${mot("bureau_du")}`, icon: KeyRound },
-      { id: "offres_baamo", label: "Offres Baamo",                  icon: Megaphone },
+      { id: "offres_baamo", label: "Offres Babamoo",                  icon: Megaphone },
       { id: "parametrage", label: "Paramètres",                     icon: Settings },
     ],
   },
@@ -147,7 +147,7 @@ function sousTitresPour(mot) {
     parametrage:   "Configuration de la plateforme",
     journal:       "Connexions et actions sensibles",
     roles:         `Qui fait quoi dans ${mot("bureau_le")}`,
-    offres_baamo:  "Ce que Baamo propose en plus, pour votre organisation",
+    offres_baamo:  "Ce que Babamoo propose en plus, pour votre organisation",
     sanctions:     "Suivi des sanctions d'accès",
   };
 }

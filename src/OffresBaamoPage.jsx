@@ -45,7 +45,7 @@ export default function OffresBaamoPage() {
 
     setOffreOuverte(null);
     setMessage("");
-    setSucces("Votre intérêt a été transmis à Baamo.");
+    setSucces("Votre intérêt a été transmis à Babamoo.");
     setTimeout(() => setSucces(""), 4000);
     charger();
   }
@@ -54,9 +54,9 @@ export default function OffresBaamoPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Offres Baamo</h2>
+      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Offres Babamoo</h2>
       <p style={{ fontSize: 13.5, color: C.textSubtle, marginBottom: 20 }}>
-        Des options que Baamo propose en plus, pour votre organisation.
+        Des options que Babamoo propose en plus, pour votre organisation.
       </p>
 
       {succes && (

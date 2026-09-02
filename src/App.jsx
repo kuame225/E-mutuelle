@@ -1401,7 +1401,7 @@ const PRODUITS_MEMBRE_VISUELS = {
   historique_cotisations: { Icon: FileBarChart2, couleur: C.success },
 };
 
-// Le paiement va vers Baamo lui-même, jamais vers l'organisation du
+// Le paiement va vers Babamoo lui-même, jamais vers l'organisation du
 // membre — un circuit séparé de celui des cotisations, mais sur le même
 // principe que DeclarationPaiementModal plus haut : pas de paiement en
 // ligne automatisé, le membre déclare, l'exploitant confirme. Un achat

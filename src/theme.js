@@ -1,14 +1,24 @@
 // ============================================================
-//  MEPHDA — Design System
+//  BABAMOO — Design System
 // ============================================================
 
 // --- Palette brute -----------------------------------------
 export const PALETTE = {
-  blue900: "#0A3880",
-  blue800: "#0D47A1",
-  blue600: "#1976D2",
-  blue100: "#E3EDFB",
-  blue50:  "#F0F5FE",
+  // Bleus — Bleu Marine et Bleu Royal sont les deux couleurs exactes
+  // de la nouvelle identité ; blue600 (Bleu Ciel) aussi. blue100 et
+  // blue50 sont dérivés ici (aucun code exact fourni pour ces crans),
+  // gardant le même rôle qu'avant : des teintes pâles pour les fonds.
+  blue900: "#0D1B4C", // Bleu Marine
+  blue800: "#1E3A8A", // Bleu Royal
+  blue600: "#0EA5E9", // Bleu Ciel
+  blue100: "#DCE9FB", // dérivé
+  blue50:  "#F0F6FE", // dérivé
+
+  // Violet — nouvelle couleur d'accent de la marque, absente de
+  // l'ancienne palette. violet700 et violet100 sont dérivés.
+  violet700: "#59239E", // dérivé
+  violet600: "#6D28D9", // Violet
+  violet100: "#EEE6FB", // dérivé
 
   green700: "#1B5E20",
   green600: "#2E7D32",
@@ -25,7 +35,7 @@ export const PALETTE = {
   grey500: "#6B7684",
   grey300: "#C9D1DA",
   grey200: "#E4E9EF",
-  grey100: "#F5F7FA",
+  grey100: "#F2F4F7", // Gris Clair
   white:   "#FFFFFF",
 };
 
@@ -36,6 +46,12 @@ export const C = {
   primaryDark:  PALETTE.blue900,
   primaryLight: PALETTE.blue600,
   primarySoft:  PALETTE.blue100,
+
+  // accent — le violet de la nouvelle identité, à utiliser en touche
+  // secondaire (jamais comme couleur dominante, qui reste le bleu).
+  accent:     PALETTE.violet600,
+  accentDark: PALETTE.violet700,
+  accentSoft: PALETTE.violet100,
 
   // états
   success:     PALETTE.green600,

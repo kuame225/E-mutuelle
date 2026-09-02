@@ -138,7 +138,7 @@ function PageInscription({ children }) {
         <div className="io-marque-contenu">
           <div className="io-marque-mark">
             <div className="io-marque-logo"><Building2 size={20} /></div>
-            <span className="io-marque-nom">Baamo</span>
+            <span className="io-marque-nom">Babamoo</span>
           </div>
 
           <h1 className="io-marque-titre">

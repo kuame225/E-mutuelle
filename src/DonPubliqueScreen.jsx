@@ -131,7 +131,7 @@ export default function DonPubliqueScreen({ slug }) {
         </button>
 
         <p className="don-legal">
-          Paiement sécurisé via Wave. Baamo ne conserve aucune donnée bancaire.
+          Paiement sécurisé via Wave. Babamoo ne conserve aucune donnée bancaire.
         </p>
       </div>
     </div>

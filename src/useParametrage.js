@@ -204,14 +204,19 @@ function ecrireOrganisationActive(id) {
  * et le sélecteur ne s'affichera pas.
  */
 export async function mesOrganisationsAdministrees() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const { data, error } = await supabase
     .from("roles_admin")
-    .select("organisation_id, organisations(nom, sigle)");
+    .select("organisation_id, organisations(nom, sigle)")
+    .eq("user_id", user.id);
 
   if (error || !data) return [];
 
+  const vues = new Set();
   return data
-    .filter((r) => r.organisations)
+    .filter((r) => r.organisations && !vues.has(r.organisation_id) && vues.add(r.organisation_id))
     .map((r) => ({
       organisation_id: r.organisation_id,
       nom: r.organisations.nom,
@@ -226,14 +231,19 @@ export async function mesOrganisationsAdministrees() {
  * sans jamais y siéger, n'apparaît autrement dans aucun sélecteur.
  */
 export async function mesOrganisationsMembre() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const { data, error } = await supabase
     .from("membres")
-    .select("organisation_id, organisations(nom, sigle)");
+    .select("organisation_id, organisations(nom, sigle)")
+    .eq("user_id", user.id);
 
   if (error || !data) return [];
 
+  const vues = new Set();
   return data
-    .filter((r) => r.organisations)
+    .filter((r) => r.organisations && !vues.has(r.organisation_id) && vues.add(r.organisation_id))
     .map((r) => ({
       organisation_id: r.organisation_id,
       nom: r.organisations.nom,

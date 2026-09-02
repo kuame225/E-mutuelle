@@ -214,6 +214,28 @@ export async function mesOrganisationsAdministrees() {
 }
 
 /**
+ * Les organisations où la personne connectée est simple membre — jamais
+ * au Bureau. Distincte de mesOrganisationsAdministrees() : une personne
+ * membre d'une mutuelle d'employeur et d'une association villageoise,
+ * sans jamais y siéger, n'apparaît autrement dans aucun sélecteur.
+ */
+export async function mesOrganisationsMembre() {
+  const { data, error } = await supabase
+    .from("membres")
+    .select("organisation_id, organisations(nom, sigle)");
+
+  if (error || !data) return [];
+
+  return data
+    .filter((r) => r.organisations)
+    .map((r) => ({
+      organisation_id: r.organisation_id,
+      nom: r.organisations.nom,
+      sigle: r.organisations.sigle,
+    }));
+}
+
+/**
  * Change l'organisation active et rafraîchit tous les écrans ouverts.
  */
 export function changerOrganisationActive(organisationId) {

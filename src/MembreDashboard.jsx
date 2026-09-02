@@ -4,12 +4,13 @@ import {
   Bell, LogOut, CreditCard, HandHeart, Gift, UserCircle2,
   CheckCircle2, Clock, AlertTriangle, CalendarDays, Wallet,
   Megaphone, Ticket, X, ChevronRight, Users, UserPlus, Users2, RefreshCw, Banknote,
-  GraduationCap, Briefcase, Handshake, FileBadge, History,
+  GraduationCap, Briefcase, Handshake, FileBadge, History, ChevronsUpDown, Check, Loader2,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import CarteMembreModal from "./CarteMembreModal";
 import {
   useParametrage, moduleActif, construireMatricule, LOGO_DEFAUT,
+  mesOrganisationsMembre, changerOrganisationActive,
 } from "./useParametrage";
 import { useVocabulaire } from "./useVocabulaire";
 import { pushDisponible, pushAutorise, pushRefuse, activerNotifications } from "./push";
@@ -54,6 +55,9 @@ function raccourcisPourType(mot) {
 export default function MembreDashboard({ membre, onPage, onSignOut }) {
   const { params } = useParametrage();
   const { mot } = useVocabulaire();
+  const [mesOrgs, setMesOrgs] = useState([]);
+  const [selecteurOuvert, setSelecteurOuvert] = useState(false);
+  const [changement, setChangement] = useState(null);
   const [annuel, setAnnuel] = useState({ du: 0, paye: 0 });
   const [echeance, setEcheance] = useState(null);
   const [notifs, setNotifs] = useState([]);
@@ -72,6 +76,18 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
 
   const tombolaActive = moduleActif(params, "module_tombola");
   const annee = new Date().getFullYear();
+
+  useEffect(() => {
+    mesOrganisationsMembre().then(setMesOrgs);
+  }, []);
+
+  async function choisirOrganisation(id) {
+    if (id === params.organisation_id) { setSelecteurOuvert(false); return; }
+    setChangement(id);
+    await changerOrganisationActive(id);
+    setChangement(null);
+    setSelecteurOuvert(false);
+  }
 
   useEffect(() => {
     async function charger() {
@@ -236,6 +252,44 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
 
       {/* ============ En-tête bleu ============ */}
       <header className="md-head">
+        {/* Une personne membre de plusieurs organisations doit pouvoir
+            choisir laquelle elle regarde — invisible pour les autres,
+            même principe que le sélecteur admin dans AdminLayout.jsx. */}
+        {mesOrgs.length > 1 && (
+          <div className="md-selecteur-zone">
+            <button
+              className="md-selecteur"
+              onClick={() => setSelecteurOuvert((v) => !v)}
+            >
+              <span>{mot("changer_organisation")}</span>
+              <ChevronsUpDown size={13} />
+            </button>
+
+            {selecteurOuvert && (
+              <ul className="md-orgs">
+                {mesOrgs.map((o) => {
+                  const active = o.organisation_id === params.organisation_id;
+                  const enCours = changement === o.organisation_id;
+                  return (
+                    <li key={o.organisation_id}>
+                      <button
+                        className={`md-org ${active ? "is-active" : ""}`}
+                        onClick={() => choisirOrganisation(o.organisation_id)}
+                        disabled={enCours}
+                      >
+                        <span className="md-org-nom">{o.sigle || o.nom}</span>
+                        {enCours
+                          ? <Loader2 size={13} className="md-org-spin" />
+                          : active && <Check size={13} />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+
         <div className="md-head-bar">
           <img
             src={logo}
@@ -550,6 +604,34 @@ const CSS = `
   color:#fff;
 }
 .md-head-bar{ display:flex; align-items:center; justify-content:space-between; }
+
+.md-selecteur-zone{ position:relative; margin-bottom:${S.sm}px; }
+.md-selecteur{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+  color:rgba(255,255,255,.85); border-radius:${R.sm}px; padding:8px 11px;
+  cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:600;
+}
+.md-selecteur:hover{ background:rgba(255,255,255,.13); }
+.md-orgs{
+  list-style:none; margin:6px 0 0; padding:5px;
+  background:${PALETTE.blue900}; border:1px solid rgba(255,255,255,.16);
+  border-radius:${R.md}px; box-shadow:${SHADOW.lg};
+  position:absolute; left:0; right:0; z-index:80;
+}
+.md-org{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  width:100%; background:none; border:none; cursor:pointer;
+  padding:9px 10px; border-radius:${R.sm}px;
+  font-family:inherit; font-size:13px; color:rgba(255,255,255,.8);
+}
+.md-org:hover:not(:disabled){ background:rgba(255,255,255,.1); color:#fff; }
+.md-org.is-active{ color:#fff; font-weight:600; }
+.md-org:disabled{ opacity:.6; cursor:not-allowed; }
+.md-org-nom{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.md-org-spin{ animation:mdOrgSpin 1s linear infinite; flex-shrink:0; }
+@keyframes mdOrgSpin{ to{ transform:rotate(360deg); } }
+
 .md-logo{
   width:38px; height:38px; object-fit:contain;
   background:#fff; border-radius:9px; padding:4px;

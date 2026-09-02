@@ -1,10 +1,11 @@
 import React, { useEffect, useState, } from "react";
 import { supabase } from "./supabaseClient";
+import { sauverCache, lireCache } from "./offlineCache";
 import {
   Bell, LogOut, CreditCard, HandHeart, Gift, UserCircle2,
   CheckCircle2, Clock, AlertTriangle, CalendarDays, Wallet,
   Megaphone, Ticket, X, ChevronRight, Users, UserPlus, Users2, RefreshCw, Banknote,
-  GraduationCap, Briefcase, Handshake, FileBadge, History, ChevronsUpDown, Check, Loader2,
+  GraduationCap, Briefcase, Handshake, FileBadge, History, ChevronsUpDown, Check, Loader2, Coins, WifiOff,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import CarteMembreModal from "./CarteMembreModal";
@@ -40,6 +41,8 @@ function raccourcisPourType(mot) {
       module: "module_assemblees" },
     { id: "tontine",       icon: RefreshCw,   l1: "Tontine",  l2: "en cours",      color: C.primary,
       module: "module_tontine" },
+    { id: "epargne_avec",  icon: Coins,       l1: "Épargne",  l2: "AVEC",          color: C.primary,
+      module: "module_avec" },
     { id: "prets",         icon: Banknote,    l1: "Prêts",    l2: "& avances",     color: C.success,
       module: "module_prets" },
     { id: "formations",    icon: GraduationCap, l1: "Formations", l2: "à venir",   color: C.primaryLight,
@@ -63,6 +66,8 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
   const [notifs, setNotifs] = useState([]);
   const [tickets, setTickets] = useState({ bonus: 0, payants: 0 });
   const [loading, setLoading] = useState(true);
+  const [depuisCache, setDepuisCache] = useState(false);
+  const [horodatageCache, setHorodatageCache] = useState(null);
   const [showCarte, setShowCarte] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [pushEtat, setPushEtat] = useState(
@@ -91,6 +96,8 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
 
   useEffect(() => {
     async function charger() {
+      const idCache = `dashboard_${membre.id}`;
+      try {
       const trimestre = `${annee}-T${Math.ceil((new Date().getMonth() + 1) / 3)}`;
 
       const [cotRes, tickRes, aideRes, commRes, notifRes, baremeRes] = await Promise.all([
@@ -197,8 +204,39 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
         })),
       ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
 
+      // Copie locale de tout ce qui vient d'être calculé — pas les
+      // requêtes brutes, le résultat final déjà mis en forme, pour
+      // pouvoir le réafficher tel quel si la prochaine ouverture
+      // échoue faute de réseau.
+      sauverCache(idCache, {
+        annuel: { du: tauxMensuel * 12, paye: cotisations.reduce((s, c) => s + c.montant_paye, 0) },
+        echeance: cotisations.find((c) => c.statut !== "paye" && c.statut !== "exempte") || null,
+        tickets: {
+          bonus: tks.filter((t) => t.type_ticket === "bonus").length,
+          payants: tks.filter((t) => t.type_ticket === "payant").length,
+        },
+        notifs: flux,
+      });
+
       setNotifs(flux);
+      setDepuisCache(false);
       setLoading(false);
+      } catch (e) {
+        // Un throw ici signale une vraie coupure réseau (pas une
+        // erreur applicative, qui aurait été renvoyée dans data/error
+        // sans jamais atteindre ce catch) — on se rabat sur la
+        // dernière copie locale connue, sans jamais en inventer une.
+        const secours = lireCache(idCache);
+        if (secours) {
+          setAnnuel(secours.donnees.annuel);
+          setEcheance(secours.donnees.echeance);
+          setTickets(secours.donnees.tickets);
+          setNotifs(secours.donnees.notifs);
+          setDepuisCache(true);
+          setHorodatageCache(secours.horodatage);
+        }
+        setLoading(false);
+      }
     }
     charger();
   // « mot » figure dans les dépendances : le type d'organisation se résout
@@ -366,6 +404,19 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
 
       {/* ============ Corps ============ */}
       <main className="md-body">
+
+        {depuisCache && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, background: "#FEF3C7",
+            color: "#92400E", borderRadius: 10, padding: "10px 14px", fontSize: 12.5,
+            marginBottom: 14, lineHeight: 1.4,
+          }}>
+            <WifiOff size={14} style={{ flexShrink: 0 }} />
+            Dernières données connues du{" "}
+            {new Date(horodatageCache).toLocaleDateString("fr-FR")} à{" "}
+            {new Date(horodatageCache).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+          </div>
+        )}
 
         {/* ---- Cotisation annuelle ---- */}
         <section className="md-cotis">

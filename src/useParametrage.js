@@ -42,6 +42,11 @@ export const MODULES = [
     aide: "Épargne rotative entre membres.",
   },
   {
+    id: "module_avec",
+    label: "Épargne AVEC",
+    aide: "Parts, prêts internes et partage de fin de cycle.",
+  },
+  {
     id: "module_prets",
     label: "Prêts et avances",
     aide: "Avance sur cotisation et crédit social remboursable.",
@@ -124,6 +129,7 @@ export const PARAMS_DEFAUT = {
   module_qr_carte: true,
   module_assemblees: false,
   module_tontine: false,
+  module_avec: false,
   module_prets: false,
   // Le défaut « true » vaut pour une base pas encore migrée : les aides
   // faisaient partie du socle avant de devenir un module, mieux vaut les

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
   Plus, ArrowLeft, Loader2, Users, X, Trash2, Pencil,
-  AlertCircle, Heart, Baby, UserRound, User,
+  AlertCircle, Heart, Baby, UserRound, User, WifiOff,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import { sauverCache, lireCache } from "./offlineCache";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 const LIENS = [
@@ -25,15 +26,31 @@ export default function MembreBeneficiaires({ membre, onBack }) {
   const [confirmation, setConfirmation] = useState(null);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
+  const [depuisCache, setDepuisCache] = useState(false);
+  const [horodatageCache, setHorodatageCache] = useState(null);
 
   async function charger() {
-    const { data } = await supabase
-      .from("beneficiaires")
-      .select("*")
-      .eq("membre_id", membre.id)
-      .order("created_at", { ascending: true });
-    setListe(data || []);
-    setLoading(false);
+    const idCache = `beneficiaires_${membre.id}`;
+    try {
+      const { data } = await supabase
+        .from("beneficiaires")
+        .select("*")
+        .eq("membre_id", membre.id)
+        .order("created_at", { ascending: true });
+
+      sauverCache(idCache, data || []);
+      setListe(data || []);
+      setDepuisCache(false);
+      setLoading(false);
+    } catch (e) {
+      const secours = lireCache(idCache);
+      if (secours) {
+        setListe(secours.donnees);
+        setDepuisCache(true);
+        setHorodatageCache(secours.horodatage);
+      }
+      setLoading(false);
+    }
   }
 
   useEffect(() => { charger(); }, [membre.id]);
@@ -100,6 +117,15 @@ export default function MembreBeneficiaires({ membre, onBack }) {
           <Plus size={17} /> Ajouter
         </button>
       </header>
+
+      {depuisCache && (
+        <div className="bf-hors-ligne">
+          <WifiOff size={14} />
+          Dernières données connues du{" "}
+          {new Date(horodatageCache).toLocaleDateString("fr-FR")} à{" "}
+          {new Date(horodatageCache).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
 
       {/* ---- Liste ---- */}
       {loading ? (
@@ -344,6 +370,12 @@ const CSS = `
   transition:background .18s ease;
 }
 .bf-btn-new:hover{ background:${C.primaryDark}; }
+
+.bf-hors-ligne{
+  display:flex; align-items:center; gap:8px;
+  background:#FEF3C7; color:#92400E; border-radius:${R.md}px;
+  padding:10px 14px; font-size:12.5px; line-height:1.4;
+}
 .bf-btn-center{ margin-top:${S.md}px; }
 
 /* ---- Liste ---- */

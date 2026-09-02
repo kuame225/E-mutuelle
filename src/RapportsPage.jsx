@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Download, FileText, Loader2, CalendarRange, CalendarDays,
-  TrendingUp, Users, Wallet, AlertCircle, BarChart3,
+  TrendingUp, Users, Wallet, AlertCircle, BarChart3, Lock,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabaseClient";
@@ -16,6 +16,33 @@ export default function RapportsPage() {
   const [genere, setGenere] = useState(null);
   const [erreur, setErreur] = useState("");
   const [onglet, setOnglet] = useState("mensuel");
+  const [exercicesClotures, setExercicesClotures] = useState([]);
+  const [confirmationCloture, setConfirmationCloture] = useState(null); // année
+  const [clotureEnCours, setClotureEnCours] = useState(false);
+
+  async function chargerExercicesClotures() {
+    const { data } = await supabase
+      .from("exercices_clotures")
+      .select("annee")
+      .eq("organisation_id", params.organisation_id);
+    setExercicesClotures((data || []).map((e) => e.annee));
+  }
+
+  async function cloturerExercice(annee) {
+    setClotureEnCours(true);
+    const { error } = await supabase.rpc("cloturer_exercice", {
+      p_organisation_id: params.organisation_id,
+      p_annee: Number(annee),
+    });
+    setClotureEnCours(false);
+    if (error) { setErreur(error.message); return; }
+    setConfirmationCloture(null);
+    chargerExercicesClotures();
+  }
+
+  useEffect(() => {
+    if (params.organisation_id) chargerExercicesClotures();
+  }, [params.organisation_id]);
 
   useEffect(() => {
     async function charger() {
@@ -263,7 +290,7 @@ export default function RapportsPage() {
       const debut = `${annee}-01-01`;
       const fin = `${annee}-12-31`;
 
-      const [membresRes, operationsRes, assembleesRes] = await Promise.all([
+      const [membresRes, operationsRes, assembleesRes, aidesRes] = await Promise.all([
         supabase.from("membres")
           .select("id, statut_cotisation, date_adhesion, actif")
           .eq("organisation_id", params.organisation_id),
@@ -275,6 +302,11 @@ export default function RapportsPage() {
           .select("id")
           .eq("organisation_id", params.organisation_id)
           .gte("date_prevue", `${debut}T00:00:00`).lte("date_prevue", `${fin}T23:59:59`),
+        supabase.from("aides_sociales")
+          .select("montant_valide")
+          .eq("organisation_id", params.organisation_id)
+          .eq("statut", "payee")
+          .gte("decide_le", `${debut}T00:00:00`).lte("decide_le", `${fin}T23:59:59`),
       ]);
 
       const membresActifs = (membresRes.data || []).filter((m) => m.actif !== false);
@@ -293,8 +325,9 @@ export default function RapportsPage() {
       const operations = operationsRes.data || [];
       const totalRecettesDiverses = operations.filter((o) => o.sens === "recette").reduce((s, o) => s + (o.montant || 0), 0);
       const totalDepenses = operations.filter((o) => o.sens === "depense").reduce((s, o) => s + (o.montant || 0), 0);
+      const totalAidesVersees = (aidesRes.data || []).reduce((s, a) => s + (a.montant_valide || 0), 0);
       const totalRecettes = totalCotisations + totalRecettesDiverses;
-      const solde = totalRecettes - totalDepenses;
+      const solde = totalRecettes - totalDepenses - totalAidesVersees;
 
       const nombreAssemblees = (assembleesRes.data || []).length;
 
@@ -314,6 +347,7 @@ export default function RapportsPage() {
         ["Autres recettes", montant(totalRecettesDiverses) + " F"],
         ["Total des recettes", montant(totalRecettes) + " F"],
         ["Total des depenses", montant(totalDepenses) + " F"],
+        ["Aides sociales versees", montant(totalAidesVersees) + " F"],
       ]);
 
       y += 4;
@@ -470,10 +504,57 @@ export default function RapportsPage() {
                     }}
                   />
                 </div>
+
+                {onglet === "annuel" && (
+                  <div className="rp-cloture">
+                    {exercicesClotures.includes(Number(p.periode)) ? (
+                      <span className="rp-cloture-badge">
+                        <Lock size={13} /> Exercice clôturé
+                      </span>
+                    ) : (
+                      <button
+                        className="rp-cloture-btn"
+                        onClick={() => setConfirmationCloture(p.periode)}
+                      >
+                        <Lock size={13} /> Clôturer cet exercice
+                      </button>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}
         </ul>
+      )}
+
+      {confirmationCloture && (
+        <div className="rp-overlay" onClick={() => setConfirmationCloture(null)}>
+          <div className="rp-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="rp-modal-titre">Clôturer l'exercice {confirmationCloture} ?</h3>
+            <p className="rp-modal-texte">
+              Une fois clôturé, plus aucun paiement ni aucune opération diverse datée de{" "}
+              {confirmationCloture} ne pourra être modifié ou supprimé — par personne, y compris
+              un administrateur technique. Cette action est définitive.
+            </p>
+            {erreur && <div className="rp-erreur"><AlertCircle size={15} /> {erreur}</div>}
+            <div className="rp-modal-actions">
+              <button
+                className="rp-mbtn rp-mbtn-ghost"
+                onClick={() => setConfirmationCloture(null)}
+                disabled={clotureEnCours}
+              >
+                Annuler
+              </button>
+              <button
+                className="rp-mbtn rp-mbtn-primary"
+                onClick={() => cloturerExercice(confirmationCloture)}
+                disabled={clotureEnCours}
+              >
+                {clotureEnCours ? "Clôture…" : "Clôturer définitivement"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -768,6 +849,41 @@ const CSS = `
   margin-top:${S.md}px; overflow:hidden;
 }
 .rp-jauge div{ height:100%; border-radius:${R.pill}px; transition:width .5s ease; }
+
+.rp-cloture{ margin-top:${S.md}px; padding-top:${S.md}px; border-top:1px solid ${C.border}; }
+.rp-cloture-badge{
+  display:inline-flex; align-items:center; gap:6px;
+  background:${PALETTE.grey200}; color:${C.textMuted};
+  border-radius:${R.pill}px; padding:6px 13px; font-size:12.5px; font-weight:600;
+}
+.rp-cloture-btn{
+  display:flex; align-items:center; gap:6px;
+  background:none; border:1.5px solid ${C.danger}; color:${C.danger};
+  border-radius:${R.pill}px; padding:8px 14px; cursor:pointer;
+  font-family:inherit; font-size:12.5px; font-weight:600;
+}
+.rp-cloture-btn:hover{ background:${C.dangerSoft}; }
+
+.rp-overlay{
+  position:fixed; inset:0; z-index:200; background:rgba(10,20,40,.5);
+  display:flex; align-items:center; justify-content:center; padding:${S.lg}px;
+}
+.rp-modal{ background:${C.surface}; border-radius:${R.xxl}px; padding:${S.xl}px; width:100%; max-width:440px; }
+.rp-modal-titre{ font-size:18px; font-weight:700; margin:0 0 10px; }
+.rp-modal-texte{ font-size:13.5px; color:${C.textMuted}; line-height:1.6; margin:0 0 16px; }
+.rp-erreur{
+  display:flex; align-items:flex-start; gap:8px; background:${C.dangerSoft}; color:${C.danger};
+  border-radius:${R.md}px; padding:11px 13px; font-size:13px; margin-bottom:16px;
+}
+.rp-modal-actions{ display:flex; gap:10px; }
+.rp-mbtn{
+  flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+  border-radius:${R.md}px; padding:12px 0; cursor:pointer; border:none;
+  font-family:inherit; font-size:14px; font-weight:600;
+}
+.rp-mbtn:disabled{ opacity:.6; cursor:not-allowed; }
+.rp-mbtn-primary{ flex:2; background:${C.danger}; color:#fff; }
+.rp-mbtn-ghost{ background:${C.surface}; color:${C.textMuted}; border:1.5px solid ${C.border}; }
 
 /* ---- Divers ---- */
 .rp-vide{

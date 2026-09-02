@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Plus, ArrowLeft, Loader2, HandHeart, X, AlertCircle,
   CheckCircle2, Clock, XCircle, Search, ShieldAlert, CalendarClock,
-  Info,
+  Info, WifiOff,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import { sauverCache, lireCache } from "./offlineCache";
 import { useVocabulaire } from "./useVocabulaire";
 import { de } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
@@ -47,27 +48,52 @@ export default function MembreAides({ membre, onBack }) {
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
   const [form, setForm] = useState({ type_aide: "", description: "", montant: "" });
+  const [depuisCache, setDepuisCache] = useState(false);
+  const [horodatageCache, setHorodatageCache] = useState(null);
 
   async function charger() {
-    const [aidesRes, sanctRes, baremeRes, eligRes] = await Promise.all([
-      supabase.from("aides_sociales").select("*")
-        .eq("membre_id", membre.id)
-        .order("created_at", { ascending: false }),
-      supabase.from("sanctions_acces").select("id")
-        .eq("membre_id", membre.id)
-        .eq("type_sanction", "aides_suspendues")
-        .is("date_levee", null),
-      supabase.from("bareme_prestations").select("*")
-        .eq("actif", true)
-        .order("ordre"),
-      supabase.rpc("verifier_eligibilite_prestation", { p_membre_id: membre.id }),
-    ]);
+    const idCache = `aides_${membre.id}`;
+    try {
+      const [aidesRes, sanctRes, baremeRes, eligRes] = await Promise.all([
+        supabase.from("aides_sociales").select("*")
+          .eq("membre_id", membre.id)
+          .order("created_at", { ascending: false }),
+        supabase.from("sanctions_acces").select("id")
+          .eq("membre_id", membre.id)
+          .eq("type_sanction", "aides_suspendues")
+          .is("date_levee", null),
+        supabase.from("bareme_prestations").select("*")
+          .eq("actif", true)
+          .order("ordre"),
+        supabase.rpc("verifier_eligibilite_prestation", { p_membre_id: membre.id }),
+      ]);
 
-    setAides(aidesRes.data || []);
-    setSuspendu((sanctRes.data || []).length > 0);
-    setBareme(baremeRes.data || []);
-    setEligibilite(eligRes.data?.[0] || null);
-    setLoading(false);
+      const resultat = {
+        aides: aidesRes.data || [],
+        suspendu: (sanctRes.data || []).length > 0,
+        bareme: baremeRes.data || [],
+        eligibilite: eligRes.data?.[0] || null,
+      };
+      sauverCache(idCache, resultat);
+
+      setAides(resultat.aides);
+      setSuspendu(resultat.suspendu);
+      setBareme(resultat.bareme);
+      setEligibilite(resultat.eligibilite);
+      setDepuisCache(false);
+      setLoading(false);
+    } catch (e) {
+      const secours = lireCache(idCache);
+      if (secours) {
+        setAides(secours.donnees.aides);
+        setSuspendu(secours.donnees.suspendu);
+        setBareme(secours.donnees.bareme);
+        setEligibilite(secours.donnees.eligibilite);
+        setDepuisCache(true);
+        setHorodatageCache(secours.horodatage);
+      }
+      setLoading(false);
+    }
   }
 
   useEffect(() => { charger(); }, [membre.id]);
@@ -178,6 +204,15 @@ export default function MembreAides({ membre, onBack }) {
           </button>
         )}
       </header>
+
+      {depuisCache && (
+        <div className="ma-hors-ligne">
+          <WifiOff size={14} />
+          Dernières données connues du{" "}
+          {new Date(horodatageCache).toLocaleDateString("fr-FR")} à{" "}
+          {new Date(horodatageCache).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
 
       {/* ---- Accès suspendu ---- */}
       {suspendu && (
@@ -486,6 +521,12 @@ const CSS = `
   transition:background .18s ease;
 }
 .ma-btn-new:hover{ background:${C.primaryDark}; }
+
+.ma-hors-ligne{
+  display:flex; align-items:center; gap:8px;
+  background:#FEF3C7; color:#92400E; border-radius:${R.md}px;
+  padding:10px 14px; font-size:12.5px; line-height:1.4;
+}
 
 /* ---- Blocage ---- */
 .ma-bloque{

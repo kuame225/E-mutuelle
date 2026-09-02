@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import {
   LogOut, UserCircle2, ArrowLeft, PowerOff, ShieldOff, ShieldCheck, CheckCircle2,
-  Users2, GraduationCap, Award, FileBarChart2,
+  Users2, GraduationCap, Award, FileBarChart2, WifiOff,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
+import { sauverCache, lireCache } from "./offlineCache";
 import { notifierMembre } from "./notifier";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
@@ -19,6 +20,7 @@ import MembreDashboard from "./MembreDashboard";
 import MembreAides from "./MembreAides";
 import MembreProfil from "./MembreProfil";
 import MembreBeneficiaires from "./MembreBeneficiaires";
+import MembreEpargneAvec from "./MembreEpargneAvec";
 
 import AdminLayout, { ADMIN_PAGES, PAGES_MODULES } from "./AdminLayout";
 import TableauBordFinancier from "./TableauBordFinancier";
@@ -36,7 +38,7 @@ import PartenairesPage from "./PartenairesPage";
 import ActiviteEconomiquePage from "./ActiviteEconomiquePage";
 import ProjetsPage from "./ProjetsPage";
 import PartageBeneficesPage from "./PartageBeneficesPage";
-import ClotureAvecPage from "./ClotureAvecPage";
+
 import MoyensPaiementPage from "./MoyensPaiementPage";
 import DeclarationsPaiementPage from "./DeclarationsPaiementPage";
 import AgendaPage from "./AgendaPage";
@@ -44,6 +46,7 @@ import CommunicationPage from "./CommunicationPage";
 import VueEnsemblePage from "./VueEnsemblePage";
 import AssembleesPage from "./AssembleesPage";
 import TontinePage from "./TontinePage";
+import EpargneAvecPage from "./EpargneAvecPage";
 import PretsPage from "./PretsPage";
 import ParametragePage from "./ParametragePage";
 import RapportsPage from "./RapportsPage";
@@ -472,6 +475,10 @@ function Shell() {
               <MembreBeneficiaires membre={membre} onBack={() => setPage("accueil")} />
             )}
 
+            {page === "epargne_avec" && (
+              <MembreEpargneAvec membre={membre} onBack={() => setPage("accueil")} />
+            )}
+
             {page === "cotisations" && (
               <PageMembre onBack={() => setPage("accueil")}>
                 <MembreCotisations membre={membre} />
@@ -585,13 +592,14 @@ function Shell() {
           {page === "activite_eco"  && <ActiviteEconomiquePage />}
           {page === "projets"       && <ProjetsPage />}
           {page === "partage_benefices" && <PartageBeneficesPage />}
-          {page === "cloture_avec" && <ClotureAvecPage />}
+
           {page === "operations"    && <OperationsDiversesPage />}
           {page === "comptabilite"  && <ComptabilitePage />}
           {page === "agenda"        && <AgendaPage />}
           {page === "communication" && <CommunicationPage />}
           {page === "assemblees"    && <AssembleesPage />}
           {page === "tontine"       && <TontinePage />}
+          {page === "epargne_avec"  && <EpargneAvecPage />}
           {page === "prets"         && <PretsPage />}
           {page === "parametrage"   && <ParametragePage />}
           {page === "rapports"      && <RapportsPage />}
@@ -777,20 +785,43 @@ function MembreCotisations({ membre }) {
   const [waveErreur, setWaveErreur] = useState("");
   const [selection, setSelection] = useState([]); // ids des cotisations cochées
   const [telechargementHistorique, setTelechargementHistorique] = useState(false);
+  const [depuisCache, setDepuisCache] = useState(false);
+  const [horodatageCache, setHorodatageCache] = useState(null);
 
   async function charger() {
-    const [{ data: cot }, { data: moy }, { data: decl }, { data: wave }] = await Promise.all([
-      supabase.from("cotisations").select("*").eq("membre_id", membre.id).order("periode", { ascending: false }),
-      supabase.from("moyens_paiement").select("*").eq("organisation_id", membre.organisation_id).eq("actif", true).order("ordre"),
-      supabase.from("declarations_paiement").select("cotisation_id, cotisation_ids, statut").eq("membre_id", membre.id).eq("statut", "en_attente"),
-      supabase.from("integrations_paiement").select("actif").eq("organisation_id", membre.organisation_id).eq("fournisseur", "wave").maybeSingle(),
-    ]);
-    setCotisations(cot || []);
-    setMoyens(moy || []);
-    setDeclarations(decl || []);
-    setWaveActif(Boolean(wave?.actif));
-    setSelection([]);
-    setLoading(false);
+    const idCache = `cotisations_${membre.id}`;
+    try {
+      const [{ data: cot }, { data: moy }, { data: decl }, { data: wave }] = await Promise.all([
+        supabase.from("cotisations").select("*").eq("membre_id", membre.id).order("periode", { ascending: false }),
+        supabase.from("moyens_paiement").select("*").eq("organisation_id", membre.organisation_id).eq("actif", true).order("ordre"),
+        supabase.from("declarations_paiement").select("cotisation_id, cotisation_ids, statut").eq("membre_id", membre.id).eq("statut", "en_attente"),
+        supabase.from("integrations_paiement").select("actif").eq("organisation_id", membre.organisation_id).eq("fournisseur", "wave").maybeSingle(),
+      ]);
+
+      const resultat = {
+        cotisations: cot || [], moyens: moy || [], declarations: decl || [], waveActif: Boolean(wave?.actif),
+      };
+      sauverCache(idCache, resultat);
+
+      setCotisations(resultat.cotisations);
+      setMoyens(resultat.moyens);
+      setDeclarations(resultat.declarations);
+      setWaveActif(resultat.waveActif);
+      setSelection([]);
+      setDepuisCache(false);
+      setLoading(false);
+    } catch (e) {
+      const secours = lireCache(idCache);
+      if (secours) {
+        setCotisations(secours.donnees.cotisations);
+        setMoyens(secours.donnees.moyens);
+        setDeclarations(secours.donnees.declarations);
+        setWaveActif(secours.donnees.waveActif);
+        setDepuisCache(true);
+        setHorodatageCache(secours.horodatage);
+      }
+      setLoading(false);
+    }
   }
 
   useEffect(() => { charger(); }, [membre.id]);
@@ -888,6 +919,19 @@ function MembreCotisations({ membre }) {
           </button>
         )}
       </div>
+
+      {depuisCache && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, background: "#FEF3C7",
+          color: "#92400E", borderRadius: 10, padding: "10px 14px", fontSize: 12.5,
+          marginBottom: 14, lineHeight: 1.4,
+        }}>
+          <WifiOff size={14} style={{ flexShrink: 0 }} />
+          Dernières données connues du{" "}
+          {new Date(horodatageCache).toLocaleDateString("fr-FR")} à{" "}
+          {new Date(horodatageCache).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
 
       {moyens.length > 0 && <MoyensPaiementApercu moyens={moyens} />}
 
@@ -1072,15 +1116,34 @@ function MembreFormations({ membre }) {
   const [mesPresences, setMesPresences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enCours, setEnCours] = useState(null);
+  const [depuisCache, setDepuisCache] = useState(false);
+  const [horodatageCache, setHorodatageCache] = useState(null);
 
   async function charger() {
-    const [{ data: f }, { data: p }] = await Promise.all([
-      supabase.from("formations").select("*").eq("organisation_id", membre.organisation_id).order("date_debut", { ascending: false }),
-      supabase.from("formation_presences").select("*").eq("membre_id", membre.id),
-    ]);
-    setFormations(f || []);
-    setMesPresences(p || []);
-    setLoading(false);
+    const idCache = `formations_${membre.id}`;
+    try {
+      const [{ data: f }, { data: p }] = await Promise.all([
+        supabase.from("formations").select("*").eq("organisation_id", membre.organisation_id).order("date_debut", { ascending: false }),
+        supabase.from("formation_presences").select("*").eq("membre_id", membre.id),
+      ]);
+
+      const resultat = { formations: f || [], mesPresences: p || [] };
+      sauverCache(idCache, resultat);
+
+      setFormations(resultat.formations);
+      setMesPresences(resultat.mesPresences);
+      setDepuisCache(false);
+      setLoading(false);
+    } catch (e) {
+      const secours = lireCache(idCache);
+      if (secours) {
+        setFormations(secours.donnees.formations);
+        setMesPresences(secours.donnees.mesPresences);
+        setDepuisCache(true);
+        setHorodatageCache(secours.horodatage);
+      }
+      setLoading(false);
+    }
   }
 
   useEffect(() => { charger(); }, [membre.id]);
@@ -1111,6 +1174,19 @@ function MembreFormations({ membre }) {
   return (
     <div>
       <h2 style={titrePage}>Formations</h2>
+
+      {depuisCache && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, background: "#FEF3C7",
+          color: "#92400E", borderRadius: 10, padding: "10px 14px", fontSize: 12.5,
+          marginBottom: 14, lineHeight: 1.4,
+        }}>
+          <WifiOff size={14} style={{ flexShrink: 0 }} />
+          Dernières données connues du{" "}
+          {new Date(horodatageCache).toLocaleDateString("fr-FR")} à{" "}
+          {new Date(horodatageCache).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
 
       {formations.length === 0 ? (
         <div style={carteVide}>Aucune formation pour le moment.</div>
@@ -1340,36 +1416,51 @@ const PRODUITS_MEMBRE_VISUELS = {
 function MembreCalendrier({ membre }) {
   const [evenements, setEvenements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [depuisCache, setDepuisCache] = useState(false);
+  const [horodatageCache, setHorodatageCache] = useState(null);
 
   async function charger() {
+    const idCache = `calendrier_${membre.id}`;
     const maintenant = new Date().toISOString();
 
-    const [{ data: assemblees }, { data: formations }] = await Promise.all([
-      supabase.from("assemblees")
-        .select("id, titre, date_prevue, lieu")
-        .eq("organisation_id", membre.organisation_id)
-        .gte("date_prevue", maintenant)
-        .order("date_prevue"),
-      supabase.from("formations")
-        .select("id, titre, date_debut, lieu")
-        .eq("organisation_id", membre.organisation_id)
-        .gte("date_debut", maintenant)
-        .order("date_debut"),
-    ]);
+    try {
+      const [{ data: assemblees }, { data: formations }] = await Promise.all([
+        supabase.from("assemblees")
+          .select("id, titre, date_prevue, lieu")
+          .eq("organisation_id", membre.organisation_id)
+          .gte("date_prevue", maintenant)
+          .order("date_prevue"),
+        supabase.from("formations")
+          .select("id, titre, date_debut, lieu")
+          .eq("organisation_id", membre.organisation_id)
+          .gte("date_debut", maintenant)
+          .order("date_debut"),
+      ]);
 
-    const liste = [
-      ...(assemblees || []).map((a) => ({
-        id: `assemblee-${a.id}`, type: "assemblee", titre: a.titre,
-        date: a.date_prevue, lieu: a.lieu,
-      })),
-      ...(formations || []).map((f) => ({
-        id: `formation-${f.id}`, type: "formation", titre: f.titre,
-        date: f.date_debut, lieu: f.lieu,
-      })),
-    ].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const liste = [
+        ...(assemblees || []).map((a) => ({
+          id: `assemblee-${a.id}`, type: "assemblee", titre: a.titre,
+          date: a.date_prevue, lieu: a.lieu,
+        })),
+        ...(formations || []).map((f) => ({
+          id: `formation-${f.id}`, type: "formation", titre: f.titre,
+          date: f.date_debut, lieu: f.lieu,
+        })),
+      ].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    setEvenements(liste);
-    setLoading(false);
+      sauverCache(idCache, liste);
+      setEvenements(liste);
+      setDepuisCache(false);
+      setLoading(false);
+    } catch (e) {
+      const secours = lireCache(idCache);
+      if (secours) {
+        setEvenements(secours.donnees);
+        setDepuisCache(true);
+        setHorodatageCache(secours.horodatage);
+      }
+      setLoading(false);
+    }
   }
 
   useEffect(() => { charger(); }, [membre.organisation_id]);
@@ -1383,6 +1474,19 @@ function MembreCalendrier({ membre }) {
   return (
     <div>
       <h2 style={titrePage}>Mon calendrier</h2>
+
+      {depuisCache && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, background: "#FEF3C7",
+          color: "#92400E", borderRadius: 10, padding: "10px 14px", fontSize: 12.5,
+          marginBottom: 14, lineHeight: 1.4,
+        }}>
+          <WifiOff size={14} style={{ flexShrink: 0 }} />
+          Dernières données connues du{" "}
+          {new Date(horodatageCache).toLocaleDateString("fr-FR")} à{" "}
+          {new Date(horodatageCache).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
 
       {evenements.length === 0 ? (
         <div style={carteVide}>Rien de prévu pour le moment.</div>
@@ -1435,36 +1539,51 @@ function MembreCalendrier({ membre }) {
 function MembreHistorique({ membre }) {
   const [evenements, setEvenements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [depuisCache, setDepuisCache] = useState(false);
+  const [horodatageCache, setHorodatageCache] = useState(null);
 
   async function charger() {
-    const [{ data: assPresences }, { data: formPresences }] = await Promise.all([
-      supabase.from("assemblee_presences")
-        .select("present, emarge_le, assemblees(titre, date_prevue, lieu)")
-        .eq("membre_id", membre.id)
-        .eq("present", true),
-      supabase.from("formation_presences")
-        .select("statut, formations(titre, date_debut, lieu)")
-        .eq("membre_id", membre.id)
-        .eq("statut", "present"),
-    ]);
+    const idCache = `historique_${membre.id}`;
+    try {
+      const [{ data: assPresences }, { data: formPresences }] = await Promise.all([
+        supabase.from("assemblee_presences")
+          .select("present, emarge_le, assemblees(titre, date_prevue, lieu)")
+          .eq("membre_id", membre.id)
+          .eq("present", true),
+        supabase.from("formation_presences")
+          .select("statut, formations(titre, date_debut, lieu)")
+          .eq("membre_id", membre.id)
+          .eq("statut", "present"),
+      ]);
 
-    const liste = [
-      ...(assPresences || [])
-        .filter((p) => p.assemblees)
-        .map((p, i) => ({
-          id: `assemblee-${i}`, type: "assemblee", titre: p.assemblees.titre,
-          date: p.assemblees.date_prevue, lieu: p.assemblees.lieu,
-        })),
-      ...(formPresences || [])
-        .filter((p) => p.formations)
-        .map((p, i) => ({
-          id: `formation-${i}`, type: "formation", titre: p.formations.titre,
-          date: p.formations.date_debut, lieu: p.formations.lieu,
-        })),
-    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const liste = [
+        ...(assPresences || [])
+          .filter((p) => p.assemblees)
+          .map((p, i) => ({
+            id: `assemblee-${i}`, type: "assemblee", titre: p.assemblees.titre,
+            date: p.assemblees.date_prevue, lieu: p.assemblees.lieu,
+          })),
+        ...(formPresences || [])
+          .filter((p) => p.formations)
+          .map((p, i) => ({
+            id: `formation-${i}`, type: "formation", titre: p.formations.titre,
+            date: p.formations.date_debut, lieu: p.formations.lieu,
+          })),
+      ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    setEvenements(liste);
-    setLoading(false);
+      sauverCache(idCache, liste);
+      setEvenements(liste);
+      setDepuisCache(false);
+      setLoading(false);
+    } catch (e) {
+      const secours = lireCache(idCache);
+      if (secours) {
+        setEvenements(secours.donnees);
+        setDepuisCache(true);
+        setHorodatageCache(secours.horodatage);
+      }
+      setLoading(false);
+    }
   }
 
   useEffect(() => { charger(); }, [membre.id]);
@@ -1478,6 +1597,19 @@ function MembreHistorique({ membre }) {
   return (
     <div>
       <h2 style={titrePage}>Mon historique</h2>
+
+      {depuisCache && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, background: "#FEF3C7",
+          color: "#92400E", borderRadius: 10, padding: "10px 14px", fontSize: 12.5,
+          marginBottom: 14, lineHeight: 1.4,
+        }}>
+          <WifiOff size={14} style={{ flexShrink: 0 }} />
+          Dernières données connues du{" "}
+          {new Date(horodatageCache).toLocaleDateString("fr-FR")} à{" "}
+          {new Date(horodatageCache).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
 
       {evenements.length === 0 ? (
         <div style={carteVide}>Aucune participation enregistrée pour le moment.</div>
@@ -1532,19 +1664,45 @@ function MembreDocuments({ membre }) {
   const [erreur, setErreur] = useState("");
   const [message, setMessage] = useState("");
   const [produitADeclarer, setProduitADeclarer] = useState(null);
+  const [depuisCache, setDepuisCache] = useState(false);
+  const [horodatageCache, setHorodatageCache] = useState(null);
 
   async function charger() {
-    const [{ data: p }, { data: a }, { data: d }, { data: m }] = await Promise.all([
-      supabase.from("produits_membre").select("*").eq("actif", true),
-      supabase.from("achats_membre").select("produit_code").eq("membre_id", membre.id),
-      supabase.from("declarations_paiement_membre").select("produit_code").eq("membre_id", membre.id).eq("statut", "en_attente"),
-      supabase.from("moyens_paiement_plateforme").select("*").eq("actif", true),
-    ]);
-    setProduits(p || []);
-    setAchats((a || []).map((x) => x.produit_code));
-    setDeclarationsEnAttente((d || []).map((x) => x.produit_code));
-    setMoyens(m || []);
-    setLoading(false);
+    const idCache = `documents_${membre.id}`;
+    try {
+      const [{ data: p }, { data: a }, { data: d }, { data: m }] = await Promise.all([
+        supabase.from("produits_membre").select("*").eq("actif", true),
+        supabase.from("achats_membre").select("produit_code").eq("membre_id", membre.id),
+        supabase.from("declarations_paiement_membre").select("produit_code").eq("membre_id", membre.id).eq("statut", "en_attente"),
+        supabase.from("moyens_paiement_plateforme").select("*").eq("actif", true),
+      ]);
+
+      const resultat = {
+        produits: p || [],
+        achats: (a || []).map((x) => x.produit_code),
+        declarationsEnAttente: (d || []).map((x) => x.produit_code),
+        moyens: m || [],
+      };
+      sauverCache(idCache, resultat);
+
+      setProduits(resultat.produits);
+      setAchats(resultat.achats);
+      setDeclarationsEnAttente(resultat.declarationsEnAttente);
+      setMoyens(resultat.moyens);
+      setDepuisCache(false);
+      setLoading(false);
+    } catch (e) {
+      const secours = lireCache(idCache);
+      if (secours) {
+        setProduits(secours.donnees.produits);
+        setAchats(secours.donnees.achats);
+        setDeclarationsEnAttente(secours.donnees.declarationsEnAttente);
+        setMoyens(secours.donnees.moyens);
+        setDepuisCache(true);
+        setHorodatageCache(secours.horodatage);
+      }
+      setLoading(false);
+    }
   }
 
   useEffect(() => { charger(); }, [membre.id]);
@@ -1575,6 +1733,19 @@ function MembreDocuments({ membre }) {
   return (
     <div>
       <h2 style={titrePage}>Mes documents</h2>
+
+      {depuisCache && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, background: "#FEF3C7",
+          color: "#92400E", borderRadius: 10, padding: "10px 14px", fontSize: 12.5,
+          marginBottom: 14, lineHeight: 1.4,
+        }}>
+          <WifiOff size={14} style={{ flexShrink: 0 }} />
+          Dernières données connues du{" "}
+          {new Date(horodatageCache).toLocaleDateString("fr-FR")} à{" "}
+          {new Date(horodatageCache).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
 
       {message && (
         <div style={{ background: "#DCFCE7", color: C.success, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>

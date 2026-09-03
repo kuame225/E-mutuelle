@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Coins, Plus, Loader2, Calendar, Users, ChevronLeft,
   AlertCircle, PartyPopper, History, Search, TrendingUp, Wallet,
@@ -6,6 +6,9 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
+import { ecrireOuMettreEnFile, surChangementFile } from "./offlineQueue";
+import { ressembleAUneCoupureReseau } from "./offlineCache";
+import IndicateurFileAttente from "./IndicateurFileAttente";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 function montant(v) {
@@ -415,6 +418,16 @@ function FicheCycle({ cycle, onRefresh }) {
 
   useEffect(() => { charger(); }, [cycle.id]);
 
+  // Dès qu'un élément de la file d'attente se synchronise avec succès
+  // (la file rétrécit), les données rechargent — sans ça, un achat de
+  // parts saisi hors ligne resterait invisible dans la liste normale
+  // même une fois réellement enregistré en base.
+  const tailleFilePrecedente = useRef(0);
+  useEffect(() => surChangementFile((file) => {
+    if (file.length < tailleFilePrecedente.current) charger();
+    tailleFilePrecedente.current = file.length;
+  }), [cycle.id]);
+
   async function creerReunion() {
     if (!dateReunion) { setErreur("Choisissez une date."); return; }
     setEnCours(true);
@@ -609,6 +622,7 @@ function FicheCycle({ cycle, onRefresh }) {
                         )
                       ) : (
                         <>
+                          <IndicateurFileAttente />
                           <SectionPresence
                             reunion={r} cycle={cycle}
                             presencesReunion={presences.filter((p) => p.reunion_id === r.id)}
@@ -697,7 +711,14 @@ function VerificationCaisse({ reunion, onVerifie }) {
     });
 
     setEnCours(false);
-    if (error) { setErreur(error.message); return; }
+    if (error) {
+      setErreur(
+        ressembleAUneCoupureReseau(error)
+          ? "La vérification de caisse compare en direct ce qui est attendu — elle a besoin d'une connexion, même brève. Réessayez dès que le réseau revient."
+          : error.message
+      );
+      return;
+    }
     setResultat(data);
   }
 
@@ -878,17 +899,23 @@ function SectionPresence({ reunion, cycle, presencesReunion, presencesCycle, onC
     else if (statut === "absent_injustifie") montantDu = cycle.montant_amende_absence || 0;
 
     const existant = presenceIciParMembre[membreId];
-    const { error } = existant
-      ? await supabase.from("avec_presences")
-          .update({ statut, montant_du: montantDu }).eq("id", existant.id)
-      : await supabase.from("avec_presences").insert({
-          reunion_id: reunion.id, organisation_id: params.organisation_id,
-          membre_id: membreId, statut, montant_du: montantDu,
+    const { enFile, error } = existant
+      ? await ecrireOuMettreEnFile({
+          type: "update", table: "avec_presences",
+          donnees: { statut, montant_du: montantDu },
+          filtre: { id: existant.id },
+        })
+      : await ecrireOuMettreEnFile({
+          type: "insert", table: "avec_presences",
+          donnees: {
+            reunion_id: reunion.id, organisation_id: params.organisation_id,
+            membre_id: membreId, statut, montant_du: montantDu,
+          },
         });
 
     setEnCours(null);
     if (error) { setErreur(error.message); return; }
-    onChange();
+    if (!enFile) onChange();
   }
 
   async function encaisserTout(membreId) {
@@ -899,14 +926,20 @@ function SectionPresence({ reunion, cycle, presencesReunion, presencesCycle, onC
       (p) => p.membre_id === membreId && (p.montant_du || 0) > (p.montant_paye || 0)
     );
 
+    let auMoinsUneEnFile = false;
+
     for (const p of aRegler) {
-      const { error } = await supabase.from("avec_presences")
-        .update({ montant_paye: p.montant_du }).eq("id", p.id);
+      const { enFile, error } = await ecrireOuMettreEnFile({
+        type: "update", table: "avec_presences",
+        donnees: { montant_paye: p.montant_du },
+        filtre: { id: p.id },
+      });
       if (error) { setErreur(error.message); setEnCours(null); return; }
+      if (enFile) auMoinsUneEnFile = true;
     }
 
     setEnCours(null);
-    onChange();
+    if (!auMoinsUneEnFile) onChange();
   }
 
   return (
@@ -995,18 +1028,22 @@ function SaisieParts({ reunion, cycle, achats, onChange }) {
     setEnCours(membreId);
     setErreur("");
 
-    const { error } = await supabase.from("avec_achats_parts").insert({
-      reunion_id: reunion.id,
-      organisation_id: params.organisation_id,
-      membre_id: membreId,
-      nombre_parts: n,
-      montant: n * cycle.valeur_part,
+    const { enFile, error } = await ecrireOuMettreEnFile({
+      type: "insert",
+      table: "avec_achats_parts",
+      donnees: {
+        reunion_id: reunion.id,
+        organisation_id: params.organisation_id,
+        membre_id: membreId,
+        nombre_parts: n,
+        montant: n * cycle.valeur_part,
+      },
     });
 
     setEnCours(null);
     if (error) { setErreur(error.message); return; }
     setRecherche("");
-    onChange();
+    if (!enFile) onChange();
   }
 
   return (
@@ -1116,7 +1153,14 @@ function SectionCredits({ reunion, cycle, params }) {
     });
 
     setEnCours(false);
-    if (error) { setErreur(error.message); return; }
+    if (error) {
+      setErreur(
+        ressembleAUneCoupureReseau(error)
+          ? "L'octroi d'un crédit vérifie l'éligibilité en direct (liquidités, prêts en cours) — il a besoin d'une connexion, même brève. Réessayez dès que le réseau revient."
+          : error.message
+      );
+      return;
+    }
 
     const typeChoisiObj = types.find((t) => t.id === typeChoisi);
     setPretASigner({
@@ -1140,10 +1184,16 @@ function SectionCredits({ reunion, cycle, params }) {
   // copier. Le téléphone passe au membre pour ce seul geste.
   async function signer() {
     setSignatureEnCours(true);
-    const { error } = await supabase.rpc("confirmer_signature_pret", { p_pret_id: pretASigner.id });
+    const { enFile, error } = await ecrireOuMettreEnFile({
+      type: "rpc", fonction: "confirmer_signature_pret", parametres: { p_pret_id: pretASigner.id },
+    });
     setSignatureEnCours(false);
     if (error) { setErreur(error.message); return; }
-    setSucces(`Prêt accordé et signé par ${pretASigner.membreNom}.`);
+    setSucces(
+      enFile
+        ? `Signature de ${pretASigner.membreNom} enregistrée — sera confirmée dès le retour du réseau.`
+        : `Prêt accordé et signé par ${pretASigner.membreNom}.`
+    );
     setPretASigner(null);
   }
 

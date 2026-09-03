@@ -91,8 +91,8 @@ const ORDRE_TYPES = ["mutuelle", "association", "cooperative", "ong", "avec", "p
 // encore non couverts (coopérative, ONG, AVEC, professionnelle...)
 // reviendrait à fabriquer un faux témoignage client.
 const ORGANISATIONS = [
-  { logo: "/logo-mephda.png", nom: "MAEPHDA — Mutuelle des Agents de l'EPHD de Dabakala", secteur: "Santé" },
-  { init: "FD", nom: "FDSD — Famille District Sanitaire de Daloa", secteur: "Santé" },
+  { logo: "/logo-maephda.png", nom: "MAEPHDA — Mutuelle des Agents de l'EPHD de Dabakala", secteur: "Santé" },
+  { logo: "/logo-fdsd.png", nom: "FDSD — Famille District Sanitaire de Daloa", secteur: "Santé" },
   { init: "LQ", nom: "Les Quêteuses", secteur: "Association religieuse" },
 ];
 
@@ -734,11 +734,11 @@ section{ padding:88px 0; }
 .lp-marquee-outer:hover .lp-marquee-track{ animation-play-state:paused; }
 @keyframes lpOrgScroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
 @media (prefers-reduced-motion: reduce){ .lp-marquee-track{ animation:none; flex-wrap:wrap; width:auto; } .lp-marquee-outer{ overflow:visible; -webkit-mask-image:none; mask-image:none; } }
-.lp-org-chip{ display:flex; align-items:center; gap:11px; background:${C.bg}; border:1px solid ${C.border}; border-radius:${R.md}px; padding:13px 16px; width:270px; flex-shrink:0; }
-.lp-org-badge{ width:34px; height:34px; border-radius:${R.md}px; background:${C.primary}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0; overflow:hidden; }
+.lp-org-chip{ display:flex; align-items:center; gap:14px; background:${C.bg}; border:1px solid ${C.border}; border-radius:${R.lg}px; padding:15px 18px; width:310px; flex-shrink:0; }
+.lp-org-badge{ width:58px; height:58px; border-radius:${R.md}px; background:${C.primary}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex-shrink:0; overflow:hidden; }
 .lp-org-badge img{ width:100%; height:100%; object-fit:contain; background:#fff; }
-.lp-org-nom{ font-size:13px; font-weight:600; line-height:1.3; }
-.lp-org-secteur{ font-size:11px; color:${C.textSubtle}; }
+.lp-org-nom{ font-size:14px; font-weight:600; line-height:1.3; }
+.lp-org-secteur{ font-size:12px; color:${C.textSubtle}; }
 
 .lp-trust-grid{ display:grid; grid-template-columns:1fr 1fr; gap:52px; align-items:center; }
 @media (max-width:860px){ .lp-trust-grid{ grid-template-columns:1fr; gap:32px; } }

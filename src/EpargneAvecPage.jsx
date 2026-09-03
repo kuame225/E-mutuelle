@@ -70,7 +70,12 @@ export default function EpargneAvecPage() {
   }
 
   if (active) {
-    return <FicheCycle cycle={active} onRefresh={charger} />;
+    return (
+      <FicheCycle
+        cycle={active} onRefresh={charger}
+        onGererGardiens={() => setGestionGardiens(true)}
+      />
+    );
   }
 
   return (
@@ -379,7 +384,7 @@ function CreationCycle({ onBack, onCree }) {
 
 /* ---------------- Fiche du cycle actif ---------------- */
 
-function FicheCycle({ cycle, onRefresh }) {
+function FicheCycle({ cycle, onRefresh, onGererGardiens }) {
   const { params } = useParametrage();
   const [reunions, setReunions] = useState([]);
   const [achats, setAchats] = useState([]);
@@ -512,9 +517,14 @@ function FicheCycle({ cycle, onRefresh }) {
             <Calendar size={13} /> Démarré le {new Date(cycle.date_debut).toLocaleDateString("fr-FR")}
           </p>
         </div>
-        <button className="av-btn-cloture" onClick={() => setConfirmationCloture(true)}>
-          <PartyPopper size={15} /> Clôturer le cycle
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className="av-btn-ghost" onClick={onGererGardiens}>
+            <KeyRound size={15} /> Gardiens des clés
+          </button>
+          <button className="av-btn-cloture" onClick={() => setConfirmationCloture(true)}>
+            <PartyPopper size={15} /> Clôturer le cycle
+          </button>
+        </div>
       </header>
 
       <div className="av-kpis">

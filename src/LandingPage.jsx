@@ -91,7 +91,7 @@ const ORDRE_TYPES = ["mutuelle", "association", "cooperative", "ong", "avec", "p
 // encore non couverts (coopérative, ONG, AVEC, professionnelle...)
 // reviendrait à fabriquer un faux témoignage client.
 const ORGANISATIONS = [
-  { logo: "/logo-babamoo.png", nom: "MAEPHDA — Mutuelle des Agents de l'EPHD de Dabakala", secteur: "Santé" },
+  { logo: "/logo-mephda.png", nom: "MAEPHDA — Mutuelle des Agents de l'EPHD de Dabakala", secteur: "Santé" },
   { init: "FD", nom: "FDSD — Famille District Sanitaire de Daloa", secteur: "Santé" },
   { init: "LQ", nom: "Les Quêteuses", secteur: "Association religieuse" },
 ];
@@ -495,8 +495,8 @@ section{ padding:88px 0; }
 
 .lp-header{ position:sticky; top:0; z-index:50; background:rgba(255,255,255,.92); backdrop-filter:blur(8px); border-bottom:1px solid ${C.border}; }
 .lp-nav{ max-width:1180px; margin:0 auto; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; }
-.lp-wordmark{ font-size:18px; font-weight:700; color:${C.primary}; display:flex; align-items:center; gap:9px; }
-.lp-mark{ width:30px; height:30px; border-radius:${R.md}px; background:${C.surface}; border:1px solid ${C.border}; display:flex; align-items:center; justify-content:center; padding:4px; }
+.lp-wordmark{ font-size:20px; font-weight:700; color:${C.primary}; display:flex; align-items:center; gap:11px; }
+.lp-mark{ width:56px; height:56px; border-radius:${R.md}px; background:${C.surface}; border:1px solid ${C.border}; display:flex; align-items:center; justify-content:center; padding:2px; }
 .lp-mark img{ width:100%; height:100%; object-fit:contain; }
 
 .lp-nav-actions{ display:flex; align-items:center; gap:16px; }
@@ -569,15 +569,15 @@ section{ padding:88px 0; }
   content:""; position:absolute; left:50%; top:5px; transform:translateX(-50%);
   width:60px; height:3px; background:#3A4368; border-radius:2px;
 }
-.illus-barre-titre{ display:flex; align-items:center; gap:6px; margin-bottom:14px; }
+.illus-barre-titre{ display:flex; align-items:center; gap:8px; margin-bottom:16px; }
 .illus-logo-badge{
-  width:16px; height:16px; border-radius:5px; flex-shrink:0;
+  width:26px; height:26px; border-radius:7px; flex-shrink:0;
   background:${C.surface}; border:1px solid ${C.border};
   display:flex; align-items:center; justify-content:center; padding:2px;
 }
 .illus-logo-badge img{ width:100%; height:100%; object-fit:contain; }
-.illus-logo-badge-petit{ width:13px; height:13px; border-radius:4px; }
-.illus-marque-texte{ font-size:10.5px; font-weight:700; color:${C.textMuted}; }
+.illus-logo-badge-petit{ width:20px; height:20px; border-radius:6px; }
+.illus-marque-texte{ font-size:12px; font-weight:700; color:${C.textMuted}; }
 
 .illus-vue{ position:absolute; inset:42px 18px 16px; }
 .illus-vue-a{ animation:illusVueA 10s ease-in-out infinite; }

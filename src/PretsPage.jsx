@@ -507,14 +507,24 @@ function CatalogueTypesPret({ onBack }) {
   }
 
   async function basculerActif(t) {
-    await supabase.from("types_pret").update({ actif: !t.actif })
+    setErreur("");
+    const { error } = await supabase.from("types_pret").update({ actif: !t.actif })
       .eq("id", t.id).eq("organisation_id", params.organisation_id);
+    if (error) {
+      setErreur("Le changement n'a pas abouti. Vérifiez votre connexion et réessayez.");
+      return;
+    }
     charger();
   }
 
   async function supprimer(id) {
-    await supabase.from("types_pret").delete()
+    setErreur("");
+    const { error } = await supabase.from("types_pret").delete()
       .eq("id", id).eq("organisation_id", params.organisation_id);
+    if (error) {
+      setErreur("La suppression n'a pas abouti — ce type est peut-être déjà utilisé par un prêt existant.");
+      return;
+    }
     charger();
   }
 
@@ -531,6 +541,12 @@ function CatalogueTypesPret({ onBack }) {
           <Plus size={16} /> Nouveau type
         </button>
       </div>
+
+      {erreur && !edition && (
+        <div className="pr-erreur" style={{ marginBottom: 14 }}>
+          <AlertCircle size={15} /> {erreur}
+        </div>
+      )}
 
       {loading ? <div className="pr-sk" /> : types.length === 0 ? (
         <div className="pr-vide">Aucun type de prêt configuré pour l'instant.</div>

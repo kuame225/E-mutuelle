@@ -143,8 +143,12 @@ function FicheFormation({ formation, onBack, onDelete, onUpdate }) {
 
   async function retirer(p) {
     setEnCours(true);
-    await supabase.from("formation_presences").delete().eq("id", p.id);
+    const { error } = await supabase.from("formation_presences").delete().eq("id", p.id);
     setEnCours(false);
+    if (error) {
+      setMessage({ type: "err", texte: "Le retrait n'a pas abouti. Vérifiez votre connexion et réessayez." });
+      return;
+    }
     charger();
   }
 

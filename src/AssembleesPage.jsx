@@ -282,19 +282,32 @@ function FicheAssemblee({ assemblee, onBack, onRefresh }) {
 
   async function cloturer() {
     setEnCours(true);
-    await supabase.from("assemblees")
+    setErreur("");
+    const { error } = await supabase.from("assemblees")
       .update({ statut: "cloturee" })
       .eq("id", assemblee.id).eq("organisation_id", assemblee.organisation_id);
     setEnCours(false);
+    if (error) {
+      setErreur("La clôture n'a pas abouti. Vérifiez votre connexion et réessayez.");
+      return;
+    }
     onRefresh();
   }
 
   async function enregistrerPvTexte() {
     setEnCours(true);
-    await supabase.from("assemblees")
+    setErreur("");
+    const { error } = await supabase.from("assemblees")
       .update({ pv_texte: pvTexte.trim() || null })
       .eq("id", assemblee.id).eq("organisation_id", assemblee.organisation_id);
     setEnCours(false);
+    if (error) {
+      setErreur(
+        "Le procès-verbal n'a pas pu être enregistré — ne quittez pas cet écran, " +
+        "votre texte est encore là. Vérifiez votre connexion et réessayez."
+      );
+      return;
+    }
     onRefresh();
   }
 

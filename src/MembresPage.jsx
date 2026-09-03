@@ -788,8 +788,12 @@ function FicheMembre({ membre, onBack, onUpdate }) {
   async function retirerPhoto() {
     setUpload(true);
     setErreur("");
-    await supabase.from("membres").update({ photo_url: null }).eq("id", membre.id);
+    const { error } = await supabase.from("membres").update({ photo_url: null }).eq("id", membre.id);
     setUpload(false);
+    if (error) {
+      setErreur("Le retrait de la photo n'a pas abouti. Vérifiez votre connexion et réessayez.");
+      return;
+    }
     onUpdate({ ...membre, photo_url: null });
   }
 

@@ -1199,6 +1199,7 @@ function MembreFormations({ membre }) {
   const [mesPresences, setMesPresences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enCours, setEnCours] = useState(null);
+  const [erreurAction, setErreurAction] = useState("");
   const [depuisCache, setDepuisCache] = useState(false);
   const [horodatageCache, setHorodatageCache] = useState(null);
 
@@ -1247,20 +1248,30 @@ function MembreFormations({ membre }) {
 
   async function inscrire(formation) {
     setEnCours(formation.id);
-    await supabase.from("formation_presences").insert({
+    setErreurAction("");
+    const { error } = await supabase.from("formation_presences").insert({
       formation_id: formation.id,
       organisation_id: membre.organisation_id,
       membre_id: membre.id,
       statut: "inscrit",
     });
     setEnCours(null);
+    if (error) {
+      setErreurAction("L'inscription n'a pas abouti. Vérifiez votre connexion et réessayez.");
+      return;
+    }
     charger();
   }
 
   async function seDesinscrire(presence) {
     setEnCours(presence.formation_id);
-    await supabase.from("formation_presences").delete().eq("id", presence.id);
+    setErreurAction("");
+    const { error } = await supabase.from("formation_presences").delete().eq("id", presence.id);
     setEnCours(null);
+    if (error) {
+      setErreurAction("La désinscription n'a pas abouti. Vérifiez votre connexion et réessayez.");
+      return;
+    }
     charger();
   }
 
@@ -1269,6 +1280,15 @@ function MembreFormations({ membre }) {
   return (
     <div>
       <h2 style={titrePage}>Formations</h2>
+
+      {erreurAction && (
+        <div style={{
+          background: "#FEE2E2", color: C.danger, borderRadius: 10,
+          padding: "11px 14px", fontSize: 13, marginBottom: 14, lineHeight: 1.4,
+        }}>
+          {erreurAction}
+        </div>
+      )}
 
       {depuisCache && (
         <div style={{

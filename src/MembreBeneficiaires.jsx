@@ -95,8 +95,13 @@ export default function MembreBeneficiaires({ membre, onBack }) {
 
   async function supprimer(id) {
     setEnvoi(true);
-    await supabase.from("beneficiaires").delete().eq("id", id);
+    setErreur("");
+    const { error } = await supabase.from("beneficiaires").delete().eq("id", id);
     setEnvoi(false);
+    if (error) {
+      setErreur("La suppression n'a pas abouti. Vérifiez votre connexion et réessayez.");
+      return;
+    }
     setConfirmation(null);
     charger();
   }
@@ -316,6 +321,13 @@ export default function MembreBeneficiaires({ membre, onBack }) {
               <strong>{confirmation.nom}</strong> ne figurera plus parmi vos
               bénéficiaires déclarés. Cette action est définitive.
             </p>
+
+            {erreur && (
+              <div className="bf-erreur">
+                <AlertCircle size={16} /> {erreur}
+              </div>
+            )}
+
             <div className="bf-modal-actions">
               <button
                 className="bf-btn bf-btn-ghost"

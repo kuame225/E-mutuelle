@@ -251,8 +251,13 @@ function SectionWave({ organisationId }) {
 
   async function desactiver() {
     setEnCours(true);
-    await supabase.rpc("desactiver_integration_wave", { p_organisation_id: organisationId });
+    setErreur("");
+    const { error } = await supabase.rpc("desactiver_integration_wave", { p_organisation_id: organisationId });
     setEnCours(false);
+    if (error) {
+      setErreur("La désactivation n'a pas abouti. Vérifiez votre connexion et réessayez.");
+      return;
+    }
     charger();
   }
 

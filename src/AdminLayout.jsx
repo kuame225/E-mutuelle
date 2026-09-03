@@ -4,7 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
-  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake, Heart, Eye, Coins,
+  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake, Heart, Eye, Coins, HelpCircle,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -50,6 +50,7 @@ export const NAV_GROUPS = [
       { id: "cotisations",  label: (mot) => mot("cotisations"), icon: Receipt },
       { id: "moyens_paiement", label: "Moyens de paiement", icon: Smartphone },
       { id: "declarations_paiement", label: "Paiements déclarés", icon: ClipboardCheck },
+      { id: "suivi_wave", label: "Suivi des paiements Wave", icon: Wallet },
       { id: "operations",   label: "Opérations diverses",       icon: ArrowLeftRight },
       { id: "comptabilite", label: "Comptabilité",              icon: Wallet },
     ],
@@ -91,6 +92,7 @@ export const NAV_GROUPS = [
       { id: "journal",     label: "Journal d'activité",             icon: ScrollText },
       { id: "roles",       label: (mot) => `Rôles ${mot("bureau_du")}`, icon: KeyRound },
       { id: "offres_baamo", label: "Offres Babamoo",                  icon: Megaphone },
+      { id: "aide_support", label: "Aide et support",                icon: HelpCircle },
       { id: "parametrage", label: "Paramètres",                     icon: Settings },
     ],
   },
@@ -125,6 +127,7 @@ function sousTitresPour(mot) {
     cotisations:   "Suivi des échéances et paiements",
     moyens_paiement: "Lien, numéro et QR à afficher aux membres",
     declarations_paiement: "Paiements signalés par les membres, à confirmer",
+    suivi_wave: "Chaque lien envoyé, et s'il a réellement mené à un paiement confirmé",
     operations:    `Dons, subventions et frais ${mot("organisation_de")}`,
     comptabilite:  "Entrées, sorties et balance",
     aides_admin:   `Instruction des demandes (${mot("aides").toLowerCase()})`,
@@ -148,6 +151,7 @@ function sousTitresPour(mot) {
     journal:       "Connexions et actions sensibles",
     roles:         `Qui fait quoi dans ${mot("bureau_le")}`,
     offres_baamo:  "Ce que Babamoo propose en plus, pour votre organisation",
+    aide_support: "Questions fréquentes, contact direct et formulaire de support",
     sanctions:     "Suivi des sanctions d'accès",
   };
 }

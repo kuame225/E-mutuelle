@@ -4,7 +4,7 @@ import {
   AlertCircle, Heart, Baby, UserRound, User, WifiOff,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { sauverCache, lireCache } from "./offlineCache";
+import { sauverCache, lireCache, ressembleAUneCoupureReseau } from "./offlineCache";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 const LIENS = [
@@ -31,12 +31,21 @@ export default function MembreBeneficiaires({ membre, onBack }) {
 
   async function charger() {
     const idCache = `beneficiaires_${membre.id}`;
+
+    const dejaEnCache = lireCache(idCache);
+    if (dejaEnCache) {
+      setListe(dejaEnCache.donnees);
+      setLoading(false);
+    }
+
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("beneficiaires")
         .select("*")
         .eq("membre_id", membre.id)
         .order("created_at", { ascending: true });
+
+      if (error && ressembleAUneCoupureReseau(error)) throw error;
 
       sauverCache(idCache, data || []);
       setListe(data || []);

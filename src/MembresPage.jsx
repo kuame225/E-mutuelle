@@ -4,10 +4,11 @@ import {
   CalendarDays, Camera, Loader2, Trash2, CheckCircle2,
   Clock, AlertTriangle, Users, KeyRound, Copy, Check, ShieldCheck, UserPlus,
   Smartphone, Receipt, CalendarCheck, LogOut, Undo2, Info, Coins, Pencil,
-  Heart, Baby, UserRound, User,
+  Heart, Baby, UserRound, User, FileSpreadsheet,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage, construireMatricule, dateEligibilite, moduleActif } from "./useParametrage";
+import ImportMembresModal from "./ImportMembresModal";
 import { useVocabulaire } from "./useVocabulaire";
 import { de } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
@@ -96,6 +97,7 @@ export default function MembresPage() {
   const [filtre, setFiltre] = useState("tous");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [import_, setImport] = useState(false);
 
   async function charger() {
     setLoading(true);
@@ -180,14 +182,19 @@ export default function MembresPage() {
 
       {/* ---- Recherche et filtres ---- */}
       <div className="mb-tools">
-        <div className="mb-search">
-          <Search size={17} className="mb-search-icon" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Rechercher ${mot("membre_un")}…`}
-            className="mb-input"
-          />
+        <div className="mb-search-ligne">
+          <div className="mb-search">
+            <Search size={17} className="mb-search-icon" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Rechercher ${mot("membre_un")}…`}
+              className="mb-input"
+            />
+          </div>
+          <button className="mb-btn-import" onClick={() => setImport(true)}>
+            <FileSpreadsheet size={15} /> Importer
+          </button>
         </div>
 
         <div className="mb-filters">
@@ -261,6 +268,14 @@ export default function MembresPage() {
             );
           })}
         </ul>
+      )}
+
+      {import_ && (
+        <ImportMembresModal
+          organisationId={params.organisation_id}
+          onClose={() => setImport(false)}
+          onTermine={() => { setImport(false); charger(); }}
+        />
       )}
     </div>
   );
@@ -1720,7 +1735,15 @@ const CSS = `
 
 /* ---- Outils ---- */
 .mb-tools{ display:flex; flex-direction:column; gap:${S.md}px; }
-.mb-search{ position:relative; max-width:400px; }
+.mb-search-ligne{ display:flex; gap:10px; align-items:center; }
+.mb-search{ position:relative; max-width:400px; flex:1; }
+.mb-btn-import{
+  display:flex; align-items:center; gap:7px; flex-shrink:0;
+  background:${C.surface}; border:1.5px solid ${C.border}; color:${C.textMuted};
+  border-radius:${R.md}px; padding:12px 16px; cursor:pointer;
+  font-family:inherit; font-size:13.5px; font-weight:600;
+}
+.mb-btn-import:hover{ border-color:${C.primary}; color:${C.primary}; }
 .mb-search-icon{ position:absolute; left:14px; top:50%; transform:translateY(-50%); color:${C.textSubtle}; }
 .mb-input{
   width:100%; box-sizing:border-box; padding:13px 16px 13px 42px;

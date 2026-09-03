@@ -787,9 +787,12 @@ const CSS = `
 .rp-onglets{
   display:flex; gap:4px; background:${C.bg};
   padding:4px; border-radius:${R.md}px; align-self:flex-start;
+  max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
 }
+.rp-onglets::-webkit-scrollbar{ display:none; }
 .rp-onglet{
-  display:flex; align-items:center; gap:8px;
+  display:flex; align-items:center; gap:8px; flex-shrink:0;
   border:none; background:transparent; cursor:pointer;
   padding:11px 18px; border-radius:${R.sm}px;
   font-family:inherit; font-size:14px; font-weight:600; color:${C.textSubtle};

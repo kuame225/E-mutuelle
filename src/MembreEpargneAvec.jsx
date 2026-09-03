@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, Coins, HeartHandshake, Banknote, CheckCircle2, Clock, WifiOff } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { sauverCache, lireCache } from "./offlineCache";
+import { sauverCache, lireCache, ressembleAUneCoupureReseau } from "./offlineCache";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 function montant(v) {
@@ -25,13 +25,26 @@ export default function MembreEpargneAvec({ membre, onBack }) {
   useEffect(() => {
     async function charger() {
       const idCache = `epargne_avec_${membre.id}`;
+
+      const dejaEnCache = lireCache(idCache);
+      if (dejaEnCache) {
+        setCycle(dejaEnCache.donnees.cycle);
+        setParts(dejaEnCache.donnees.parts);
+        setPresences(dejaEnCache.donnees.presences);
+        setPret(dejaEnCache.donnees.pret);
+        setEcheances(dejaEnCache.donnees.echeances);
+        setLoading(false);
+      }
+
       try {
-        const { data: c } = await supabase
+        const { data: c, error: cErr } = await supabase
           .from("avec_cycles")
           .select("*")
           .eq("organisation_id", membre.organisation_id)
           .eq("statut", "en_cours")
           .maybeSingle();
+
+        if (cErr && ressembleAUneCoupureReseau(cErr)) throw cErr;
 
         if (!c) {
           // Pas de cycle en cours : un état légitime, pas une panne
@@ -45,11 +58,12 @@ export default function MembreEpargneAvec({ membre, onBack }) {
         }
         setCycle(c);
 
-        const { data: reunions } = await supabase
+        const { data: reunions, error: rErr } = await supabase
           .from("avec_reunions").select("id").eq("cycle_id", c.id);
+        if (rErr && ressembleAUneCoupureReseau(rErr)) throw rErr;
         const idsReunions = (reunions || []).map((r) => r.id);
 
-        const [{ data: p }, { data: pr }, { data: pret1 }] = await Promise.all([
+        const [partsRes, presRes, pretRes] = await Promise.all([
           idsReunions.length
             ? supabase.from("avec_achats_parts").select("*").eq("membre_id", membre.id).in("reunion_id", idsReunions)
             : Promise.resolve({ data: [] }),
@@ -63,15 +77,22 @@ export default function MembreEpargneAvec({ membre, onBack }) {
             .limit(1).maybeSingle(),
         ]);
 
+        for (const r of [partsRes, presRes, pretRes]) {
+          if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
+        }
+
+        const pret1 = pretRes.data;
+
         let echeancesData = [];
         if (pret1) {
-          const { data: e } = await supabase
+          const { data: e, error: eErr } = await supabase
             .from("pret_echeances").select("*").eq("pret_id", pret1.id).order("numero_echeance");
+          if (eErr && ressembleAUneCoupureReseau(eErr)) throw eErr;
           echeancesData = e || [];
         }
 
         const resultat = {
-          cycle: c, parts: p || [], presences: pr || [], pret: pret1 || null, echeances: echeancesData,
+          cycle: c, parts: partsRes.data || [], presences: presRes.data || [], pret: pret1 || null, echeances: echeancesData,
         };
         sauverCache(idCache, resultat);
 

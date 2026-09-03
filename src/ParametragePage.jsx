@@ -171,7 +171,10 @@ export default function ParametragePage() {
     setErreur("");
 
     const ext = fichier.name.split(".").pop().toLowerCase();
-    const chemin = `organisation.${ext}`;
+    // Le chemin doit être propre à l'organisation — un nom générique ferait
+    // qu'un logo au même format écraserait celui de toute autre organisation
+    // partageant ce même chemin, sans qu'aucune erreur ne le signale.
+    const chemin = `${orgId}/organisation.${ext}`;
 
     const { error: upErr } = await supabase.storage
       .from(BUCKET_LOGOS)

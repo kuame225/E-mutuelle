@@ -5,7 +5,7 @@ import {
   Info, WifiOff,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { sauverCache, lireCache } from "./offlineCache";
+import { sauverCache, lireCache, ressembleAUneCoupureReseau } from "./offlineCache";
 import { useVocabulaire } from "./useVocabulaire";
 import { de } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
@@ -53,6 +53,16 @@ export default function MembreAides({ membre, onBack }) {
 
   async function charger() {
     const idCache = `aides_${membre.id}`;
+
+    const dejaEnCache = lireCache(idCache);
+    if (dejaEnCache) {
+      setAides(dejaEnCache.donnees.aides);
+      setSuspendu(dejaEnCache.donnees.suspendu);
+      setBareme(dejaEnCache.donnees.bareme);
+      setEligibilite(dejaEnCache.donnees.eligibilite);
+      setLoading(false);
+    }
+
     try {
       const [aidesRes, sanctRes, baremeRes, eligRes] = await Promise.all([
         supabase.from("aides_sociales").select("*")
@@ -67,6 +77,10 @@ export default function MembreAides({ membre, onBack }) {
           .order("ordre"),
         supabase.rpc("verifier_eligibilite_prestation", { p_membre_id: membre.id }),
       ]);
+
+      for (const r of [aidesRes, sanctRes, baremeRes, eligRes]) {
+        if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
+      }
 
       const resultat = {
         aides: aidesRes.data || [],

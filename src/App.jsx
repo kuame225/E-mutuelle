@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
-import { sauverCache, lireCache } from "./offlineCache";
+import { sauverCache, lireCache, ressembleAUneCoupureReseau } from "./offlineCache";
 import { notifierMembre } from "./notifier";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
@@ -51,12 +51,13 @@ import PretsPage from "./PretsPage";
 import ParametragePage from "./ParametragePage";
 import RapportsPage from "./RapportsPage";
 import OffresBaamoPage from "./OffresBaamoPage";
+import SuiviPaiementsWave from "./SuiviPaiementsWave";
+import AideSupportPage from "./AideSupportPage";
 import DonsPage from "./DonsPage";
 import SanctionsPage from "./SanctionsPage";
 import SplashScreen from "./SplashScreen";
 import ActivationScreen from "./ActivationScreen";
 import RecuperationScreen from "./RecuperationScreen";
-import PinSetupScreen from "./PinSetupScreen";
 import PinLockScreen from "./PinLockScreen";
 import JournalPage from "./JournalPage";
 import RolesPage from "./RolesPage";
@@ -375,25 +376,16 @@ function Shell() {
   }
 
   // ---------- Verrouillage par code PIN ----------
+  // Retiré comme barrière obligatoire à la demande des utilisateurs —
+  // trop de codes en plus du déverrouillage du téléphone lui-même.
+  // Conservé uniquement pour les comptes ayant déjà un code (ou une
+  // empreinte) configuré avant ce changement, sans jamais en imposer
+  // un nouveau : plus personne ne passe par PinSetupScreen.
   if (session && !pinEtat.pret) {
     return <div style={ecranAttente}>Chargement…</div>;
   }
 
-  if (session && !pinEtat.configure) {
-    return (
-      <PinSetupScreen
-        userId={session.user.id}
-        membreId={membre?.id}
-        nomAffiche={membre?.nom}
-        onTermine={() => {
-          setPinEtat({ pret: true, configure: true });
-          setPinDeverrouille(true);
-        }}
-      />
-    );
-  }
-
-  if (session && !pinDeverrouille) {
+  if (session && pinEtat.configure && !pinDeverrouille) {
     return (
       <PinLockScreen
         userId={session.user.id}
@@ -547,6 +539,12 @@ function Shell() {
               <MembreEpargneAvec membre={membre} onBack={() => setPage("accueil")} />
             )}
 
+            {page === "aide_support" && (
+              <PageMembre onBack={() => setPage("accueil")}>
+                <AideSupportPage membre={membre} />
+              </PageMembre>
+            )}
+
             {page === "cotisations" && (
               <PageMembre onBack={() => setPage("accueil")}>
                 <MembreCotisations membre={membre} />
@@ -672,6 +670,8 @@ function Shell() {
           {page === "parametrage"   && <ParametragePage />}
           {page === "rapports"      && <RapportsPage />}
           {page === "offres_baamo"  && <OffresBaamoPage />}
+          {page === "suivi_wave"    && <SuiviPaiementsWave />}
+          {page === "aide_support"  && <AideSupportPage />}
           {page === "dons"          && <DonsPage />}
           {page === "journal"       && <JournalPage />}
           {page === "roles"         && <RolesPage />}
@@ -858,16 +858,31 @@ function MembreCotisations({ membre }) {
 
   async function charger() {
     const idCache = `cotisations_${membre.id}`;
+
+    const dejaEnCache = lireCache(idCache);
+    if (dejaEnCache) {
+      setCotisations(dejaEnCache.donnees.cotisations);
+      setMoyens(dejaEnCache.donnees.moyens);
+      setDeclarations(dejaEnCache.donnees.declarations);
+      setWaveActif(dejaEnCache.donnees.waveActif);
+      setLoading(false);
+    }
+
     try {
-      const [{ data: cot }, { data: moy }, { data: decl }, { data: wave }] = await Promise.all([
+      const [cotRes, moyRes, declRes, waveRes] = await Promise.all([
         supabase.from("cotisations").select("*").eq("membre_id", membre.id).order("periode", { ascending: false }),
         supabase.from("moyens_paiement").select("*").eq("organisation_id", membre.organisation_id).eq("actif", true).order("ordre"),
         supabase.from("declarations_paiement").select("cotisation_id, cotisation_ids, statut").eq("membre_id", membre.id).eq("statut", "en_attente"),
         supabase.from("integrations_paiement").select("actif").eq("organisation_id", membre.organisation_id).eq("fournisseur", "wave").maybeSingle(),
       ]);
 
+      for (const r of [cotRes, moyRes, declRes, waveRes]) {
+        if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
+      }
+
       const resultat = {
-        cotisations: cot || [], moyens: moy || [], declarations: decl || [], waveActif: Boolean(wave?.actif),
+        cotisations: cotRes.data || [], moyens: moyRes.data || [], declarations: declRes.data || [],
+        waveActif: Boolean(waveRes.data?.actif),
       };
       sauverCache(idCache, resultat);
 
@@ -1189,13 +1204,25 @@ function MembreFormations({ membre }) {
 
   async function charger() {
     const idCache = `formations_${membre.id}`;
+
+    const dejaEnCache = lireCache(idCache);
+    if (dejaEnCache) {
+      setFormations(dejaEnCache.donnees.formations);
+      setMesPresences(dejaEnCache.donnees.mesPresences);
+      setLoading(false);
+    }
+
     try {
-      const [{ data: f }, { data: p }] = await Promise.all([
+      const [fRes, pRes] = await Promise.all([
         supabase.from("formations").select("*").eq("organisation_id", membre.organisation_id).order("date_debut", { ascending: false }),
         supabase.from("formation_presences").select("*").eq("membre_id", membre.id),
       ]);
 
-      const resultat = { formations: f || [], mesPresences: p || [] };
+      for (const r of [fRes, pRes]) {
+        if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
+      }
+
+      const resultat = { formations: fRes.data || [], mesPresences: pRes.data || [] };
       sauverCache(idCache, resultat);
 
       setFormations(resultat.formations);
@@ -1491,8 +1518,14 @@ function MembreCalendrier({ membre }) {
     const idCache = `calendrier_${membre.id}`;
     const maintenant = new Date().toISOString();
 
+    const dejaEnCache = lireCache(idCache);
+    if (dejaEnCache) {
+      setEvenements(dejaEnCache.donnees);
+      setLoading(false);
+    }
+
     try {
-      const [{ data: assemblees }, { data: formations }] = await Promise.all([
+      const [assRes, formRes] = await Promise.all([
         supabase.from("assemblees")
           .select("id, titre, date_prevue, lieu")
           .eq("organisation_id", membre.organisation_id)
@@ -1505,12 +1538,16 @@ function MembreCalendrier({ membre }) {
           .order("date_debut"),
       ]);
 
+      for (const r of [assRes, formRes]) {
+        if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
+      }
+
       const liste = [
-        ...(assemblees || []).map((a) => ({
+        ...(assRes.data || []).map((a) => ({
           id: `assemblee-${a.id}`, type: "assemblee", titre: a.titre,
           date: a.date_prevue, lieu: a.lieu,
         })),
-        ...(formations || []).map((f) => ({
+        ...(formRes.data || []).map((f) => ({
           id: `formation-${f.id}`, type: "formation", titre: f.titre,
           date: f.date_debut, lieu: f.lieu,
         })),
@@ -1612,8 +1649,15 @@ function MembreHistorique({ membre }) {
 
   async function charger() {
     const idCache = `historique_${membre.id}`;
+
+    const dejaEnCache = lireCache(idCache);
+    if (dejaEnCache) {
+      setEvenements(dejaEnCache.donnees);
+      setLoading(false);
+    }
+
     try {
-      const [{ data: assPresences }, { data: formPresences }] = await Promise.all([
+      const [assRes, formRes] = await Promise.all([
         supabase.from("assemblee_presences")
           .select("present, emarge_le, assemblees(titre, date_prevue, lieu)")
           .eq("membre_id", membre.id)
@@ -1624,14 +1668,18 @@ function MembreHistorique({ membre }) {
           .eq("statut", "present"),
       ]);
 
+      for (const r of [assRes, formRes]) {
+        if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
+      }
+
       const liste = [
-        ...(assPresences || [])
+        ...(assRes.data || [])
           .filter((p) => p.assemblees)
           .map((p, i) => ({
             id: `assemblee-${i}`, type: "assemblee", titre: p.assemblees.titre,
             date: p.assemblees.date_prevue, lieu: p.assemblees.lieu,
           })),
-        ...(formPresences || [])
+        ...(formRes.data || [])
           .filter((p) => p.formations)
           .map((p, i) => ({
             id: `formation-${i}`, type: "formation", titre: p.formations.titre,
@@ -1737,19 +1785,33 @@ function MembreDocuments({ membre }) {
 
   async function charger() {
     const idCache = `documents_${membre.id}`;
+
+    const dejaEnCache = lireCache(idCache);
+    if (dejaEnCache) {
+      setProduits(dejaEnCache.donnees.produits);
+      setAchats(dejaEnCache.donnees.achats);
+      setDeclarationsEnAttente(dejaEnCache.donnees.declarationsEnAttente);
+      setMoyens(dejaEnCache.donnees.moyens);
+      setLoading(false);
+    }
+
     try {
-      const [{ data: p }, { data: a }, { data: d }, { data: m }] = await Promise.all([
+      const [pRes, aRes, dRes, mRes] = await Promise.all([
         supabase.from("produits_membre").select("*").eq("actif", true),
         supabase.from("achats_membre").select("produit_code").eq("membre_id", membre.id),
         supabase.from("declarations_paiement_membre").select("produit_code").eq("membre_id", membre.id).eq("statut", "en_attente"),
         supabase.from("moyens_paiement_plateforme").select("*").eq("actif", true),
       ]);
 
+      for (const r of [pRes, aRes, dRes, mRes]) {
+        if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
+      }
+
       const resultat = {
-        produits: p || [],
-        achats: (a || []).map((x) => x.produit_code),
-        declarationsEnAttente: (d || []).map((x) => x.produit_code),
-        moyens: m || [],
+        produits: pRes.data || [],
+        achats: (aRes.data || []).map((x) => x.produit_code),
+        declarationsEnAttente: (dRes.data || []).map((x) => x.produit_code),
+        moyens: mRes.data || [],
       };
       sauverCache(idCache, resultat);
 

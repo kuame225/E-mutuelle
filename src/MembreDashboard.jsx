@@ -1,11 +1,11 @@
 import React, { useEffect, useState, } from "react";
 import { supabase } from "./supabaseClient";
-import { sauverCache, lireCache } from "./offlineCache";
+import { sauverCache, lireCache, ressembleAUneCoupureReseau } from "./offlineCache";
 import {
   Bell, LogOut, CreditCard, HandHeart, Gift, UserCircle2,
   CheckCircle2, Clock, AlertTriangle, CalendarDays, Wallet,
   Megaphone, Ticket, X, ChevronRight, Users, UserPlus, Users2, RefreshCw, Banknote,
-  GraduationCap, Briefcase, Handshake, FileBadge, History, ChevronsUpDown, Check, Loader2, Coins, WifiOff,
+  GraduationCap, Briefcase, Handshake, FileBadge, History, ChevronsUpDown, Check, Loader2, Coins, WifiOff, HelpCircle,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import CarteMembreModal from "./CarteMembreModal";
@@ -52,6 +52,7 @@ function raccourcisPourType(mot) {
     { id: "partenariats",  icon: Handshake,   l1: "Partenaires", l2: "de l'organisation", color: C.success,
       module: "module_partenariats" },
     { id: "beneficiaires", icon: Users,       l1: "Mes",      l2: "bénéficiaires", color: C.primaryLight },
+    { id: "aide_support",  icon: HelpCircle,  l1: "Aide",     l2: "et support",    color: C.textSubtle },
   ];
 }
 
@@ -97,6 +98,20 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
   useEffect(() => {
     async function charger() {
       const idCache = `dashboard_${membre.id}`;
+
+      // Affiche tout de suite ce qui est déjà connu, sans attendre le
+      // réseau — évite l'écran de chargement à chaque retour dans
+      // l'application quand une copie récente existe déjà. Le réseau
+      // continue juste après, en silence, pour rafraîchir si besoin.
+      const dejaEnCache = lireCache(idCache);
+      if (dejaEnCache) {
+        setAnnuel(dejaEnCache.donnees.annuel);
+        setEcheance(dejaEnCache.donnees.echeance);
+        setTickets(dejaEnCache.donnees.tickets);
+        setNotifs(dejaEnCache.donnees.notifs);
+        setLoading(false);
+      }
+
       try {
       const trimestre = `${annee}-T${Math.ceil((new Date().getMonth() + 1) / 3)}`;
 
@@ -113,13 +128,24 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
           .eq("membre_id", membre.id)
           .order("created_at", { ascending: false }).limit(3),
         supabase.from("communications_mutuelle").select("*")
+          .eq("organisation_id", membre.organisation_id)
           .or(`cible.eq.tous,cible.eq.${membre.statut_cotisation === "a_jour" ? "a_jour" : "retard"}`)
           .order("created_at", { ascending: false }).limit(3),
         supabase.from("notifications").select("*")
           .eq("membre_id", membre.id)
           .order("created_at", { ascending: false }).limit(5),
-        supabase.from("bareme_prestations").select("type_aide, libelle"),
+        supabase.from("bareme_prestations").select("type_aide, libelle")
+          .eq("organisation_id", membre.organisation_id),
       ]);
+
+      // Une coupure réseau ne lève pas toujours d'exception — elle peut
+      // revenir normalement comme { data: null, error: ... }. On la
+      // détecte ici et on la relève manuellement, pour que le bloc catch
+      // ci-dessous (qui gère déjà le repli sur le cache) s'en charge —
+      // plutôt que de continuer avec des données vides en silence.
+      for (const r of [cotRes, tickRes, aideRes, commRes, notifRes, baremeRes]) {
+        if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
+      }
 
       const cotisations = cotRes.data || [];
       const tks = tickRes.data || [];
@@ -157,9 +183,10 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
       const ids = cotisations.map((c) => c.id);
       let paiements = [];
       if (ids.length) {
-        const { data } = await supabase.from("paiements").select("*")
+        const { data, error } = await supabase.from("paiements").select("*")
           .in("cotisation_id", ids)
           .order("created_at", { ascending: false }).limit(4);
+        if (error && ressembleAUneCoupureReseau(error)) throw error;
         paiements = data || [];
       }
 

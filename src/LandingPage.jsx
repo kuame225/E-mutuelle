@@ -91,7 +91,7 @@ const ORDRE_TYPES = ["mutuelle", "association", "cooperative", "ong", "avec", "p
 // encore non couverts (coopérative, ONG, AVEC, professionnelle...)
 // reviendrait à fabriquer un faux témoignage client.
 const ORGANISATIONS = [
-  { logo: "/logo-mephda.png", nom: "MAEPHDA — Mutuelle des Agents de l'EPHD de Dabakala", secteur: "Santé" },
+  { logo: "/logo-babamoo.png", nom: "MAEPHDA — Mutuelle des Agents de l'EPHD de Dabakala", secteur: "Santé" },
   { init: "FD", nom: "FDSD — Famille District Sanitaire de Daloa", secteur: "Santé" },
   { init: "LQ", nom: "Les Quêteuses", secteur: "Association religieuse" },
 ];

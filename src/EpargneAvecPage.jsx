@@ -130,6 +130,7 @@ function GestionGardiens({ onBack }) {
   const [membres, setMembres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ajout, setAjout] = useState(false);
+  const [erreur, setErreur] = useState("");
 
   async function charger() {
     setLoading(true);
@@ -150,7 +151,16 @@ function GestionGardiens({ onBack }) {
   useEffect(() => { charger(); }, [params.organisation_id]);
 
   async function basculerActif(g) {
-    await supabase.from("avec_gardiens").update({ actif: !g.actif }).eq("id", g.id);
+    setErreur("");
+    const { data, error } = await supabase.from("avec_gardiens")
+      .update({ actif: !g.actif }).eq("id", g.id).select();
+    // Une politique RLS qui refuse ne renvoie pas d'erreur — elle
+    // affecte simplement zéro ligne, silencieusement. C'est donc la
+    // longueur du résultat, pas error, qui révèle un refus.
+    if (error || !data || data.length === 0) {
+      setErreur("Seuls le Président et le Trésorier général peuvent activer ou désactiver un gardien.");
+      return;
+    }
     charger();
   }
 
@@ -176,6 +186,8 @@ function GestionGardiens({ onBack }) {
           <Plus size={16} /> Ajouter un gardien
         </button>
       </header>
+
+      {erreur && <div className="av-erreur"><AlertCircle size={15} /> {erreur}</div>}
 
       {gardiens.length === 0 ? (
         <div className="av-vide">

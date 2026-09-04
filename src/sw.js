@@ -1,14 +1,25 @@
 import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
 import { clientsClaim } from "workbox-core";
 
-self.skipWaiting();
+// skipWaiting() a été retiré d'ici : il faisait prendre le contrôle au
+// nouveau service worker sur-le-champ, sans jamais laisser de version
+// "en attente" — ce qui court-circuitait entièrement le bandeau de
+// mise à jour, qui n'avait donc jamais rien à annoncer. L'activation
+// est maintenant déclenchée par le clic sur "Mettre à jour", via le
+// message SKIP_WAITING envoyé par vite-plugin-pwa.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 clientsClaim();
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 // Nom de repli lorsqu'une notification arrive sans titre.
 // Vient de .env, comme le manifeste et le titre de la page.
-const NOM_PLATEFORME = import.meta.env.VITE_NOM_PLATEFORME || "Ma mutuelle";
+const NOM_PLATEFORME = import.meta.env.VITE_NOM_PLATEFORME || "Babamoo";
 
 // ---- Réception d'une notification push ----
 self.addEventListener("push", (event) => {

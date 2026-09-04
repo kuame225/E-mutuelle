@@ -27,7 +27,11 @@ export default defineConfig(({ mode }) => {
         strategies: 'injectManifest',
         srcDir: 'src',
         filename: 'sw.js',
-        registerType: 'autoUpdate',
+        // 'prompt' et non 'autoUpdate' : la nouvelle version reste en
+        // attente jusqu'à ce que la personne clique sur "Mettre à jour"
+        // dans le bandeau, au lieu de s'appliquer d'elle-même en pleine
+        // utilisation — parfois au milieu d'une saisie.
+        registerType: 'prompt',
         injectManifest: {
           globPatterns: ['**/*.{js,css,html,png,jpg,svg,woff2}'],
           maximumFileSizeToCacheInBytes: 4000000, // Modifié ici : Augmente la limite à 4 Mo pour éviter le bug

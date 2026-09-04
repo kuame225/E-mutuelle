@@ -20,6 +20,18 @@ const updateSW = registerSW({
   onOfflineReady() {},
 });
 
+// Filet de sécurité : si un service worker était déjà en attente avant
+// même que registerSW() ne démarre, onNeedRefresh peut ne jamais se
+// déclencher. On interroge donc directement le navigateur au démarrage.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistration().then((reg) => {
+    if (reg?.waiting) {
+      fonctionMiseAJour.actuelle = () => updateSW(true);
+      annoncerMiseAJourDisponible();
+    }
+  }).catch(() => {});
+}
+
 // Titre de l'onglet, repris du nom défini dans .env.
 // Le remplacement direct dans index.html s'avérant peu fiable selon les
 // versions de Vite, il est fixé ici, où import.meta.env est toujours résolu.

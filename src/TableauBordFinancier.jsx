@@ -9,21 +9,117 @@ import {
 } from "recharts";
 import { supabase } from "./supabaseClient";
 import { useParametrage, moduleActif } from "./useParametrage";
+import { blocsAAfficher, BLOCS } from "./compositionTableauBord";
+import {
+  BlocRecouvrement, BlocCapitalSocial, BlocEpargneAvec, BlocAppuisAgr,
+  BlocTresorerie, BlocAides, BlocPrets, BlocProjets, BlocDons, BlocEffectif,
+} from "./BlocsTableauBord";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 export default function TableauBordFinancier() {
   const { params } = useParametrage();
   const [stats, setStats] = useState(null);
   const [statsCoop, setStatsCoop] = useState(null);
+  const [statsBlocs, setStatsBlocs] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // La coopérative n'a pas de cotisations — voir vocabulaire.js, décision
-  // prise plus tôt cette nuit — donc pas le même tableau de bord : montrer
-  // un bandeau à 0 % et des graphiques vides n'aiderait personne. Le
-  // reste de l'écran (hero, KPI cotisations, graphiques, retardataires)
-  // ne s'applique qu'aux autres types.
+  // La composition du tableau de bord dépend du type d'organisation et
+  // de ses modules actifs — voir compositionTableauBord.js. Chaque type voit
+  // ce qui le concerne : une ONG ses appuis AGR, une coopérative son
+  // capital social, une mutuelle son taux de recouvrement.
+  const blocs = blocsAAfficher(params);
+  const aBloc = (id) => blocs.includes(id);
+
   const estCooperative = params.type_organisation === "cooperative";
+
+  // Charge uniquement ce que les blocs affichés réclament — inutile
+  // d'interroger les appuis AGR pour une mutuelle qui ne les montre pas.
+  async function chargerBlocsSpecifiques() {
+    const resultat = {};
+
+    if (aBloc(BLOCS.APPUIS_AGR)) {
+      const [{ data: benef }, { data: appuis }, { data: versements }] = await Promise.all([
+        supabase.from("beneficiaires_ong").select("id")
+          .eq("organisation_id", params.organisation_id),
+        supabase.from("appuis_agr").select("statut, montant_accorde, montant_a_rembourser")
+          .eq("organisation_id", params.organisation_id),
+        supabase.from("appuis_agr_versements").select("montant, statut")
+          .eq("organisation_id", params.organisation_id),
+      ]);
+
+      const listeAppuis = appuis || [];
+      resultat.agr = {
+        beneficiaires: (benef || []).length,
+        enAttente: listeAppuis.filter((a) => a.statut === "transmis").length,
+        totalAccorde: listeAppuis.reduce((s, a) => s + Number(a.montant_accorde || 0), 0),
+        totalARembourser: listeAppuis.reduce((s, a) => s + Number(a.montant_a_rembourser || 0), 0),
+        totalRembourse: (versements || [])
+          .filter((v) => v.statut === "depose")
+          .reduce((s, v) => s + Number(v.montant), 0),
+      };
+    }
+
+    if (aBloc(BLOCS.EPARGNE_AVEC)) {
+      const { data: cycle } = await supabase.from("avec_cycles")
+        .select("id").eq("organisation_id", params.organisation_id)
+        .eq("statut", "en_cours").maybeSingle();
+
+      if (cycle) {
+        const { data: reunions } = await supabase.from("avec_reunions")
+          .select("id").eq("cycle_id", cycle.id);
+        const ids = (reunions || []).map((r) => r.id);
+        const { data: achats } = ids.length
+          ? await supabase.from("avec_achats_parts").select("membre_id, montant").in("reunion_id", ids)
+          : { data: [] };
+
+        resultat.avec = {
+          cycleEnCours: true,
+          capital: (achats || []).reduce((s, a) => s + Number(a.montant), 0),
+          societaires: new Set((achats || []).map((a) => a.membre_id)).size,
+        };
+      } else {
+        resultat.avec = { cycleEnCours: false, capital: 0, societaires: 0 };
+      }
+    }
+
+    if (aBloc(BLOCS.PRETS) && !estCooperative) {
+      const { data: prets } = await supabase.from("prets")
+        .select("statut, montant_principal")
+        .eq("organisation_id", params.organisation_id);
+      const liste = prets || [];
+      const enCours = liste.filter((p) => p.statut === "approuve");
+      resultat.prets = {
+        enCours: enCours.length,
+        encours: enCours.reduce((s, p) => s + Number(p.montant_principal || 0), 0),
+        enAttente: liste.filter((p) => p.statut === "en_attente").length,
+      };
+    }
+
+    if (aBloc(BLOCS.PROJETS)) {
+      const { data: projets } = await supabase.from("projets")
+        .select("statut, budget_prevu")
+        .eq("organisation_id", params.organisation_id);
+      const liste = projets || [];
+      resultat.projets = {
+        enCours: liste.filter((p) => p.statut === "en_cours").length,
+        budgetTotal: liste.reduce((s, p) => s + Number(p.budget_prevu || 0), 0),
+      };
+    }
+
+    if (aBloc(BLOCS.DONS)) {
+      const { data: dons } = await supabase.from("dons")
+        .select("montant, statut")
+        .eq("organisation_id", params.organisation_id);
+      const confirmes = (dons || []).filter((d) => d.statut === "confirme");
+      resultat.dons = {
+        total: confirmes.reduce((s, d) => s + Number(d.montant || 0), 0),
+        nombre: confirmes.length,
+      };
+    }
+
+    setStatsBlocs(resultat);
+  }
 
   async function charger() {
     setLoading(true);
@@ -64,6 +160,11 @@ export default function TableauBordFinancier() {
       } else {
         await chargerCotisations();
       }
+
+      // Les blocs propres au type (appuis AGR, épargne AVEC, projets,
+      // dons…) se chargent dans tous les cas — ils ne dépendent pas du
+      // découpage historique coopérative / reste.
+      await chargerBlocsSpecifiques();
     } catch (e) {
       setError(e.message);
     }
@@ -182,161 +283,62 @@ export default function TableauBordFinancier() {
     );
   }
 
-  // Coopérative : pas de bandeau "à jour" ni de graphique d'encaissement,
-  // ces notions n'existent pas sans cotisations — un tableau de bord
-  // centré sur le capital social et les prêts, ce que la coopérative
-  // suit réellement.
-  if (estCooperative) {
-    return (
-      <div className="tb-wrap">
-        <style>{CSS}</style>
-
-        <section className="hero">
-          <div className="hero-glow" />
-          <div className="hero-inner">
-            <div className="hero-left">
-              <div className="hero-label">
-                <Wallet size={14} /> Capital social
-              </div>
-              <div className="hero-value">
-                {montant(statsCoop.capitalSocial)}<span className="hero-pct">F</span>
-              </div>
-              <div className="hero-detail">
-                {statsCoop.societaires} sociétaire{statsCoop.societaires > 1 ? "s" : ""} détenant des parts
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="kpi-grid">
-          <Kpi
-            label="Sociétaires actifs"
-            value={statsCoop.societaires}
-            unit=""
-            hint="Détenant au moins une part sociale"
-            Icon={Users}
-            color={C.primary}
-          />
-          <Kpi
-            label="Encours de prêts"
-            value={montant(statsCoop.encoursPrets)}
-            unit="FCFA"
-            hint={`${statsCoop.nombrePretsEnCours} prêt${statsCoop.nombrePretsEnCours > 1 ? "s" : ""} en cours`}
-            Icon={TrendingUp}
-            color={C.success}
-          />
-          <Kpi
-            label="Prêts en attente"
-            value={statsCoop.pretsEnAttente}
-            unit=""
-            hint="Demandes à instruire"
-            Icon={HandHeart}
-            color={C.warning}
-          />
-        </section>
-      </div>
-    );
-  }
-
+  // Le rendu est désormais piloté par compositionTableauBord.js : chaque type
+  // affiche les blocs qui le concernent, dans l'ordre déclaré. Le
+  // premier bloc de bandeau rencontré occupe la tête de l'écran.
   const objectif = params.objectif_recouvrement || 90;
-  const atteint = stats.taux >= objectif;
+
+  const bandeau = aBloc(BLOCS.RECOUVREMENT) ? (
+    <BlocRecouvrement stats={stats} objectif={objectif} />
+  ) : aBloc(BLOCS.CAPITAL_SOCIAL) && statsCoop ? (
+    <BlocCapitalSocial statsCoop={statsCoop} />
+  ) : aBloc(BLOCS.EPARGNE_AVEC) && statsBlocs.avec ? (
+    <BlocEpargneAvec statsAvec={statsBlocs.avec} />
+  ) : aBloc(BLOCS.APPUIS_AGR) && statsBlocs.agr ? (
+    <BlocAppuisAgr statsAgr={statsBlocs.agr} />
+  ) : null;
 
   return (
     <div className="tb-wrap">
       <style>{CSS}</style>
 
-      {/* ---- Bandeau objectif ---- */}
-      <section className="hero">
-        <div className="hero-glow" />
-        <div className="hero-inner">
-          <div className="hero-left">
-            <div className="hero-label">
-              <Target size={14} /> Membres à jour
-            </div>
-            <div className="hero-value">
-              {stats.taux}<span className="hero-pct">%</span>
-            </div>
-            <div className="hero-detail">
-              {stats.aJour} membre{stats.aJour > 1 ? "s" : ""} à jour sur {stats.totalMembres}
-              {stats.nouveaux > 0 && (
-                <> · dont {stats.nouveaux} nouveau{stats.nouveaux > 1 ? "x" : ""} sans cotisation</>
-              )}
-            </div>
-          </div>
+      {bandeau}
 
-          <div className={`hero-badge ${atteint ? "is-ok" : ""}`}>
-            {atteint ? <CheckCircle2 size={26} /> : <TrendingUp size={26} />}
-            <div className="hero-badge-text">
-              <div className="hero-badge-title">
-                {atteint ? "Objectif atteint" : "En progression"}
-              </div>
-              <div className="hero-badge-sub">Cible : {objectif} %</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="gauge">
-          <div
-            className="gauge-fill"
-            style={{
-              width: `${Math.min(stats.taux, 100)}%`,
-              background: atteint
-                ? `linear-gradient(90deg, ${C.success}, #4ADE80)`
-                : `linear-gradient(90deg, ${C.warning}, #FBBF24)`,
-            }}
-          />
-          <div className="gauge-mark" style={{ left: `${objectif}%` }} />
-        </div>
-        <div className="gauge-legend">
-          <span>0 %</span>
-          <span className="gauge-target" style={{ left: `${objectif}%` }}>
-            Objectif {objectif} %
-          </span>
-          <span>100 %</span>
-        </div>
-      </section>
-
-      {/* ---- Indicateurs ---- */}
       <section className="kpi-grid">
-        <Kpi
-          label="Solde de la caisse"
-          value={montant(stats.solde)}
-          unit="FCFA"
-          hint="Cotisations − aides versées"
-          Icon={Wallet}
-          color={C.primary}
-        />
-        <Kpi
-          label="Total encaissé"
-          value={montant(stats.totalPaye)}
-          unit="FCFA"
-          hint={`sur ${montant(stats.totalDu)} F attendus`}
-          Icon={ArrowUpRight}
-          color={C.success}
-        />
-        {moduleActif(params, "module_aides") && (
-          <Kpi
-            label="Aides versées"
-            value={montant(stats.totalAides)}
-            unit="FCFA"
-            hint={`${stats.aidesEnCours} demande${stats.aidesEnCours > 1 ? "s" : ""} en cours`}
-            Icon={HandHeart}
-            color={C.warning}
-          />
+        {aBloc(BLOCS.TRESORERIE) && stats && (
+          <BlocTresorerie stats={{
+            solde: stats.solde,
+            totalPaye: stats.totalPaye,
+            hintSolde: "Cotisations \u2212 aides vers\u00e9es",
+            hintEncaisse: `sur ${montant(stats.totalDu)} F attendus`,
+          }} />
         )}
-        {moduleActif(params, "module_tombola") && (
-          <Kpi
-            label="Cagnotte tombola"
-            value={montant(stats.cagnotte)}
-            unit="FCFA"
-            hint="Circuit financier séparé"
-            Icon={Gift}
-            color={C.primaryLight}
-          />
+        {aBloc(BLOCS.AIDES) && stats && (
+          <BlocAides stats={{
+            totalAides: stats.totalAides,
+            hintAides: `${stats.aidesEnCours} demande${stats.aidesEnCours > 1 ? "s" : ""} en cours`,
+          }} />
+        )}
+        {aBloc(BLOCS.PRETS) && (statsBlocs.prets || statsCoop) && (
+          <BlocPrets statsPrets={statsBlocs.prets || {
+            enCours: statsCoop.nombrePretsEnCours,
+            encours: statsCoop.encoursPrets,
+            enAttente: statsCoop.pretsEnAttente,
+          }} />
+        )}
+        {aBloc(BLOCS.PROJETS) && statsBlocs.projets && (
+          <BlocProjets statsProjets={statsBlocs.projets} />
+        )}
+        {aBloc(BLOCS.DONS) && statsBlocs.dons && (
+          <BlocDons statsDons={statsBlocs.dons} />
+        )}
+        {aBloc(BLOCS.EFFECTIF) && stats && (
+          <BlocEffectif stats={stats} />
         )}
       </section>
 
       {/* ---- Graphiques ---- */}
+      {(aBloc(BLOCS.EVOLUTION) || aBloc(BLOCS.REPARTITION)) && stats && (
       <section className="charts">
         <article className="card card-chart">
           <header className="card-head">
@@ -431,9 +433,10 @@ export default function TableauBordFinancier() {
           )}
         </article>
       </section>
+      )}
 
       {/* ---- Retardataires ---- */}
-      {stats.retardataires.length > 0 && (
+      {aBloc(BLOCS.RETARDATAIRES) && stats?.retardataires?.length > 0 && (
         <section className="card">
           <header className="card-head">
             <div>

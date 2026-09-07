@@ -69,7 +69,14 @@ export default function ParametragePage() {
     if (params.nom_mutuelle.trim().length > 20)
       return "Le sigle doit rester court : 20 caractères au maximum.";
     if (!params.prefixe_matricule?.trim()) return "Le préfixe de matricule est obligatoire.";
-    if (params.montant_cotisation < 100) return "La cotisation doit être d'au moins 100 FCFA.";
+    // Zéro est une valeur légitime : l'organisation n'applique pas de
+    // cotisation (une ONG, par exemple). Le plancher de 100 ne
+    // s'applique donc qu'à partir du moment où une cotisation existe,
+    // pour éviter les montants dérisoires saisis par erreur.
+    if (params.montant_cotisation < 0)
+      return "La cotisation ne peut pas être négative.";
+    if (params.montant_cotisation > 0 && params.montant_cotisation < 100)
+      return "Une cotisation doit être d'au moins 100 FCFA — ou zéro si votre organisation n'en applique pas.";
     if (params.droit_adhesion < 0) return "Le droit d'adhésion ne peut pas être négatif.";
     if (params.carence_mois < 0 || params.carence_mois > 24)
       return "Le délai de carence doit être compris entre 0 et 24 mois.";
@@ -439,8 +446,9 @@ export default function ParametragePage() {
         aide="Le montant s'applique aux cotisations générées à partir de maintenant.">
         <div className="pm-duo">
           <ChampNombre label="Montant mensuel" unite="FCFA"
-            value={params.montant_cotisation}
-            onChange={(v) => maj("montant_cotisation", v)} />
+            value={params.montant_cotisation} min={0}
+            onChange={(v) => maj("montant_cotisation", v)}
+            aide="Zéro si votre organisation n'applique pas de cotisation." />
           <ChampNombre label="Versements maximum" unite="fois"
             value={params.max_fractions} min={1} max={4}
             onChange={(v) => maj("max_fractions", v)}
@@ -450,7 +458,7 @@ export default function ParametragePage() {
         <ChampNombre label="Droit d'adhésion" unite="FCFA"
           value={params.droit_adhesion} min={0}
           onChange={(v) => maj("droit_adhesion", v)}
-          aide="Versé une seule fois à l'entrée dans la mutuelle. Article 15 pour la MAEPHDA : 2 000 francs." />
+          aide="Versé une seule fois à l'entrée. Zéro si votre organisation n'en applique pas." />
 
         <div className="pm-projection">
           <span className="pm-proj-label">Recette mensuelle attendue</span>

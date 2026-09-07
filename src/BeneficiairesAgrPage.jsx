@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import {
   Users, Plus, Search, Loader2, AlertCircle, CheckCircle2, XCircle,
-  HandCoins, ArrowLeft, Clock, Banknote,
+  HandCoins, ArrowLeft, Clock, Banknote, MapPin, Download,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
+import { usePermissions } from "./usePermissions";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 function montant(v) {
@@ -23,13 +24,24 @@ const BENEFICIAIRE_VIDE = {
   nom: "", sexe: "", annee_naissance: "", activite_professionnelle: "",
   lieu_residence: "", contact: "", centre_pec: "", code_pec: "",
   statut_matrimonial: "", scolarise: "",
+  latitude: null, longitude: null, precision_gps: null,
 };
 
 export default function BeneficiairesAgrPage() {
   const { params } = useParametrage();
+  // L'ASC saisit et transmet ; le responsable AGR décide et décaisse.
+  // Les boutons de chacun sont masqués à l'autre — la base refuse déjà
+  // l'action, mais un bouton qui échoue systématiquement déroute.
+  const { peut } = usePermissions();
+  const estAsc = peut("beneficiaires_ong");
+  const estResponsableAgr = peut("appuis_agr");
   const [onglet, setOnglet] = useState("beneficiaires");
   const [beneficiaires, setBeneficiaires] = useState([]);
   const [appuis, setAppuis] = useState([]);
+  const [versements, setVersements] = useState([]);
+  const [remboursementPour, setRemboursementPour] = useState(null);
+  const [periode, setPeriode] = useState({ debut: "", fin: "" });
+  const [exportOuvert, setExportOuvert] = useState(false);
   const [loading, setLoading] = useState(true);
   const [recherche, setRecherche] = useState("");
   const [nouveauBenef, setNouveauBenef] = useState(false);
@@ -39,16 +51,20 @@ export default function BeneficiairesAgrPage() {
 
   async function charger() {
     setLoading(true);
-    const [{ data: b }, { data: a }] = await Promise.all([
+    const [{ data: b }, { data: a }, { data: v }] = await Promise.all([
       supabase.from("beneficiaires_ong").select("*")
         .eq("organisation_id", params.organisation_id)
         .order("created_at", { ascending: false }),
       supabase.from("appuis_agr").select("*, beneficiaires_ong(nom, contact)")
         .eq("organisation_id", params.organisation_id)
         .order("transmis_le", { ascending: false }),
+      supabase.from("appuis_agr_versements").select("*")
+        .eq("organisation_id", params.organisation_id)
+        .order("date_versement", { ascending: false }),
     ]);
     setBeneficiaires(b || []);
     setAppuis(a || []);
+    setVersements(v || []);
     setLoading(false);
   }
 
@@ -62,6 +78,88 @@ export default function BeneficiairesAgrPage() {
 
   const enAttente = appuis.filter((a) => a.statut === "transmis").length;
 
+  async function confirmerDepot(versementId) {
+    setErreur("");
+    const { error } = await supabase.rpc("confirmer_depot_remboursement_agr", {
+      p_versement_id: versementId,
+    });
+    if (error) { setErreur(error.message); return; }
+    charger();
+  }
+
+  // Un point-virgule comme séparateur, jamais la virgule : Excel en
+  // configuration française ne découpe pas les colonnes autrement. Le
+  // BOM en tête permet aux accents de s'afficher correctement.
+  function exporterCsv() {
+    const debut = periode.debut ? new Date(periode.debut) : null;
+    const fin = periode.fin ? new Date(periode.fin + "T23:59:59") : null;
+
+    const dansPeriode = (dateIso) => {
+      if (!dateIso) return false;
+      const d = new Date(dateIso);
+      if (debut && d < debut) return false;
+      if (fin && d > fin) return false;
+      return true;
+    };
+
+    const benefRetenus = beneficiaires.filter((b) => dansPeriode(b.created_at));
+    const appuisRetenus = appuis.filter((a) => dansPeriode(a.transmis_le));
+
+    const echapper = (v) => {
+      if (v == null) return "";
+      const s = String(v);
+      return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const ligne = (cellules) => cellules.map(echapper).join(";");
+
+    const lignes = [];
+
+    lignes.push(ligne(["BÉNÉFICIAIRES ENREGISTRÉS"]));
+    lignes.push(ligne([
+      "Nom", "Sexe", "Année de naissance", "Activité professionnelle",
+      "Lieu de résidence", "Contact", "Centre PEC", "Code PEC",
+      "Latitude", "Longitude", "Précision GPS (m)", "Enregistré le",
+    ]));
+    benefRetenus.forEach((b) => lignes.push(ligne([
+      b.nom, b.sexe, b.annee_naissance, b.activite_professionnelle,
+      b.lieu_residence, b.contact, b.centre_pec, b.code_pec,
+      b.latitude, b.longitude, b.precision_gps,
+      new Date(b.created_at).toLocaleDateString("fr-FR"),
+    ])));
+
+    lignes.push("");
+    lignes.push(ligne(["APPUIS AGR"]));
+    lignes.push(ligne([
+      "Bénéficiaire", "Type d'AGR", "Activité", "Coût du projet",
+      "Montant demandé", "Montant accordé", "Taux (%)", "À rembourser",
+      "Déjà remboursé", "Reste dû", "Date décaissement",
+      "Fin remboursement", "Statut", "Motif du rejet", "Transmis le",
+    ]));
+    appuisRetenus.forEach((a) => {
+      const depose = versements
+        .filter((v) => v.appui_id === a.id && v.statut === "depose")
+        .reduce((t, v) => t + Number(v.montant), 0);
+      const reste = a.montant_a_rembourser != null
+        ? Math.max(a.montant_a_rembourser - depose, 0) : null;
+      lignes.push(ligne([
+        a.beneficiaires_ong?.nom, a.type_agr, a.activite_a_entreprendre,
+        a.cout_projet, a.montant_demande, a.montant_accorde,
+        a.taux_interet_pct, a.montant_a_rembourser, depose, reste,
+        a.date_decaissement, a.date_fin_remboursement,
+        STATUTS[a.statut]?.label || a.statut, a.motif_rejet,
+        new Date(a.transmis_le).toLocaleDateString("fr-FR"),
+      ]));
+    });
+
+    const contenu = "\uFEFF" + lignes.join("\n");
+    const url = URL.createObjectURL(new Blob([contenu], { type: "text/csv;charset=utf-8;" }));
+    const lien = document.createElement("a");
+    lien.href = url;
+    lien.download = `beneficiaires-appuis-${periode.debut || "debut"}-${periode.fin || "aujourdhui"}.csv`;
+    lien.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (loading) return <div className="bg-wrap"><style>{CSS}</style><div className="bg-sk" /></div>;
 
   return (
@@ -69,13 +167,47 @@ export default function BeneficiairesAgrPage() {
       <style>{CSS}</style>
 
       <header className="bg-head">
-        <div>
-          <h1 className="bg-titre"><Users size={20} /> Bénéficiaires et appuis</h1>
-          <p className="bg-sous">
-            Les personnes suivies par l'organisation et les appuis AGR qui leur sont accordés —
-            distincts des membres de l'organisation elle-même.
-          </p>
+        <div className="bg-head-ligne">
+          <div>
+            <h1 className="bg-titre"><Users size={20} /> Bénéficiaires et appuis</h1>
+            <p className="bg-sous">
+              Les personnes suivies par l'organisation et les appuis AGR qui leur sont accordés —
+              distincts des membres de l'organisation elle-même.
+            </p>
+          </div>
+          <button className="bg-btn-petit" onClick={() => setExportOuvert((v) => !v)}>
+            <Download size={14} /> Exporter
+          </button>
         </div>
+
+        {exportOuvert && (
+          <div className="bg-export">
+            <div className="bg-export-champs">
+              <div>
+                <label className="bg-label">Du</label>
+                <input
+                  className="bg-input" type="date" value={periode.debut}
+                  onChange={(e) => setPeriode((p) => ({ ...p, debut: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="bg-label">Au</label>
+                <input
+                  className="bg-input" type="date" value={periode.fin}
+                  onChange={(e) => setPeriode((p) => ({ ...p, fin: e.target.value }))}
+                />
+              </div>
+              <button className="btn-primary" onClick={exporterCsv}>
+                <Download size={15} /> Télécharger
+              </button>
+            </div>
+            <p className="bg-note">
+              Laissez une date vide pour ne pas borner de ce côté. Le fichier contient les
+              bénéficiaires enregistrés et les appuis transmis sur la période, avec l'état des
+              remboursements.
+            </p>
+          </div>
+        )}
       </header>
 
       <nav className="bg-onglets">
@@ -106,9 +238,11 @@ export default function BeneficiairesAgrPage() {
                 placeholder="Chercher un bénéficiaire…" className="bg-input-recherche"
               />
             </div>
-            <button className="btn-primary" onClick={() => setNouveauBenef(true)}>
-              <Plus size={16} /> Nouveau bénéficiaire
-            </button>
+            {estAsc && (
+              <button className="btn-primary" onClick={() => setNouveauBenef(true)}>
+                <Plus size={16} /> Nouveau bénéficiaire
+              </button>
+            )}
           </div>
 
           {benefFiltres.length === 0 ? (
@@ -133,9 +267,11 @@ export default function BeneficiairesAgrPage() {
                         </div>
                         {b.code_pec && <div className="bg-carte-pec">Code PEC : {b.code_pec}</div>}
                       </div>
-                      <button className="bg-btn-petit" onClick={() => setDemandePour(b)}>
-                        <HandCoins size={14} /> Demande d'appui
-                      </button>
+                      {estAsc && (
+                        <button className="bg-btn-petit" onClick={() => setDemandePour(b)}>
+                          <HandCoins size={14} /> Demande d'appui
+                        </button>
+                      )}
                     </div>
                     {sesAppuis.length > 0 && (
                       <ul className="bg-appuis-mini">
@@ -173,6 +309,14 @@ export default function BeneficiairesAgrPage() {
             <ul className="bg-liste">
               {appuis.map((a) => {
                 const s = STATUTS[a.statut] || STATUTS.transmis;
+                const sesVersements = versements.filter((v) => v.appui_id === a.id);
+                const totalDepose = sesVersements
+                  .filter((v) => v.statut === "depose")
+                  .reduce((t, v) => t + Number(v.montant), 0);
+                const enAttenteDepot = sesVersements.filter((v) => v.statut === "collecte");
+                const reste = a.montant_a_rembourser != null
+                  ? Math.max(a.montant_a_rembourser - totalDepose, 0) : null;
+
                 return (
                   <li key={a.id} className="bg-carte">
                     <div className="bg-carte-haut">
@@ -198,13 +342,69 @@ export default function BeneficiairesAgrPage() {
                         <span className="bg-chip" style={{ background: s.fond, color: s.couleur }}>
                           <s.Icone size={13} /> {s.label}
                         </span>
-                        {a.statut === "transmis" && (
+                        {estResponsableAgr && a.statut === "transmis" && (
                           <button className="bg-btn-petit" onClick={() => setAppuiATraiter(a)}>
                             Traiter
                           </button>
                         )}
+                        {estAsc && (a.statut === "decaisse" || a.statut === "solde") && (
+                          <button className="bg-btn-petit" onClick={() => setRemboursementPour(a)}>
+                            <Banknote size={14} /> Remboursement
+                          </button>
+                        )}
                       </div>
                     </div>
+
+                    {(a.statut === "decaisse" || a.statut === "solde") && a.montant_a_rembourser != null && (
+                      <div className="bg-remb">
+                        <div className="bg-remb-ligne">
+                          <span>Remboursé : <strong>{montant(totalDepose)} F</strong></span>
+                          {reste > 0 && <span>Reste : <strong>{montant(reste)} F</strong></span>}
+                        </div>
+                        <div className="bg-jauge">
+                          <div style={{
+                            width: `${Math.min((totalDepose / a.montant_a_rembourser) * 100, 100)}%`,
+                            background: reste === 0 ? C.success : C.primary,
+                          }} />
+                        </div>
+
+                        {enAttenteDepot.length > 0 && (
+                          <div className="bg-remb-attente">
+                            <Clock size={13} />
+                            {enAttenteDepot.length} versement{enAttenteDepot.length > 1 ? "s" : ""} collecté
+                            {enAttenteDepot.length > 1 ? "s" : ""} par l'ASC, en attente de dépôt
+                            {" "}({montant(enAttenteDepot.reduce((t, v) => t + Number(v.montant), 0))} F)
+                          </div>
+                        )}
+
+                        {sesVersements.length > 0 && (
+                          <ul className="bg-versements">
+                            {sesVersements.map((v) => (
+                              <li key={v.id}>
+                                <span>{new Date(v.date_versement).toLocaleDateString("fr-FR")}</span>
+                                <strong>{montant(v.montant)} F</strong>
+                                {v.statut === "depose" ? (
+                                  <span className="bg-chip" style={{ background: "#DCFCE7", color: C.success }}>
+                                    Déposé
+                                  </span>
+                                ) : estResponsableAgr ? (
+                                  <button
+                                    className="bg-btn-mini"
+                                    onClick={() => confirmerDepot(v.id)}
+                                  >
+                                    Confirmer le dépôt
+                                  </button>
+                                ) : (
+                                  <span className="bg-chip" style={{ background: "#FEF3C7", color: "#92400E" }}>
+                                    En attente de dépôt
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                   </li>
                 );
               })}
@@ -237,6 +437,14 @@ export default function BeneficiairesAgrPage() {
           onTraite={() => { setAppuiATraiter(null); charger(); }}
         />
       )}
+
+      {remboursementPour && (
+        <ModalRemboursement
+          appui={remboursementPour}
+          onCancel={() => setRemboursementPour(null)}
+          onEnregistre={() => { setRemboursementPour(null); charger(); }}
+        />
+      )}
     </div>
   );
 }
@@ -247,8 +455,45 @@ function ModalBeneficiaire({ organisationId, onCancel, onCree }) {
   const [form, setForm] = useState(BENEFICIAIRE_VIDE);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
+  const [gpsEnCours, setGpsEnCours] = useState(false);
+  const [gpsErreur, setGpsErreur] = useState("");
 
   const maj = (champ, valeur) => setForm((f) => ({ ...f, [champ]: valeur }));
+
+  // Capture explicite, jamais automatique : la position relevée est
+  // celle de l'appareil au moment du clic — donc celle du demandeur
+  // uniquement si l'ASC saisit sur place. Le bouton rend ce choix
+  // conscient plutôt que de relever une position trompeuse à distance.
+  function capterPosition() {
+    if (!navigator.geolocation) {
+      setGpsErreur("Cet appareil ne permet pas la géolocalisation.");
+      return;
+    }
+
+    setGpsEnCours(true);
+    setGpsErreur("");
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm((f) => ({
+          ...f,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          precision_gps: Math.round(pos.coords.accuracy),
+        }));
+        setGpsEnCours(false);
+      },
+      (err) => {
+        setGpsEnCours(false);
+        setGpsErreur(
+          err.code === 1
+            ? "Autorisation refusée — activez la localisation pour ce site."
+            : "Position introuvable. Réessayez à l'extérieur ou près d'une fenêtre."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
 
   async function enregistrer() {
     if (!form.nom.trim()) { setErreur("Le nom est obligatoire."); return; }
@@ -269,6 +514,9 @@ function ModalBeneficiaire({ organisationId, onCancel, onCree }) {
       code_pec: form.code_pec.trim() || null,
       statut_matrimonial: form.statut_matrimonial.trim() || null,
       scolarise: form.scolarise.trim() || null,
+      latitude: form.latitude,
+      longitude: form.longitude,
+      precision_gps: form.precision_gps,
       saisi_par: userData.user?.id,
     });
 
@@ -331,6 +579,28 @@ function ModalBeneficiaire({ organisationId, onCancel, onCree }) {
           </div>
         </div>
 
+        <div className="bg-gps">
+          <div className="bg-gps-haut">
+            <div>
+              <div className="bg-gps-titre">Localisation</div>
+              <div className="bg-gps-sous">
+                {form.latitude != null
+                  ? `${form.latitude.toFixed(5)}, ${form.longitude.toFixed(5)} · précision ${form.precision_gps} m`
+                  : "À relever sur place, chez le bénéficiaire."}
+              </div>
+            </div>
+            <button
+              type="button" className="bg-btn-petit"
+              onClick={capterPosition} disabled={gpsEnCours}
+            >
+              {gpsEnCours
+                ? <><Loader2 size={14} className="bg-spin" /> Relevé…</>
+                : <><MapPin size={14} /> {form.latitude != null ? "Relever à nouveau" : "Relever ici"}</>}
+            </button>
+          </div>
+          {gpsErreur && <div className="bg-gps-erreur">{gpsErreur}</div>}
+        </div>
+
         {erreur && <div className="bg-erreur"><AlertCircle size={15} /> {erreur}</div>}
 
         <div className="bg-modal-actions">
@@ -364,15 +634,15 @@ function ModalDemande({ beneficiaire, organisationId, onCancel, onCree }) {
     setEnvoi(true);
     setErreur("");
 
-    const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase.from("appuis_agr").insert({
-      organisation_id: organisationId,
-      beneficiaire_id: beneficiaire.id,
-      activite_a_entreprendre: form.activite_a_entreprendre.trim() || null,
-      type_agr: form.type_agr.trim() || null,
-      cout_projet: form.cout_projet ? Number(form.cout_projet) : null,
-      montant_demande: Number(form.montant_demande),
-      transmis_par: userData.user?.id,
+    // Passe par la fonction serveur, qui refuse une seconde demande
+    // tant que la précédente n'est pas soldée ou rejetée.
+    const { error } = await supabase.rpc("transmettre_demande_agr", {
+      p_organisation_id: organisationId,
+      p_beneficiaire_id: beneficiaire.id,
+      p_activite_a_entreprendre: form.activite_a_entreprendre.trim() || null,
+      p_type_agr: form.type_agr.trim() || null,
+      p_cout_projet: form.cout_projet ? Number(form.cout_projet) : null,
+      p_montant_demande: Number(form.montant_demande),
     });
 
     setEnvoi(false);
@@ -535,10 +805,83 @@ function ModalTraitement({ appui, onCancel, onTraite }) {
   );
 }
 
+/* ---------------- Collecter un remboursement (ASC) ---------------- */
+
+function ModalRemboursement({ appui, onCancel, onEnregistre }) {
+  const [form, setForm] = useState({
+    montant: "",
+    date_versement: new Date().toISOString().slice(0, 10),
+  });
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  async function enregistrer() {
+    if (!form.montant || Number(form.montant) <= 0) {
+      setErreur("Le montant est obligatoire.");
+      return;
+    }
+
+    setEnvoi(true);
+    setErreur("");
+
+    const { error } = await supabase.rpc("collecter_remboursement_agr", {
+      p_appui_id: appui.id,
+      p_montant: Number(form.montant),
+      p_date_versement: form.date_versement,
+    });
+
+    setEnvoi(false);
+    if (error) { setErreur(error.message); return; }
+    onEnregistre();
+  }
+
+  return (
+    <div className="bg-overlay" onClick={onCancel}>
+      <div className="bg-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="bg-modal-titre">Remboursement collecté</h3>
+        <p className="bg-modal-sous">
+          De <strong>{appui.beneficiaires_ong?.nom}</strong>. Ce versement sera marqué comme
+          collecté par vous, en attente de votre dépôt auprès du responsable AGR — qui le
+          confirmera de son côté.
+        </p>
+
+        <label className="bg-label">Montant reçu (FCFA) *</label>
+        <input
+          className="bg-input" type="number" value={form.montant}
+          onChange={(e) => setForm((f) => ({ ...f, montant: e.target.value }))}
+        />
+
+        <label className="bg-label">Date du versement</label>
+        <input
+          className="bg-input" type="date" value={form.date_versement}
+          onChange={(e) => setForm((f) => ({ ...f, date_versement: e.target.value }))}
+        />
+
+        {erreur && <div className="bg-erreur"><AlertCircle size={15} /> {erreur}</div>}
+
+        <div className="bg-modal-actions">
+          <button className="bg-btn-ghost" onClick={onCancel} disabled={envoi}>Annuler</button>
+          <button className="btn-primary" onClick={enregistrer} disabled={envoi}>
+            {envoi ? <><Loader2 size={15} className="bg-spin" /> Enregistrement…</> : "Enregistrer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const CSS = `
 .bg-wrap{ padding:${S.xl}px; max-width:960px; }
 .bg-sk{ height:220px; border-radius:${R.xl}px; background:${PALETTE.grey100}; }
 .bg-head{ margin-bottom:${S.lg}px; }
+.bg-head-ligne{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+.bg-export{
+  margin-top:14px; background:${C.bg}; border:1px solid ${C.border};
+  border-radius:${R.md}px; padding:14px 16px;
+}
+.bg-export-champs{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+.bg-export-champs > div{ flex:1; min-width:130px; }
+.bg-export-champs button{ flex-shrink:0; }
 .bg-titre{ display:flex; align-items:center; gap:9px; font-size:20px; font-weight:700; margin:0; }
 .bg-sous{ font-size:13.5px; color:${C.textSubtle}; margin:6px 0 0; max-width:62ch; line-height:1.5; }
 
@@ -590,6 +933,36 @@ const CSS = `
 .bg-appuis-mini li{ display:flex; align-items:center; gap:10px; font-size:12.5px; }
 .bg-appuis-mini li span:first-child{ flex:1; color:${C.textMuted}; }
 
+.bg-remb{ margin-top:13px; padding-top:13px; border-top:1px solid ${C.border}; }
+.bg-remb-ligne{
+  display:flex; justify-content:space-between; gap:12px;
+  font-size:12.5px; color:${C.textMuted}; margin-bottom:7px;
+}
+.bg-jauge{
+  height:6px; border-radius:${R.pill}px; background:${PALETTE.grey200}; overflow:hidden;
+}
+.bg-jauge div{ height:100%; border-radius:${R.pill}px; transition:width .4s ease; }
+.bg-remb-attente{
+  display:flex; align-items:center; gap:7px; margin-top:10px;
+  background:#FEF3C7; color:#92400E; border-radius:${R.md}px;
+  padding:8px 12px; font-size:12px; line-height:1.4;
+}
+.bg-versements{
+  list-style:none; margin:10px 0 0; padding:0;
+  display:flex; flex-direction:column; gap:6px;
+}
+.bg-versements li{
+  display:flex; align-items:center; gap:10px; font-size:12.5px;
+  padding:6px 0; border-bottom:1px solid ${C.border};
+}
+.bg-versements li:last-child{ border-bottom:none; }
+.bg-versements li span:first-child{ flex:1; color:${C.textSubtle}; }
+.bg-btn-mini{
+  background:${C.primary}; color:#fff; border:none; border-radius:${R.sm}px;
+  padding:5px 11px; cursor:pointer; font-family:inherit;
+  font-size:11.5px; font-weight:600; white-space:nowrap;
+}
+
 .bg-chip{
   display:inline-flex; align-items:center; gap:5px; border-radius:${R.pill}px;
   padding:4px 11px; font-size:11.5px; font-weight:600; white-space:nowrap;
@@ -629,6 +1002,15 @@ const CSS = `
 }
 .bg-grille2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 @media (max-width:520px){ .bg-grille2{ grid-template-columns:1fr; } }
+
+.bg-gps{
+  background:${C.bg}; border:1px solid ${C.border}; border-radius:${R.md}px;
+  padding:12px 14px; margin-top:6px;
+}
+.bg-gps-haut{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.bg-gps-titre{ font-size:13px; font-weight:600; }
+.bg-gps-sous{ font-size:11.5px; color:${C.textSubtle}; margin-top:3px; line-height:1.4; }
+.bg-gps-erreur{ font-size:11.5px; color:${C.danger}; margin-top:8px; line-height:1.4; }
 .bg-note{ font-size:11.5px; color:${C.textSubtle}; margin:2px 0 0; line-height:1.45; }
 
 .bg-choix{ display:flex; gap:8px; margin:6px 0; }

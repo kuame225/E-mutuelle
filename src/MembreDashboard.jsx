@@ -280,9 +280,10 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
   const logo = params.logo_url || LOGO_DEFAUT;
   const qrActif = moduleActif(params, "module_qr_carte");
 
-  const raccourcis = raccourcisPourType(mot).filter(
-    (r) => !r.module || moduleActif(params, r.module)
-  );
+  const raccourcis = raccourcisPourType(mot)
+    .filter((r) => !r.module || moduleActif(params, r.module))
+    // Sans cotisation configurée, la tuile mènerait à un écran vide.
+    .filter((r) => r.id !== "cotisations" || Number(params.montant_cotisation ?? 0) > 0);
 
   const joursRestants = echeance
     ? Math.ceil((new Date(echeance.date_limite) - new Date()) / 86400000)
@@ -446,40 +447,46 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
         )}
 
         {/* ---- Cotisation annuelle ---- */}
-        <section className="md-cotis">
-          <div className="md-cotis-glow" />
-          <div className="md-cotis-top">
-            <div>
-              <div className="md-cotis-title">{mot("cotisation_ma")}</div>
-              <div className="md-cotis-year">Année {annee}</div>
+        {/* Une organisation qui met le montant à zéro n'applique pas de
+            cotisation — une ONG, par exemple, dont les membres ne
+            cotisent pas. La section entière disparaît alors, plutôt
+            que d'afficher une barre de progression vide et sans objet. */}
+        {Number(params.montant_cotisation ?? 0) > 0 && (
+          <section className="md-cotis">
+            <div className="md-cotis-glow" />
+            <div className="md-cotis-top">
+              <div>
+                <div className="md-cotis-title">{mot("cotisation_ma")}</div>
+                <div className="md-cotis-year">Année {annee}</div>
+              </div>
+              <div className="md-cotis-amount">
+                {loading ? "…" : montant(annuel.du)} <span>FCFA</span>
+              </div>
             </div>
-            <div className="md-cotis-amount">
-              {loading ? "…" : montant(annuel.du)} <span>FCFA</span>
+
+            <div className="md-bar">
+              <div
+                className="md-bar-fill"
+                style={{
+                  width: `${progression}%`,
+                  background: progression >= 100
+                    ? "linear-gradient(90deg,#22C55E,#4ADE80)"
+                    : "linear-gradient(90deg,#22C55E,#86EFAC)",
+                }}
+              />
             </div>
-          </div>
 
-          <div className="md-bar">
-            <div
-              className="md-bar-fill"
-              style={{
-                width: `${progression}%`,
-                background: progression >= 100
-                  ? "linear-gradient(90deg,#22C55E,#4ADE80)"
-                  : "linear-gradient(90deg,#22C55E,#86EFAC)",
-              }}
-            />
-          </div>
-
-          <div className="md-cotis-foot">
-            <span>
-              Total payé : <strong>{montant(annuel.paye)} FCFA</strong>
-              {annuel.du > 0 && ` (${Math.round(progression)}%)`}
-            </span>
-            <span className={reste === 0 ? "md-ok" : ""}>
-              {reste === 0 ? "Année soldée" : `Reste : ${montant(reste)} FCFA`}
-            </span>
-          </div>
-        </section>
+            <div className="md-cotis-foot">
+              <span>
+                Total payé : <strong>{montant(annuel.paye)} FCFA</strong>
+                {annuel.du > 0 && ` (${Math.round(progression)}%)`}
+              </span>
+              <span className={reste === 0 ? "md-ok" : ""}>
+                {reste === 0 ? "Année soldée" : `Reste : ${montant(reste)} FCFA`}
+              </span>
+            </div>
+          </section>
+        )}
 
         {/* ---- Activation des alertes ---- */}
         {pushDisponible() && pushEtat !== "actif" && pushEtat !== "refuse" && (

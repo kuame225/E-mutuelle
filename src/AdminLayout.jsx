@@ -4,7 +4,7 @@ import {
   Gift, Megaphone, Calendar, BarChart3, Settings, LogOut,
   Menu, X, ShieldAlert, ScrollText, UserCircle2, ArrowLeftRight,
   Scale, ChevronsUpDown, Check, Loader2, KeyRound, Users2, RefreshCw, Banknote,
-  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake, Heart, Eye, Coins, HelpCircle,
+  FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake, Heart, Eye, Coins, HelpCircle, HandCoins,
 } from "lucide-react";
 import {
   useParametrage, moduleActif, LOGO_DEFAUT,
@@ -70,6 +70,7 @@ export const NAV_GROUPS = [
       { id: "sanctions",   label: "Sanctions",        icon: ShieldAlert, module: "module_sanctions" },
       { id: "activite_eco", label: "Activité économique", icon: ShoppingCart, module: "module_activites_economiques" },
       { id: "projets",      label: "Projets",          icon: Briefcase,   module: "module_projets" },
+      { id: "beneficiaires_agr", label: "Bénéficiaires et appuis", icon: HandCoins, module: "module_agr" },
       { id: "partage_benefices", label: "Partage des bénéfices", icon: PieChart, module: "module_parts_sociales" },
     ],
   },
@@ -135,6 +136,7 @@ function sousTitresPour(mot) {
     tombola:       "Tickets et tirages trimestriels",
     activite_eco:  "Achats, ventes et suivi du stock",
     projets:       "Projets, budgets et dépenses",
+    beneficiaires_agr: "Personnes suivies et appuis aux activités génératrices de revenus",
     partage_benefices: "Intérêt sur les parts sociales, par exercice",
     tontine:       "Cycles, ordre de passage et versements",
     epargne_avec:  "Parts, prêts internes et partage de fin de cycle",

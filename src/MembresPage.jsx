@@ -138,9 +138,15 @@ export default function MembresPage() {
       : actifs.filter((m) => m.statut_cotisation === id).length;
   };
 
-  const sansDroit = membres.filter(
-    (m) => !m.droit_adhesion_paye_le && !m.sortie_le
-  ).length;
+  // Une organisation qui met le droit d'adhésion à zéro n'est pas
+  // concernée par cette notion — une ONG, par exemple, dont les
+  // bénéficiaires ne sont pas des adhérents cotisants. Ni bannière,
+  // ni bouton, ni pastille d'alerte dans ce cas.
+  const droitAdhesionApplicable = Number(params.droit_adhesion ?? 0) > 0;
+
+  const sansDroit = droitAdhesionApplicable
+    ? membres.filter((m) => !m.droit_adhesion_paye_le && !m.sortie_le).length
+    : 0;
 
   if (loading) {
     return (
@@ -248,7 +254,7 @@ export default function MembresPage() {
                     </div>
                   </div>
 
-                  {!sorti && !m.droit_adhesion_paye_le && (
+                  {droitAdhesionApplicable && !sorti && !m.droit_adhesion_paye_le && (
                     <span className="mb-pastille" title="Droit d'adhésion non enregistré" />
                   )}
 
@@ -368,6 +374,9 @@ function FicheMembre({ membre, onBack, onUpdate }) {
 
   const droitPaye = Boolean(membre.droit_adhesion_paye_le);
   const montantReference = params.droit_adhesion ?? 2000;
+  // Zéro signifie que l'organisation n'applique pas de droit
+  // d'adhésion — toute la section disparaît alors de la fiche.
+  const droitAdhesionApplicable = Number(params.droit_adhesion ?? 0) > 0;
   const carenceMois = params.carence_mois ?? 3;
   const eligibilite = dateEligibilite(params, membre);
 
@@ -874,7 +883,7 @@ function FicheMembre({ membre, onBack, onUpdate }) {
                 {actif ? "Compte activé" : "Compte non activé"}
               </span>
 
-              {!sorti && (
+              {droitAdhesionApplicable && !sorti && (
                 <span
                   className="mb-chip"
                   style={{
@@ -991,7 +1000,7 @@ function FicheMembre({ membre, onBack, onUpdate }) {
         </section>
 
         {/* ---- Droit d'adhésion (article 15) ---- */}
-        {!sorti && (
+        {droitAdhesionApplicable && !sorti && (
           <section className="mb-acces">
             <header className="mb-acces-head">
               <span className="mb-acces-icon"><Receipt size={18} /></span>

@@ -53,6 +53,7 @@ import RapportsPage from "./RapportsPage";
 import OffresBaamoPage from "./OffresBaamoPage";
 import SuiviPaiementsWave from "./SuiviPaiementsWave";
 import AideSupportPage from "./AideSupportPage";
+import BeneficiairesAgrPage from "./BeneficiairesAgrPage";
 import DonsPage from "./DonsPage";
 import SanctionsPage from "./SanctionsPage";
 import SplashScreen from "./SplashScreen";
@@ -672,6 +673,7 @@ function Shell() {
           {page === "offres_baamo"  && <OffresBaamoPage />}
           {page === "suivi_wave"    && <SuiviPaiementsWave />}
           {page === "aide_support"  && <AideSupportPage />}
+          {page === "beneficiaires_agr" && <BeneficiairesAgrPage />}
           {page === "dons"          && <DonsPage />}
           {page === "journal"       && <JournalPage />}
           {page === "roles"         && <RolesPage />}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Users, Plus, Search, Loader2, AlertCircle, CheckCircle2, XCircle,
-  HandCoins, ArrowLeft, Clock, Banknote, MapPin, Download,
+  HandCoins, ArrowLeft, Clock, Banknote, MapPin, Download, Pencil,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
@@ -19,6 +19,43 @@ const STATUTS = {
   solde: { label: "Soldé", couleur: C.textMuted, fond: PALETTE.grey200, Icone: CheckCircle2 },
   rejete: { label: "Rejeté", couleur: C.danger, fond: "#FEE2E2", Icone: XCircle },
 };
+
+// Nombre de jours avant l'échéance à partir duquel on prévient. Assez
+// tôt pour que l'ASC ait le temps de passer voir le bénéficiaire,
+// assez tard pour ne pas alerter dans le vide.
+const JOURS_ALERTE_PREVENTIVE = 30;
+
+/**
+ * L'état de remboursement d'un appui décaissé : à jour, échéance
+ * proche, ou en retard. Un appui déjà soldé n'est jamais en retard,
+ * même si sa date de fin est passée — il a été remboursé.
+ */
+function etatEcheance(appui, totalDepose) {
+  if (appui.statut !== "decaisse") return null;
+  if (!appui.date_fin_remboursement) return null;
+  if (appui.montant_a_rembourser != null && totalDepose >= appui.montant_a_rembourser) return null;
+
+  const fin = new Date(appui.date_fin_remboursement);
+  const aujourdhui = new Date();
+  aujourdhui.setHours(0, 0, 0, 0);
+  const jours = Math.ceil((fin - aujourdhui) / 86400000);
+
+  if (jours < 0) {
+    return {
+      niveau: "retard",
+      label: `En retard de ${Math.abs(jours)} jour${Math.abs(jours) > 1 ? "s" : ""}`,
+      couleur: C.danger, fond: "#FEE2E2",
+    };
+  }
+  if (jours <= JOURS_ALERTE_PREVENTIVE) {
+    return {
+      niveau: "proche",
+      label: jours === 0 ? "Échéance aujourd'hui" : `Échéance dans ${jours} jour${jours > 1 ? "s" : ""}`,
+      couleur: C.warning, fond: "#FEF3C7",
+    };
+  }
+  return null;
+}
 
 const BENEFICIAIRE_VIDE = {
   nom: "", sexe: "", annee_naissance: "", activite_professionnelle: "",
@@ -40,6 +77,7 @@ export default function BeneficiairesAgrPage() {
   const [appuis, setAppuis] = useState([]);
   const [versements, setVersements] = useState([]);
   const [remboursementPour, setRemboursementPour] = useState(null);
+  const [ficheOuverte, setFicheOuverte] = useState(null);
   const [periode, setPeriode] = useState({ debut: "", fin: "" });
   const [exportOuvert, setExportOuvert] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,7 +93,7 @@ export default function BeneficiairesAgrPage() {
       supabase.from("beneficiaires_ong").select("*")
         .eq("organisation_id", params.organisation_id)
         .order("created_at", { ascending: false }),
-      supabase.from("appuis_agr").select("*, beneficiaires_ong(nom, contact)")
+      supabase.from("appuis_agr").select("*, beneficiaires_ong(nom, contact, sexe, lieu_residence)")
         .eq("organisation_id", params.organisation_id)
         .order("transmis_le", { ascending: false }),
       supabase.from("appuis_agr_versements").select("*")
@@ -76,7 +114,116 @@ export default function BeneficiairesAgrPage() {
     b.nom.toLowerCase().includes(recherche.toLowerCase().trim())
   );
 
+  // Reproduit exactement la mise en page de leur fichier de suivi :
+  // quatre sections d'en-tête, six versements en colonnes fixes, puis
+  // total, solde et observation. Le format leur permet de transmettre
+  // le document tel quel, sans le retravailler à la main.
+  function exporterFormatSuivi() {
+    const debut = periode.debut ? new Date(periode.debut) : null;
+    const fin = periode.fin ? new Date(periode.fin + "T23:59:59") : null;
+
+    const dansPeriode = (dateIso) => {
+      if (!dateIso) return false;
+      const d = new Date(dateIso);
+      if (debut && d < debut) return false;
+      if (fin && d > fin) return false;
+      return true;
+    };
+
+    const echapper = (v) => {
+      if (v == null) return "";
+      const s = String(v);
+      return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const ligne = (cellules) => cellules.map(echapper).join(";");
+    const dateFr = (d) => (d ? new Date(d).toLocaleDateString("fr-FR") : "");
+
+    const retenus = appuis.filter((a) => dansPeriode(a.transmis_le));
+    const MAX_VERSEMENTS = 6;
+
+    const lignes = [];
+
+    // Première ligne d'en-tête : les quatre grandes sections, chacune
+    // positionnée au-dessus de sa première colonne.
+    const sections = new Array(32).fill("");
+    sections[0] = "INFORMATIONS GENERALES";
+    sections[5] = "INFORMATION SUR L'AGR";
+    sections[8] = "INFORMATION SUR LE PRÊT";
+    sections[14] = "REMBOURSEMENT";
+    lignes.push(ligne(sections));
+
+    const entetes = [
+      "N°", "NOM ET PRENOMS", "Sexe", "Contact", "LIEU DE RESIDENCE",
+      "ACTIVITE A ENTREPRENDRE", "TYPE D'AGR", "COUT DU PROJET",
+      "MONTANT DE PRÊT DEMANDE", "MONTANT DE PRÊT ACCORDE",
+      "DATE DE DECAISSEMENT", "TAUX", "MONTANT A REMBOURSER",
+      "DATE DE FIN DE REMBOURSEMENT",
+    ];
+    for (let i = 1; i <= MAX_VERSEMENTS; i++) {
+      entetes.push(`${i}${i === 1 ? "er" : "ème"} VERSEMENT - DATE`);
+      entetes.push(`${i}${i === 1 ? "er" : "ème"} VERSEMENT - MONTANT`);
+    }
+    entetes.push("TOTAL REMBOURSE", "SOLDE", "OBSERVATION");
+    lignes.push(ligne(entetes));
+
+    retenus.forEach((a, index) => {
+      const b = a.beneficiaires_ong || {};
+      const sesVersements = versements
+        .filter((v) => v.appui_id === a.id && v.statut === "depose")
+        .sort((x, y) => new Date(x.date_versement) - new Date(y.date_versement));
+
+      const totalRembourse = sesVersements.reduce((t, v) => t + Number(v.montant), 0);
+      const solde = a.montant_a_rembourser != null
+        ? Math.max(a.montant_a_rembourser - totalRembourse, 0) : "";
+
+      const cellules = [
+        index + 1, b.nom, b.sexe || "", b.contact || "", b.lieu_residence || "",
+        a.activite_a_entreprendre, a.type_agr, a.cout_projet,
+        a.montant_demande, a.montant_accorde,
+        dateFr(a.date_decaissement), a.taux_interet_pct, a.montant_a_rembourser,
+        dateFr(a.date_fin_remboursement),
+      ];
+
+      for (let i = 0; i < MAX_VERSEMENTS; i++) {
+        const v = sesVersements[i];
+        cellules.push(v ? dateFr(v.date_versement) : "");
+        cellules.push(v ? v.montant : "");
+      }
+
+      // Au-delà de six versements, le format d'origine ne prévoit rien :
+      // plutôt que de perdre l'information en silence, elle est signalée
+      // en observation.
+      const surplus = sesVersements.length - MAX_VERSEMENTS;
+      cellules.push(totalRembourse, solde,
+        surplus > 0 ? `${surplus} versement(s) supplémentaire(s) non détaillé(s) ici` : "");
+
+      lignes.push(ligne(cellules));
+    });
+
+    const contenu = "\uFEFF" + lignes.join("\n");
+    const url = URL.createObjectURL(new Blob([contenu], { type: "text/csv;charset=utf-8;" }));
+    const lien = document.createElement("a");
+    lien.href = url;
+    lien.download = `suivi-des-prets-${periode.debut || "debut"}-${periode.fin || "aujourdhui"}.csv`;
+    lien.click();
+    URL.revokeObjectURL(url);
+  }
+
   const enAttente = appuis.filter((a) => a.statut === "transmis").length;
+
+  // Synthèse des échéances, tous appuis confondus — pour qu'un
+  // responsable suivant vingt dossiers voie l'essentiel sans parcourir
+  // toute la liste.
+  const alertes = appuis
+    .map((a) => {
+      const depose = versements
+        .filter((v) => v.appui_id === a.id && v.statut === "depose")
+        .reduce((t, v) => t + Number(v.montant), 0);
+      return etatEcheance(a, depose);
+    })
+    .filter(Boolean);
+  const nbRetards = alertes.filter((x) => x.niveau === "retard").length;
+  const nbProches = alertes.filter((x) => x.niveau === "proche").length;
 
   async function confirmerDepot(versementId) {
     setErreur("");
@@ -162,6 +309,23 @@ export default function BeneficiairesAgrPage() {
 
   if (loading) return <div className="bg-wrap"><style>{CSS}</style><div className="bg-sk" /></div>;
 
+  if (ficheOuverte) {
+    const benef = beneficiaires.find((b) => b.id === ficheOuverte) || null;
+    if (benef) {
+      return (
+        <FicheBeneficiaire
+          beneficiaire={benef}
+          appuis={appuis.filter((a) => a.beneficiaire_id === benef.id)}
+          versements={versements}
+          estAsc={estAsc}
+          onBack={() => setFicheOuverte(null)}
+          onModifie={charger}
+          onDemande={() => setDemandePour(benef)}
+        />
+      );
+    }
+  }
+
   return (
     <div className="bg-wrap">
       <style>{CSS}</style>
@@ -198,13 +362,16 @@ export default function BeneficiairesAgrPage() {
                 />
               </div>
               <button className="btn-primary" onClick={exporterCsv}>
-                <Download size={15} /> Télécharger
+                <Download size={15} /> Listing complet
+              </button>
+              <button className="bg-btn-petit" onClick={exporterFormatSuivi}>
+                <Download size={14} /> Format suivi des prêts
               </button>
             </div>
             <p className="bg-note">
-              Laissez une date vide pour ne pas borner de ce côté. Le fichier contient les
-              bénéficiaires enregistrés et les appuis transmis sur la période, avec l'état des
-              remboursements.
+              Laissez une date vide pour ne pas borner de ce côté. Le <strong>listing complet</strong> reprend
+              les bénéficiaires et les appuis dans deux sections ; le <strong>format suivi des prêts</strong> reproduit
+              la mise en page de votre fichier habituel, prêt à transmettre.
             </p>
           </div>
         )}
@@ -227,6 +394,23 @@ export default function BeneficiairesAgrPage() {
       </nav>
 
       {erreur && <div className="bg-erreur"><AlertCircle size={15} /> {erreur}</div>}
+
+      {(nbRetards > 0 || nbProches > 0) && (
+        <div className={`bg-synthese ${nbRetards > 0 ? "is-retard" : ""}`}>
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+          <span>
+            {nbRetards > 0 && (
+              <strong>
+                {nbRetards} appui{nbRetards > 1 ? "s" : ""} en retard de remboursement
+              </strong>
+            )}
+            {nbRetards > 0 && nbProches > 0 && " · "}
+            {nbProches > 0 && (
+              <>{nbProches} échéance{nbProches > 1 ? "s" : ""} dans les {JOURS_ALERTE_PREVENTIVE} jours</>
+            )}
+          </span>
+        </div>
+      )}
 
       {onglet === "beneficiaires" ? (
         <>
@@ -259,14 +443,17 @@ export default function BeneficiairesAgrPage() {
                 return (
                   <li key={b.id} className="bg-carte">
                     <div className="bg-carte-haut">
-                      <div>
+                      <button
+                        className="bg-carte-lien"
+                        onClick={() => setFicheOuverte(b.id)}
+                      >
                         <div className="bg-carte-nom">{b.nom}</div>
                         <div className="bg-carte-meta">
                           {[b.activite_professionnelle, b.lieu_residence, b.contact]
                             .filter(Boolean).join(" · ") || "—"}
                         </div>
                         {b.code_pec && <div className="bg-carte-pec">Code PEC : {b.code_pec}</div>}
-                      </div>
+                      </button>
                       {estAsc && (
                         <button className="bg-btn-petit" onClick={() => setDemandePour(b)}>
                           <HandCoins size={14} /> Demande d'appui
@@ -316,6 +503,7 @@ export default function BeneficiairesAgrPage() {
                 const enAttenteDepot = sesVersements.filter((v) => v.statut === "collecte");
                 const reste = a.montant_a_rembourser != null
                   ? Math.max(a.montant_a_rembourser - totalDepose, 0) : null;
+                const alerte = etatEcheance(a, totalDepose);
 
                 return (
                   <li key={a.id} className="bg-carte">
@@ -342,6 +530,11 @@ export default function BeneficiairesAgrPage() {
                         <span className="bg-chip" style={{ background: s.fond, color: s.couleur }}>
                           <s.Icone size={13} /> {s.label}
                         </span>
+                        {alerte && (
+                          <span className="bg-chip" style={{ background: alerte.fond, color: alerte.couleur }}>
+                            <AlertCircle size={13} /> {alerte.label}
+                          </span>
+                        )}
                         {estResponsableAgr && a.statut === "transmis" && (
                           <button className="bg-btn-petit" onClick={() => setAppuiATraiter(a)}>
                             Traiter
@@ -870,6 +1063,233 @@ function ModalRemboursement({ appui, onCancel, onEnregistre }) {
   );
 }
 
+/* ---------------- Fiche détaillée d'un bénéficiaire ---------------- */
+
+function FicheBeneficiaire({ beneficiaire, appuis, versements, estAsc, onBack, onModifie, onDemande }) {
+  const [edition, setEdition] = useState(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const b = beneficiaire;
+
+  async function enregistrerModif() {
+    if (!edition.nom.trim()) { setErreur("Le nom est obligatoire."); return; }
+
+    setEnvoi(true);
+    setErreur("");
+
+    const { data, error } = await supabase.from("beneficiaires_ong")
+      .update({
+        nom: edition.nom.trim(),
+        sexe: edition.sexe || null,
+        annee_naissance: edition.annee_naissance ? Number(edition.annee_naissance) : null,
+        activite_professionnelle: edition.activite_professionnelle?.trim() || null,
+        lieu_residence: edition.lieu_residence?.trim() || null,
+        contact: edition.contact?.trim() || null,
+        centre_pec: edition.centre_pec?.trim() || null,
+        code_pec: edition.code_pec?.trim() || null,
+      })
+      .eq("id", b.id)
+      .select();
+
+    setEnvoi(false);
+    // Une politique RLS qui refuse n'émet pas d'erreur : elle affecte
+    // zéro ligne. C'est donc la longueur du résultat qui révèle un refus.
+    if (error || !data || data.length === 0) {
+      setErreur("La modification n'a pas abouti — seul l'ASC peut modifier une fiche.");
+      return;
+    }
+    setEdition(null);
+    onModifie();
+  }
+
+  const champ = (cle, valeur) => setEdition((e) => ({ ...e, [cle]: valeur }));
+
+  return (
+    <div className="bg-wrap">
+      <style>{CSS}</style>
+
+      <button className="bg-retour" onClick={onBack}>
+        <ArrowLeft size={15} /> Retour à la liste
+      </button>
+
+      <header className="bg-fiche-head">
+        <div>
+          <h1 className="bg-fiche-nom">{b.nom}</h1>
+          <p className="bg-fiche-sous">
+            {[b.activite_professionnelle, b.lieu_residence].filter(Boolean).join(" · ") || "—"}
+          </p>
+        </div>
+        <div className="bg-fiche-actions">
+          {estAsc && !edition && (
+            <button className="bg-btn-petit" onClick={() => setEdition({ ...b })}>
+              <Pencil size={14} /> Modifier
+            </button>
+          )}
+          {estAsc && (
+            <button className="bg-btn-petit" onClick={onDemande}>
+              <HandCoins size={14} /> Demande d'appui
+            </button>
+          )}
+        </div>
+      </header>
+
+      {erreur && <div className="bg-erreur"><AlertCircle size={15} /> {erreur}</div>}
+
+      {edition ? (
+        <section className="bg-carte">
+          <h3 className="bg-section-titre">Modifier la fiche</h3>
+
+          <label className="bg-label">Nom et prénoms *</label>
+          <input className="bg-input" value={edition.nom}
+            onChange={(e) => champ("nom", e.target.value)} />
+
+          <div className="bg-grille2">
+            <div>
+              <label className="bg-label">Sexe</label>
+              <select className="bg-input" value={edition.sexe || ""}
+                onChange={(e) => champ("sexe", e.target.value)}>
+                <option value="">—</option>
+                <option value="M">Masculin</option>
+                <option value="F">Féminin</option>
+              </select>
+            </div>
+            <div>
+              <label className="bg-label">Année de naissance</label>
+              <input className="bg-input" type="number" value={edition.annee_naissance || ""}
+                onChange={(e) => champ("annee_naissance", e.target.value)} />
+            </div>
+          </div>
+
+          <label className="bg-label">Activité professionnelle</label>
+          <input className="bg-input" value={edition.activite_professionnelle || ""}
+            onChange={(e) => champ("activite_professionnelle", e.target.value)} />
+
+          <div className="bg-grille2">
+            <div>
+              <label className="bg-label">Lieu de résidence</label>
+              <input className="bg-input" value={edition.lieu_residence || ""}
+                onChange={(e) => champ("lieu_residence", e.target.value)} />
+            </div>
+            <div>
+              <label className="bg-label">Contact</label>
+              <input className="bg-input" value={edition.contact || ""}
+                onChange={(e) => champ("contact", e.target.value)} />
+            </div>
+          </div>
+
+          <div className="bg-grille2">
+            <div>
+              <label className="bg-label">Centre de prise en charge</label>
+              <input className="bg-input" value={edition.centre_pec || ""}
+                onChange={(e) => champ("centre_pec", e.target.value)} />
+            </div>
+            <div>
+              <label className="bg-label">Code PEC</label>
+              <input className="bg-input" value={edition.code_pec || ""}
+                onChange={(e) => champ("code_pec", e.target.value)} />
+            </div>
+          </div>
+
+          <div className="bg-modal-actions">
+            <button className="bg-btn-ghost" onClick={() => { setEdition(null); setErreur(""); }} disabled={envoi}>
+              Annuler
+            </button>
+            <button className="btn-primary" onClick={enregistrerModif} disabled={envoi}>
+              {envoi ? <><Loader2 size={15} className="bg-spin" /> Enregistrement…</> : "Enregistrer"}
+            </button>
+          </div>
+        </section>
+      ) : (
+        <section className="bg-carte">
+          <h3 className="bg-section-titre">Informations</h3>
+          <dl className="bg-infos">
+            <div><dt>Sexe</dt><dd>{b.sexe === "M" ? "Masculin" : b.sexe === "F" ? "Féminin" : "—"}</dd></div>
+            <div><dt>Année de naissance</dt><dd>{b.annee_naissance || "—"}</dd></div>
+            <div><dt>Activité</dt><dd>{b.activite_professionnelle || "—"}</dd></div>
+            <div><dt>Résidence</dt><dd>{b.lieu_residence || "—"}</dd></div>
+            <div><dt>Contact</dt><dd>{b.contact || "—"}</dd></div>
+            <div><dt>Centre PEC</dt><dd>{b.centre_pec || "—"}</dd></div>
+            <div><dt>Code PEC</dt><dd>{b.code_pec || "—"}</dd></div>
+            <div>
+              <dt>Enregistré le</dt>
+              <dd>{new Date(b.created_at).toLocaleDateString("fr-FR")}</dd>
+            </div>
+          </dl>
+
+          {b.latitude != null && (
+            <div className="bg-localisation">
+              <div>
+                <div className="bg-loc-titre"><MapPin size={14} /> Localisation relevée</div>
+                <div className="bg-loc-coord">
+                  {b.latitude.toFixed(5)}, {b.longitude.toFixed(5)}
+                  {b.precision_gps && ` · précision ${b.precision_gps} m`}
+                </div>
+              </div>
+              <a
+                className="bg-btn-petit"
+                href={`https://www.google.com/maps?q=${b.latitude},${b.longitude}`}
+                target="_blank" rel="noopener noreferrer"
+              >
+                Voir sur la carte
+              </a>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="bg-carte">
+        <h3 className="bg-section-titre">
+          Historique des appuis
+          {appuis.length > 0 && <span className="bg-badge">{appuis.length}</span>}
+        </h3>
+
+        {appuis.length === 0 ? (
+          <p className="bg-note">Aucun appui demandé pour ce bénéficiaire.</p>
+        ) : (
+          <ul className="bg-histo">
+            {appuis.map((a) => {
+              const s = STATUTS[a.statut] || STATUTS.transmis;
+              const depose = versements
+                .filter((v) => v.appui_id === a.id && v.statut === "depose")
+                .reduce((t, v) => t + Number(v.montant), 0);
+              const alerte = etatEcheance(a, depose);
+
+              return (
+                <li key={a.id} className="bg-histo-item">
+                  <div className="bg-histo-haut">
+                    <span className="bg-histo-titre">
+                      {a.type_agr || a.activite_a_entreprendre || "Appui"}
+                    </span>
+                    <span className="bg-chip" style={{ background: s.fond, color: s.couleur }}>
+                      <s.Icone size={12} /> {s.label}
+                    </span>
+                  </div>
+                  <div className="bg-histo-detail">
+                    Demandé {montant(a.montant_demande)} F
+                    {a.montant_accorde != null && ` · accordé ${montant(a.montant_accorde)} F`}
+                    {a.montant_a_rembourser != null && ` · remboursé ${montant(depose)} / ${montant(a.montant_a_rembourser)} F`}
+                  </div>
+                  <div className="bg-histo-date">
+                    Transmis le {new Date(a.transmis_le).toLocaleDateString("fr-FR")}
+                    {a.date_decaissement && ` · décaissé le ${new Date(a.date_decaissement).toLocaleDateString("fr-FR")}`}
+                  </div>
+                  {alerte && (
+                    <span className="bg-chip" style={{ background: alerte.fond, color: alerte.couleur, marginTop: 6 }}>
+                      <AlertCircle size={12} /> {alerte.label}
+                    </span>
+                  )}
+                  {a.motif_rejet && <div className="bg-carte-rejet">Motif : {a.motif_rejet}</div>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
 const CSS = `
 .bg-wrap{ padding:${S.xl}px; max-width:960px; }
 .bg-sk{ height:220px; border-radius:${R.xl}px; background:${PALETTE.grey100}; }
@@ -882,6 +1302,64 @@ const CSS = `
 .bg-export-champs{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
 .bg-export-champs > div{ flex:1; min-width:130px; }
 .bg-export-champs button{ flex-shrink:0; }
+
+.bg-synthese{
+  display:flex; align-items:center; gap:10px;
+  background:#FEF3C7; color:#92400E; border-radius:${R.md}px;
+  padding:12px 15px; font-size:13px; line-height:1.45; margin-bottom:${S.lg}px;
+}
+.bg-synthese.is-retard{ background:#FEE2E2; color:${C.danger}; }
+
+.bg-retour{
+  display:flex; align-items:center; gap:6px; background:none; border:none;
+  color:${C.primary}; cursor:pointer; font-family:inherit;
+  font-size:13.5px; font-weight:600; padding:0; margin-bottom:${S.lg}px;
+}
+.bg-fiche-head{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:14px; flex-wrap:wrap; margin-bottom:${S.lg}px;
+}
+.bg-fiche-nom{ font-size:22px; font-weight:700; margin:0; }
+.bg-fiche-sous{ font-size:13.5px; color:${C.textSubtle}; margin:5px 0 0; }
+.bg-fiche-actions{ display:flex; gap:8px; flex-shrink:0; }
+.bg-section-titre{
+  display:flex; align-items:center; gap:9px;
+  font-size:15px; font-weight:700; margin:0 0 14px;
+}
+.bg-carte + .bg-carte{ margin-top:${S.md}px; }
+
+.bg-infos{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+  gap:14px; margin:0;
+}
+@media (max-width:520px){ .bg-infos{ grid-template-columns:1fr 1fr; } }
+.bg-infos dt{ font-size:11.5px; color:${C.textSubtle}; font-weight:600; }
+.bg-infos dd{ font-size:14px; margin:3px 0 0; }
+
+.bg-localisation{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-top:16px; padding-top:16px; border-top:1px solid ${C.border}; flex-wrap:wrap;
+}
+.bg-loc-titre{ display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; }
+.bg-loc-coord{ font-size:12px; color:${C.textSubtle}; margin-top:3px; }
+
+.bg-carte-lien{
+  flex:1; min-width:0; text-align:left; background:none; border:none;
+  padding:0; cursor:pointer; font-family:inherit; color:inherit;
+}
+.bg-carte-lien:hover .bg-carte-nom{ color:${C.primary}; }
+
+.bg-histo{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.bg-histo-item{
+  background:${C.bg}; border-radius:${R.md}px; padding:13px 15px;
+}
+.bg-histo-haut{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; margin-bottom:6px; flex-wrap:wrap;
+}
+.bg-histo-titre{ font-size:14px; font-weight:600; }
+.bg-histo-detail{ font-size:12.5px; color:${C.textMuted}; }
+.bg-histo-date{ font-size:11.5px; color:${C.textSubtle}; margin-top:3px; }
 .bg-titre{ display:flex; align-items:center; gap:9px; font-size:20px; font-weight:700; margin:0; }
 .bg-sous{ font-size:13.5px; color:${C.textSubtle}; margin:6px 0 0; max-width:62ch; line-height:1.5; }
 

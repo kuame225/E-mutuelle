@@ -42,6 +42,7 @@ export const NAV_GROUPS = [
     items: [
       { id: "adhesions", label: (mot) => mot("adhesions"), icon: FilePlus2 },
       { id: "membres",   label: (mot) => mot("membres"),   icon: Users },
+      { id: "beneficiaires_agr", label: "Bénéficiaires et appuis", icon: HandCoins, module: "module_agr" },
     ],
   },
   {
@@ -70,7 +71,6 @@ export const NAV_GROUPS = [
       { id: "sanctions",   label: "Sanctions",        icon: ShieldAlert, module: "module_sanctions" },
       { id: "activite_eco", label: "Activité économique", icon: ShoppingCart, module: "module_activites_economiques" },
       { id: "projets",      label: "Projets",          icon: Briefcase,   module: "module_projets" },
-      { id: "beneficiaires_agr", label: "Bénéficiaires et appuis", icon: HandCoins, module: "module_agr" },
       { id: "partage_benefices", label: "Partage des bénéfices", icon: PieChart, module: "module_parts_sociales" },
     ],
   },

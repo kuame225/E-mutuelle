@@ -34,7 +34,8 @@ function raccourcisPourType(mot) {
     { id: "documents_membre", icon: FileBadge, l1: "Mes",      l2: "documents", color: C.success },
     { id: "calendrier_membre", icon: CalendarDays, l1: "Mon",   l2: "calendrier", color: C.primaryLight },
     { id: "historique_membre", icon: History, l1: "Mon",   l2: "historique", color: C.warning },
-    { id: "aides",         icon: HandHeart,   l1: "Demander", l2: `${mot("aide").toLowerCase()}`,   color: C.success },
+    { id: "aides",         icon: HandHeart,   l1: "Demander", l2: `${mot("aide").toLowerCase()}`,   color: C.success,
+      module: "module_aides" },
     { id: "tombola",       icon: Gift,        l1: "Tombola",  l2: "& récompenses", color: C.warning,
       module: "module_tombola" },
     { id: "assemblees",    icon: Users2,      l1: "Assemblées", l2: "générales",   color: C.primaryLight,
@@ -51,7 +52,11 @@ function raccourcisPourType(mot) {
       module: "module_services" },
     { id: "partenariats",  icon: Handshake,   l1: "Partenaires", l2: "de l'organisation", color: C.success,
       module: "module_partenariats" },
-    { id: "beneficiaires", icon: Users,       l1: "Mes",      l2: "bénéficiaires", color: C.primaryLight },
+    // Les ayants droit d'un membre (conjoint, enfants) n'ont de sens
+    // que si l'organisation verse des aides sociales : c'est leur
+    // seule raison d'être. Même condition que côté administration.
+    { id: "beneficiaires", icon: Users,       l1: "Mes",      l2: "bénéficiaires", color: C.primaryLight,
+      module: "module_aides" },
     { id: "aide_support",  icon: HelpCircle,  l1: "Aide",     l2: "et support",    color: C.textSubtle },
   ];
 }

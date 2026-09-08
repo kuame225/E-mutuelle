@@ -6,6 +6,7 @@ import {
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
 import { usePermissions } from "./usePermissions";
+import ReprendreAppuiModal from "./ReprendreAppuiModal";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 function montant(v) {
@@ -78,6 +79,7 @@ export default function BeneficiairesAgrPage() {
   const [versements, setVersements] = useState([]);
   const [remboursementPour, setRemboursementPour] = useState(null);
   const [ficheOuverte, setFicheOuverte] = useState(null);
+  const [repriseOuverte, setRepriseOuverte] = useState(false);
   const [periode, setPeriode] = useState({ debut: "", fin: "" });
   const [exportOuvert, setExportOuvert] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -339,9 +341,16 @@ export default function BeneficiairesAgrPage() {
               distincts des membres de l'organisation elle-même.
             </p>
           </div>
-          <button className="bg-btn-petit" onClick={() => setExportOuvert((v) => !v)}>
-            <Download size={14} /> Exporter
-          </button>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {estResponsableAgr && (
+              <button className="bg-btn-petit" onClick={() => setRepriseOuverte(true)}>
+                <Plus size={14} /> Reprendre un appui
+              </button>
+            )}
+            <button className="bg-btn-petit" onClick={() => setExportOuvert((v) => !v)}>
+              <Download size={14} /> Exporter
+            </button>
+          </div>
         </div>
 
         {exportOuvert && (
@@ -636,6 +645,15 @@ export default function BeneficiairesAgrPage() {
           appui={remboursementPour}
           onCancel={() => setRemboursementPour(null)}
           onEnregistre={() => { setRemboursementPour(null); charger(); }}
+        />
+      )}
+
+      {repriseOuverte && (
+        <ReprendreAppuiModal
+          organisationId={params.organisation_id}
+          beneficiaires={beneficiaires}
+          onClose={() => setRepriseOuverte(false)}
+          onTermine={() => { setRepriseOuverte(false); setOnglet("appuis"); charger(); }}
         />
       )}
     </div>

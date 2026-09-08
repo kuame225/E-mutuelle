@@ -181,14 +181,19 @@ const DIFFERENCES = {
     organisation_de: "de l'organisation",
     organisation_notre: "notre organisation",
     organisation_votre: "votre organisation",
-    membres: "Bénéficiaires",
-    membre_un: "un bénéficiaire",
-    membre_le: "le bénéficiaire",
-    membre_singulier: "Bénéficiaire",
-    adhesion: "Enregistrement",
-    adhesions: "Enregistrements",
-    adherer: "S'enregistrer",
-    demande_adhesion: "Demande d'enregistrement",
+    // Les membres de l'ONG sont son personnel et ses volontaires — pas
+    // les personnes qu'elle accompagne. Celles-ci vivent dans le module
+    // "Bénéficiaires et appuis", où elles n'ont ni compte ni cotisation.
+    // Les appeler toutes deux "bénéficiaires" mélangeait deux notions
+    // qui n'ont rien à voir.
+    membres: "Membres",
+    membre_un: "un membre",
+    membre_le: "le membre",
+    membre_singulier: "Membre",
+    adhesion: "Adhésion",
+    adhesions: "Adhésions",
+    adherer: "Adhérer",
+    demande_adhesion: "Demande d'adhésion",
     cotisation: "Contribution",
     cotisations: "Contributions",
     cotisation_la: "la contribution",
@@ -201,10 +206,10 @@ const DIFFERENCES = {
     bureau: "Coordination",
     bureau_le: "la Coordination",
     bureau_du: "de la Coordination",
-    carte: "Carte de bénéficiaire",
+    carte: "Carte de membre",
     matricule: "Référence",
     changer_organisation: "Changer d'organisation",
-    espace_membre: "Mon espace bénéficiaire",
+    espace_membre: "Mon espace membre",
   },
 
   avec: {

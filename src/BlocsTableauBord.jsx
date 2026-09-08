@@ -180,11 +180,13 @@ export function BlocTresorerie({ stats }) {
   return (
     <>
       <CarteKpi
-        label="Solde de la caisse" valeur={montant(stats.solde)} unite=" FCFA"
+        label={stats.labelSolde || "Solde de la caisse"}
+        valeur={montant(stats.solde)} unite=" FCFA"
         hint={stats.hintSolde} Icone={Wallet} couleur={C.primary}
       />
       <CarteKpi
-        label="Total encaissé" valeur={montant(stats.totalPaye)} unite=" FCFA"
+        label={stats.labelEncaisse || "Total encaissé"}
+        valeur={montant(stats.totalPaye)} unite=" FCFA"
         hint={stats.hintEncaisse} Icone={TrendingUp} couleur={C.success}
       />
     </>

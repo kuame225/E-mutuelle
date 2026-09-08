@@ -48,10 +48,13 @@ export const NAV_GROUPS = [
   {
     titre: "Finances",
     items: [
-      { id: "cotisations",  label: (mot) => mot("cotisations"), icon: Receipt },
-      { id: "moyens_paiement", label: "Moyens de paiement", icon: Smartphone },
-      { id: "declarations_paiement", label: "Paiements déclarés", icon: ClipboardCheck },
-      { id: "suivi_wave", label: "Suivi des paiements Wave", icon: Wallet },
+      // Ces quatre écrans n'existent que pour collecter des cotisations.
+      // Une organisation qui n'en applique pas (une ONG, financée par
+      // les bailleurs et les dons) n'a rien à y faire.
+      { id: "cotisations",  label: (mot) => mot("cotisations"), icon: Receipt, exigeCotisation: true },
+      { id: "moyens_paiement", label: "Moyens de paiement", icon: Smartphone, exigeCotisation: true },
+      { id: "declarations_paiement", label: "Paiements déclarés", icon: ClipboardCheck, exigeCotisation: true },
+      { id: "suivi_wave", label: "Suivi des paiements Wave", icon: Wallet, exigeCotisation: true },
       { id: "operations",   label: "Opérations diverses",       icon: ArrowLeftRight },
       { id: "comptabilite", label: "Comptabilité",              icon: Wallet },
     ],
@@ -199,6 +202,9 @@ export default function AdminLayout({ page, onPage, onSignOut, onEspaceMembre, c
           .filter(
             (item) =>
               (!item.module || moduleActif(params, item.module)) &&
+              // Un écran de collecte de cotisations disparaît quand
+              // l'organisation n'en applique pas.
+              (!item.exigeCotisation || Number(params.montant_cotisation ?? 0) > 0) &&
               peut(item.id)
           )
           .map((item) => ({ ...item, label: resoudre(item.label, mot) })),

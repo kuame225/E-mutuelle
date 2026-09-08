@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabaseClient";
+import { genererRapportOng } from "./rapportOng";
 import { useParametrage } from "./useParametrage";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
@@ -19,6 +20,13 @@ export default function RapportsPage() {
   const [exercicesClotures, setExercicesClotures] = useState([]);
   const [confirmationCloture, setConfirmationCloture] = useState(null); // année
   const [clotureEnCours, setClotureEnCours] = useState(false);
+
+  // Les rapports existants sont entièrement bâtis sur les cotisations
+  // (taux de recouvrement, périodes de cotisation). Une organisation
+  // qui n'en collecte pas — une ONG financée par les bailleurs — a
+  // besoin d'autre chose : un rapport d'activité tourné vers les
+  // bénéficiaires suivis, les appuis accordés et les projets.
+  const sansCotisation = Number(params.montant_cotisation ?? 0) <= 0;
 
   async function chargerExercicesClotures() {
     const { data } = await supabase
@@ -46,6 +54,33 @@ export default function RapportsPage() {
 
   useEffect(() => {
     async function charger() {
+      // Sans cotisation, les périodes ne peuvent pas venir d'elles :
+      // elles sont dérivées de l'activité réelle (appuis transmis) et
+      // complétées par le mois en cours, pour qu'un rapport soit
+      // toujours possible même sur une organisation qui démarre.
+      if (sansCotisation) {
+        const { data: appuis } = await supabase.from("appuis_agr")
+          .select("transmis_le").eq("organisation_id", params.organisation_id);
+
+        const moisSet = new Set();
+        (appuis || []).forEach((a) => {
+          if (a.transmis_le) moisSet.add(a.transmis_le.slice(0, 7));
+        });
+        moisSet.add(new Date().toISOString().slice(0, 7));
+
+        const mois = [...moisSet].sort().reverse().map((periode) => ({ periode }));
+        const annees = [...new Set([...moisSet].map((m) => m.slice(0, 4)))]
+          .sort().reverse().map((periode) => ({ periode }));
+        const trimestres = [...new Set([...moisSet].map((m) => {
+          const [a, mm] = m.split("-");
+          return `${a}-T${Math.ceil(Number(mm) / 3)}`;
+        }))].sort().reverse().map((periode) => ({ periode }));
+
+        setDonnees({ mois, trimestres, annees });
+        setLoading(false);
+        return;
+      }
+
       const [cotRes, baremeRes] = await Promise.all([
         supabase.from("cotisations")
           .select("periode, montant_du, montant_paye, statut")
@@ -126,6 +161,42 @@ export default function RapportsPage() {
   }, [params.organisation_id]);
 
   /* ---------- Génération PDF ---------- */
+
+  async function genererOng(periode) {
+    setGenere(periode);
+    setErreur("");
+
+    try {
+      let debut, fin, label;
+
+      if (periode.includes("-T")) {
+        const [annee, t] = periode.split("-T");
+        const premierMois = (Number(t) - 1) * 3;
+        debut = new Date(Date.UTC(annee, premierMois, 1));
+        fin = new Date(Date.UTC(annee, premierMois + 3, 0));
+        label = `${t}e trimestre ${annee}`;
+      } else if (periode.length === 4) {
+        debut = new Date(Date.UTC(periode, 0, 1));
+        fin = new Date(Date.UTC(periode, 11, 31));
+        label = `Annee ${periode}`;
+      } else {
+        const [annee, mois] = periode.split("-");
+        debut = new Date(Date.UTC(annee, Number(mois) - 1, 1));
+        fin = new Date(Date.UTC(annee, Number(mois), 0));
+        label = formatPeriode(periode);
+      }
+
+      await genererRapportOng(
+        params,
+        debut.toISOString().slice(0, 10),
+        fin.toISOString().slice(0, 10),
+        label
+      );
+    } catch (e) {
+      setErreur("La génération a échoué : " + e.message);
+    }
+    setGenere(null);
+  }
 
   async function genererMensuel(periode) {
     setGenere(periode);
@@ -454,14 +525,17 @@ export default function RapportsPage() {
                         : p.periode}
                     </div>
                     <div className="rp-carte-sous">
-                      {p.regles}/{p.total} cotisation{p.total > 1 ? "s" : ""} réglée{p.regles > 1 ? "s" : ""}
+                      {sansCotisation
+                        ? "Rapport d'activité"
+                        : `${p.regles}/${p.total} cotisation${p.total > 1 ? "s" : ""} réglée${p.regles > 1 ? "s" : ""}`}
                     </div>
                   </div>
                   <button
                     className="rp-btn"
                     disabled={enCours}
                     onClick={() =>
-                      onglet === "mensuel" ? genererMensuel(p.periode)
+                      sansCotisation ? genererOng(p.periode)
+                        : onglet === "mensuel" ? genererMensuel(p.periode)
                         : onglet === "trimestriel" ? genererTrimestriel(p.periode)
                         : genererAnnuel(p.periode)
                     }
@@ -472,6 +546,7 @@ export default function RapportsPage() {
                   </button>
                 </div>
 
+                {!sansCotisation && (<>
                 <div className="rp-chiffres">
                   <div className="rp-chiffre">
                     <Wallet size={14} />
@@ -504,6 +579,7 @@ export default function RapportsPage() {
                     }}
                   />
                 </div>
+                </>)}
 
                 {onglet === "annuel" && (
                   <div className="rp-cloture">

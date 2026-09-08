@@ -97,13 +97,13 @@ export default function TableauBordFinancier() {
     }
 
     if (aBloc(BLOCS.PROJETS)) {
-      const { data: projets } = await supabase.from("projets")
-        .select("statut, budget_prevu")
+      const { data: projets } = await supabase.from("projets_ong")
+        .select("statut, budget_total")
         .eq("organisation_id", params.organisation_id);
       const liste = projets || [];
       resultat.projets = {
         enCours: liste.filter((p) => p.statut === "en_cours").length,
-        budgetTotal: liste.reduce((s, p) => s + Number(p.budget_prevu || 0), 0),
+        budgetTotal: liste.reduce((s, p) => s + Number(p.budget_total || 0), 0),
       };
     }
 
@@ -115,6 +115,32 @@ export default function TableauBordFinancier() {
       resultat.dons = {
         total: confirmes.reduce((s, d) => s + Number(d.montant || 0), 0),
         nombre: confirmes.length,
+      };
+    }
+
+    // Une organisation sans cotisation (une ONG) n'a pas de solde
+    // "cotisations moins aides" : sa trésorerie, ce sont les fonds
+    // reçus (dons, opérations de recette) moins ce qui sort — appuis
+    // décaissés et dépenses de fonctionnement.
+    if (aBloc(BLOCS.TRESORERIE) && Number(params.montant_cotisation ?? 0) <= 0) {
+      const { data: operations } = await supabase.from("operations_diverses")
+        .select("sens, montant")
+        .eq("organisation_id", params.organisation_id);
+
+      const liste = operations || [];
+      const recettes = liste.filter((o) => o.sens === "recette")
+        .reduce((s, o) => s + Number(o.montant || 0), 0);
+      const depenses = liste.filter((o) => o.sens === "depense")
+        .reduce((s, o) => s + Number(o.montant || 0), 0);
+
+      const totalDons = resultat.dons?.total || 0;
+      const appuisDecaisses = resultat.agr?.totalAccorde || 0;
+      const appuisRembourses = resultat.agr?.totalRembourse || 0;
+
+      const entrees = recettes + totalDons + appuisRembourses;
+      resultat.tresorerieOng = {
+        entrees,
+        solde: entrees - depenses - appuisDecaisses,
       };
     }
 
@@ -305,13 +331,24 @@ export default function TableauBordFinancier() {
       {bandeau}
 
       <section className="kpi-grid">
-        {aBloc(BLOCS.TRESORERIE) && stats && (
-          <BlocTresorerie stats={{
-            solde: stats.solde,
-            totalPaye: stats.totalPaye,
-            hintSolde: "Cotisations \u2212 aides vers\u00e9es",
-            hintEncaisse: `sur ${montant(stats.totalDu)} F attendus`,
-          }} />
+        {aBloc(BLOCS.TRESORERIE) && (
+          statsBlocs.tresorerieOng ? (
+            <BlocTresorerie stats={{
+              labelSolde: "Trésorerie disponible",
+              solde: statsBlocs.tresorerieOng.solde,
+              hintSolde: "Entrées \u2212 appuis décaissés \u2212 dépenses",
+              labelEncaisse: "Fonds reçus",
+              totalPaye: statsBlocs.tresorerieOng.entrees,
+              hintEncaisse: "Dons et opérations de recette",
+            }} />
+          ) : stats ? (
+            <BlocTresorerie stats={{
+              solde: stats.solde,
+              totalPaye: stats.totalPaye,
+              hintSolde: "Cotisations \u2212 aides versées",
+              hintEncaisse: `sur ${montant(stats.totalDu)} F attendus`,
+            }} />
+          ) : null
         )}
         {aBloc(BLOCS.AIDES) && stats && (
           <BlocAides stats={{

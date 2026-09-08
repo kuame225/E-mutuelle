@@ -948,6 +948,12 @@ function FicheMembre({ membre, onBack, onUpdate }) {
         </div>
 
         {/* ---- Bénéficiaires déclarés — lecture seule ---- */}
+        {/* Ces ayants droit (conjoint, enfants) n'ont de sens que si
+            l'organisation verse des aides sociales : c'est leur seule
+            raison d'être. Une ONG, qui accompagne des bénéficiaires
+            AGR sans lien avec ses membres, verrait ici deux notions
+            portant le même nom — d'où la confusion. */}
+        {moduleActif(params, "module_aides") && (
         <section className="mb-acces">
           <header className="mb-acces-head">
             <span className="mb-acces-icon"><Users size={18} /></span>
@@ -998,6 +1004,7 @@ function FicheMembre({ membre, onBack, onUpdate }) {
             </ul>
           )}
         </section>
+        )}
 
         {/* ---- Droit d'adhésion (article 15) ---- */}
         {droitAdhesionApplicable && !sorti && (

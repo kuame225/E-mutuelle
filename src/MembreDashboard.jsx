@@ -60,9 +60,12 @@ function raccourcisPourType(mot) {
       module: "module_aides" },
     { id: "aide_support",  icon: HelpCircle,  l1: "Aide",     l2: "et support",    color: C.textSubtle },
     // Réservée aux membres chargés de superviser l'activité AGR sans
-    // être administrateurs — filtrée sur la permission, pas sur un module.
+    // être administrateurs. Double condition : le module doit exister
+    // dans l'organisation, et la personne doit avoir la permission —
+    // sans le module, la permission seule ferait apparaître une tuile
+    // menant à un écran vide.
     { id: "supervision_agr", icon: Eye,       l1: "Supervision", l2: "des appuis", color: C.primaryLight,
-      permission: "superviser_agr" },
+      module: "module_agr", permission: "superviser_agr" },
   ];
 }
 

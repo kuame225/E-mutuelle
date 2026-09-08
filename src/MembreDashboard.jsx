@@ -5,7 +5,7 @@ import {
   Bell, LogOut, CreditCard, HandHeart, Gift, UserCircle2,
   CheckCircle2, Clock, AlertTriangle, CalendarDays, Wallet,
   Megaphone, Ticket, X, ChevronRight, Users, UserPlus, Users2, RefreshCw, Banknote,
-  GraduationCap, Briefcase, Handshake, FileBadge, History, ChevronsUpDown, Check, Loader2, Coins, WifiOff, HelpCircle,
+  GraduationCap, Briefcase, Handshake, FileBadge, History, ChevronsUpDown, Check, Loader2, Coins, WifiOff, HelpCircle, Eye,
 } from "lucide-react";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import CarteMembreModal from "./CarteMembreModal";
@@ -13,6 +13,7 @@ import {
   useParametrage, moduleActif, construireMatricule, LOGO_DEFAUT,
   mesOrganisationsMembre, changerOrganisationActive,
 } from "./useParametrage";
+import { usePermissions } from "./usePermissions";
 import { useVocabulaire } from "./useVocabulaire";
 import { pushDisponible, pushAutorise, pushRefuse, activerNotifications } from "./push";
 
@@ -58,12 +59,17 @@ function raccourcisPourType(mot) {
     { id: "beneficiaires", icon: Users,       l1: "Mes",      l2: "bénéficiaires", color: C.primaryLight,
       module: "module_aides" },
     { id: "aide_support",  icon: HelpCircle,  l1: "Aide",     l2: "et support",    color: C.textSubtle },
+    // Réservée aux membres chargés de superviser l'activité AGR sans
+    // être administrateurs — filtrée sur la permission, pas sur un module.
+    { id: "supervision_agr", icon: Eye,       l1: "Supervision", l2: "des appuis", color: C.primaryLight,
+      permission: "superviser_agr" },
   ];
 }
 
 export default function MembreDashboard({ membre, onPage, onSignOut }) {
   const { params } = useParametrage();
   const { mot } = useVocabulaire();
+  const { peut } = usePermissions();
   const [mesOrgs, setMesOrgs] = useState([]);
   const [selecteurOuvert, setSelecteurOuvert] = useState(false);
   const [changement, setChangement] = useState(null);
@@ -288,7 +294,9 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
   const raccourcis = raccourcisPourType(mot)
     .filter((r) => !r.module || moduleActif(params, r.module))
     // Sans cotisation configurée, la tuile mènerait à un écran vide.
-    .filter((r) => r.id !== "cotisations" || Number(params.montant_cotisation ?? 0) > 0);
+    .filter((r) => r.id !== "cotisations" || Number(params.montant_cotisation ?? 0) > 0)
+    // Une tuile liée à une permission n'apparaît que si la personne l'a.
+    .filter((r) => !r.permission || peut(r.permission));
 
   const joursRestants = echeance
     ? Math.ceil((new Date(echeance.date_limite) - new Date()) / 86400000)

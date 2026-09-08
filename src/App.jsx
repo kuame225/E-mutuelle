@@ -54,6 +54,7 @@ import OffresBaamoPage from "./OffresBaamoPage";
 import SuiviPaiementsWave from "./SuiviPaiementsWave";
 import AideSupportPage from "./AideSupportPage";
 import BeneficiairesAgrPage from "./BeneficiairesAgrPage";
+import MembreSupervisionAgr from "./MembreSupervisionAgr";
 import DonsPage from "./DonsPage";
 import SanctionsPage from "./SanctionsPage";
 import SplashScreen from "./SplashScreen";
@@ -538,6 +539,10 @@ function Shell() {
 
             {page === "epargne_avec" && (
               <MembreEpargneAvec membre={membre} onBack={() => setPage("accueil")} />
+            )}
+
+            {page === "supervision_agr" && (
+              <MembreSupervisionAgr membre={membre} onBack={() => setPage("accueil")} />
             )}
 
             {page === "aide_support" && (

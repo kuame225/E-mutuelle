@@ -43,7 +43,15 @@ export default function RolesPage() {
         .order("nom"),
     ]);
 
-    setCatalogue(cat.data || []);
+    setCatalogue(
+      // Chaque rôle déclare les types d'organisation qu'il concerne
+      // (voir roles_reference.types_organisation). Un tableau vide
+      // signifie "tous les types" — le cas de la plupart des rôles.
+      (cat.data || []).filter(
+        (r) => !r.types_organisation?.length
+          || r.types_organisation.includes(params.type_organisation)
+      )
+    );
     setAttributions(attr.data || []);
     setMembres(mem.data || []);
     setLoading(false);

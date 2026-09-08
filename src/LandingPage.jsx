@@ -110,10 +110,10 @@ const FONCTIONNALITES = [
   { Icon: Wallet, titre: "Comptabilité", texte: "Recettes et dépenses diverses, justificatifs joints, rapports prêts à présenter.", couleur: "navy", types: TOUS_TYPES },
   { Icon: Megaphone, titre: "Communications", texte: "Annonces et rappels d'échéance, notification individuelle au bon moment.", couleur: "green", types: TOUS_TYPES },
   { Icon: ShieldCheck, titre: "Rôles du Bureau", texte: "Président, trésorier, secrétaire général : chacun accède à ce que sa fonction exige.", couleur: "orange", types: TOUS_TYPES },
-  { Icon: ClipboardList, titre: "Assemblées générales", texte: "Convocation, émargement, quorum en direct, procès-verbal archivé.", couleur: "navy", payant: true, types: TOUS_TYPES.filter((t) => t !== "avec") },
-  { Icon: RefreshCw, titre: "Tontine", texte: "Ordre de passage fixé, versements suivis tour par tour, notification au bénéficiaire.", couleur: "green", payant: true, types: [] },
-  { Icon: Lock, titre: "Épargne AVEC sécurisée", texte: "Parts variables par réunion, fonds social, crédit interne à éligibilité automatique — sécurisé par plusieurs clés, vérifié à chaque clôture de caisse.", couleur: "navy", payant: true, types: ["avec"] },
-  { Icon: KeyRound, titre: "Prêts et avances", texte: "Demande par le membre ou saisie directe du Bureau, échéances suivies une à une.", couleur: "orange", payant: true, types: ["cooperative"] },
+  { Icon: ClipboardList, titre: "Assemblées générales", texte: "Convocation, émargement, quorum en direct, procès-verbal archivé.", couleur: "navy", types: TOUS_TYPES.filter((t) => t !== "avec") },
+  { Icon: RefreshCw, titre: "Tontine", texte: "Ordre de passage fixé, versements suivis tour par tour, notification au bénéficiaire.", couleur: "green", types: [] },
+  { Icon: Lock, titre: "Épargne AVEC sécurisée", texte: "Parts variables par réunion, fonds social, crédit interne à éligibilité automatique — sécurisé par plusieurs clés, vérifié à chaque clôture de caisse.", couleur: "navy", types: ["avec"] },
+  { Icon: KeyRound, titre: "Prêts et avances", texte: "Demande par le membre ou saisie directe du Bureau, échéances suivies une à une.", couleur: "orange", types: ["cooperative"] },
   { Icon: PiggyBank, titre: "Parts sociales et capital", texte: "Souscriptions, remboursements, capital détenu par chaque membre suivi à tout moment.", couleur: "navy", types: ["cooperative"] },
   { Icon: ShoppingCart, titre: "Activité économique", texte: "Achats, ventes et stock suivis, partage des bénéfices calculé en fin d'exercice.", couleur: "green", types: ["cooperative"] },
   { Icon: FolderKanban, titre: "Projets et bailleurs", texte: "Budgets, dépenses et indicateurs de suivi par projet, bailleur par bailleur.", couleur: "orange", types: ["ong", "association", "federation", "reseau"] },
@@ -376,7 +376,6 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
                 <div className={`lp-feat-ic lp-ic-${f.couleur}`}><f.Icon size={19} /></div>
                 <h3>{f.titre}</h3>
                 <p>{f.texte}</p>
-                {f.payant && <span className="lp-badge-payant">Module payant</span>}
               </div>
             ))}
           </div>
@@ -442,16 +441,27 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
 
       <section className="lp-pricing">
         <div className="lp-wrap lp-center">
-          <h2 className="lp-reveal" ref={addReveal}>Un tarif construit autour de votre organisation</h2>
-          <p className="lp-reveal lp-sub" ref={addReveal}>Forfait de base + composante variable selon votre activité, modules payants en option.</p>
+          <h2 className="lp-reveal" ref={addReveal}>Gratuit pour votre organisation</h2>
+          <p className="lp-reveal lp-sub" ref={addReveal}>
+            Toutes les fonctionnalités de gestion, sans frais ni limite de durée.
+          </p>
           <div className="lp-reveal lp-price-card" ref={addReveal}>
-            <div className="lp-price-part"><span className="lp-lbl">Base</span><h3>Un forfait fixe</h3><p>Accès à la plateforme et au socle commun.</p></div>
-            <div className="lp-price-part"><span className="lp-lbl">Variable</span><h3>Selon votre activité</h3><p>Ajusté au nombre de membres actifs et/ou au volume encaissé.</p></div>
-          </div>
-          <div className="lp-reveal lp-timeline-tarif" ref={addReveal}>
-            <div className="lp-tt-item"><span className="lp-tt-num">1</span><p><strong>Inscription et essai gratuit de 2 mois</strong> — accès complet, aucun paiement demandé.</p></div>
-            <div className="lp-tt-item"><span className="lp-tt-num">2</span><p><strong>À la fin de l'essai</strong>, la première facture inclut le forfait + variable, et les éventuels frais de mise en service (configuration, import, formation) — facturés une seule fois, jamais pendant l'essai.</p></div>
-            <div className="lp-tt-item"><span className="lp-tt-num">3</span><p><strong>Les mois suivants</strong>, seuls le forfait et la composante variable sont facturés.</p></div>
+            <div className="lp-price-part">
+              <span className="lp-lbl">Inclus</span>
+              <h3>La plateforme entière</h3>
+              <p>
+                Membres, cotisations, aides, assemblées, rapports, comptabilité —
+                tout ce dont votre organisation a besoin au quotidien.
+              </p>
+            </div>
+            <div className="lp-price-part">
+              <span className="lp-lbl">En option</span>
+              <h3>Services complémentaires</h3>
+              <p>
+                Certaines options, comme les rappels par SMS, sont proposées
+                séparément — votre organisation choisit ce dont elle a l'usage.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -460,7 +470,7 @@ export default function LandingPage({ onCreationMutuelle, onConnexion }) {
         <div className="lp-wrap lp-center">
           <div className="lp-reveal lp-final-card" ref={addReveal}>
             <h2>Prêt à faire passer votre cahier au numérique ?</h2>
-            <p>Deux mois d'essai complet, sans engagement, pour voir si votre organisation s'y retrouve.</p>
+            <p>Gratuit, sans engagement, pour voir si votre organisation s'y retrouve.</p>
             <button className="lp-btn lp-btn-inverse" onClick={onCreationMutuelle}>
               <CheckCircle2 size={17} /> {cfg.cta}
             </button>

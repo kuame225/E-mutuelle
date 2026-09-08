@@ -328,10 +328,10 @@ function Shell() {
         >
           <ShieldCheck size={16} color={C.primary} style={{ marginTop: 1, flexShrink: 0 }} />
           <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: C.textMuted }}>
-            <strong style={{ color: C.text }}>2 mois d'essai gratuit</strong> dès l'activation,
-            accès complet, sans paiement. La facturation (forfait + variable,
-            et d'éventuels frais de mise en service) ne commence qu'à l'issue
-            de cet essai.
+            <strong style={{ color: C.text }}>L'accès à la plateforme est gratuit</strong> —
+            toutes les fonctionnalités de gestion de votre organisation, sans frais
+            ni limite de durée. Seules certaines options complémentaires, comme les
+            rappels par SMS, sont proposées séparément.
           </p>
         </div>
 

@@ -876,20 +876,24 @@ function MembreCotisations({ membre }) {
     }
 
     try {
-      const [cotRes, moyRes, declRes, waveRes] = await Promise.all([
+       const [cotRes, moyRes, declRes, waveRes, regRes] = await Promise.all([
         supabase.from("cotisations").select("*").eq("membre_id", membre.id).order("periode", { ascending: false }),
         supabase.from("moyens_paiement").select("*").eq("organisation_id", membre.organisation_id).eq("actif", true).order("ordre"),
         supabase.from("declarations_paiement").select("cotisation_id, cotisation_ids, statut").eq("membre_id", membre.id).eq("statut", "en_attente"),
         supabase.from("integrations_paiement").select("actif").eq("organisation_id", membre.organisation_id).eq("fournisseur", "wave").maybeSingle(),
+        supabase.rpc("calculer_regularite_membre", { p_membre_id: membre.id }),
       ]);
 
-      for (const r of [cotRes, moyRes, declRes, waveRes]) {
+      for (const r of [cotRes, moyRes, declRes, waveRes, regRes]) {
         if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
       }
+
+      const ligneRegularite = regRes.data?.[0] || { regularite_actuelle: 0, record_personnel: 0 };
 
       const resultat = {
         cotisations: cotRes.data || [], moyens: moyRes.data || [], declarations: declRes.data || [],
         waveActif: Boolean(waveRes.data?.actif),
+        regularite: { actuelle: ligneRegularite.regularite_actuelle, record: ligneRegularite.record_personnel },
       };
       sauverCache(idCache, resultat);
 
@@ -990,8 +994,7 @@ function MembreCotisations({ membre }) {
   );
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
         <h2 style={{ ...titrePage, marginBottom: 0 }}>Mes cotisations</h2>
         {cotisations.length > 0 && (
           <button
@@ -1009,6 +1012,45 @@ function MembreCotisations({ membre }) {
           </button>
         )}
       </div>
+
+      {/* ---- Statut de cotisation + régularité ---- */}
+      {cotisations.length > 0 && (
+        <div style={{
+          position: "relative", overflow: "hidden",
+          background: `linear-gradient(135deg, ${PALETTE.blue800}, ${PALETTE.blue600})`,
+          color: "#fff", borderRadius: R.xl, padding: 20, marginBottom: 16,
+          boxShadow: SHADOW.md,
+        }}>
+          <div style={{
+            position: "absolute", width: 180, height: 180, borderRadius: "50%",
+            background: "rgba(255,255,255,.07)", right: -60, top: -70,
+          }} />
+
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+            {membre.statut_cotisation === "a_jour"
+              ? <CheckCircle2 size={18} color="#A7F3C0" />
+              : <AlertTriangle size={18} color="#FDE68A" />}
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".02em", textTransform: "uppercase" }}>
+              {membre.statut_cotisation === "a_jour" ? "À jour" : "En retard"}
+            </span>
+          </div>
+
+          <div style={{ position: "relative", display: "flex", gap: 24, marginTop: 14, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
+                {regularite.actuelle} <span style={{ fontSize: 13, fontWeight: 600, opacity: .8 }}>mois</span>
+              </div>
+              <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Ma régularité</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
+                {regularite.record} <span style={{ fontSize: 13, fontWeight: 600, opacity: .8 }}>mois</span>
+              </div>
+              <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Record personnel</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {depuisCache && (
         <div style={{
@@ -1209,6 +1251,7 @@ function MembreFormations({ membre }) {
   const [erreurAction, setErreurAction] = useState("");
   const [depuisCache, setDepuisCache] = useState(false);
   const [horodatageCache, setHorodatageCache] = useState(null);
+  const [regularite, setRegularite] = useState({ actuelle: 0, record: 0 });
 
   async function charger() {
     const idCache = `formations_${membre.id}`;

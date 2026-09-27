@@ -2382,6 +2382,10 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
 
+  // Même libellés que MoyensPaiementApercu — cohérence d'affichage entre
+  // le récapitulatif "Comment payer" et cet écran de déclaration.
+  const LABELS_MOYEN = { wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money", moov_money: "Moov Money", autre: "Autre" };
+
   async function envoyer() {
     const m = parseInt(montantSaisi, 10);
     if (!m || m <= 0) { setErreur("Indiquez le montant payé."); return; }
@@ -2412,79 +2416,151 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
       style={{
         position: "fixed", inset: 0, zIndex: 200, background: "rgba(10,20,40,.5)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        overflowY: "auto",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420 }}
+        style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 420, overflow: "hidden", margin: "auto" }}
       >
-        <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>J'ai payé</h3>
-        <p style={{ fontSize: 13, color: C.textSubtle, margin: "0 0 16px" }}>
-          {groupe
-            ? `${liste.length} échéances (${liste.map((c) => formatPeriode(c.periode)).join(", ")})`
-            : formatPeriode(liste[0].periode)}
-          {" — reste dû "}{montant(restant)} FCFA
-        </p>
+        {/* ---- Bandeau ---- */}
+        <div style={{
+          position: "relative", overflow: "hidden",
+          background: `linear-gradient(135deg, ${PALETTE.blue800}, ${PALETTE.blue600})`,
+          color: "#fff", padding: "20px 22px",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
+        }}>
+          <div style={{
+            position: "absolute", width: 160, height: 160, borderRadius: "50%",
+            background: "rgba(255,255,255,.08)", right: -50, top: -60,
+          }} />
+          <div style={{ position: "relative" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.35 }}>
+              Finaliser votre paiement{" "}
+              {groupe ? `de ${liste.length} échéances` : `pour ${formatPeriode(liste[0].periode)}`}
+            </div>
+            <span style={{
+              display: "inline-flex", marginTop: 8,
+              background: "rgba(255,255,255,.18)", borderRadius: 999,
+              padding: "4px 11px", fontSize: 11.5, fontWeight: 700, letterSpacing: ".02em",
+            }}>
+              À PAYER
+            </span>
+          </div>
+          <AvatarStatutMembre sexe={membre.sexe} aJour hauteur={76} />
+        </div>
 
-        {moyens.length > 0 && (
+        <div style={{ padding: "20px 22px 22px" }}>
+          {/* ---- Récapitulatif ---- */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12,
+            padding: "13px 15px", marginBottom: 16,
+          }}>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                {groupe
+                  ? `${liste.length} échéances (${liste.map((c) => formatPeriode(c.periode)).join(", ")})`
+                  : formatPeriode(liste[0].periode)}
+              </div>
+              <div style={{ fontSize: 12, color: C.textSubtle, marginTop: 2 }}>Cotisation</div>
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>{montant(restant)} FCFA</div>
+          </div>
+
+          {/* ---- Mode de paiement ---- */}
+          {moyens.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Mode de paiement</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                {moyens.map((m) => {
+                  const actif = moyenId === m.id;
+                  const nom = m.libelle || LABELS_MOYEN[m.type] || m.type;
+                  const logoUrl = m.logo_chemin
+                    ? supabase.storage.from("qr-paiement").getPublicUrl(m.logo_chemin).data.publicUrl
+                    : null;
+
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setMoyenId(m.id)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        border: `1.5px solid ${actif ? C.primary : C.border}`,
+                        background: actif ? PALETTE.blue50 : "#fff",
+                        borderRadius: 10, padding: "9px 11px", cursor: "pointer",
+                        fontFamily: "inherit", textAlign: "left",
+                      }}
+                    >
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="" style={{ width: 26, height: 26, borderRadius: 7, objectFit: "cover", flexShrink: 0 }} />
+                      ) : (
+                        <span style={{
+                          width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                          background: actif ? C.primary : PALETTE.grey200,
+                          color: actif ? "#fff" : C.textSubtle,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 12, fontWeight: 700,
+                        }}>
+                          {(nom || "?").charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: actif ? C.primary : C.text, lineHeight: 1.25 }}>
+                        {nom}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Moyen utilisé</label>
-            <select
-              value={moyenId}
-              onChange={(e) => setMoyenId(e.target.value)}
-              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14 }}
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Montant payé</label>
+            <input
+              type="number" value={montantSaisi} onChange={(e) => setMontantSaisi(e.target.value)}
+              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Référence — facultative</label>
+            <input
+              value={reference} onChange={(e) => setReference(e.target.value)}
+              placeholder="Numéro de transaction, si vous l'avez"
+              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Note — facultative</label>
+            <input
+              value={note} onChange={(e) => setNote(e.target.value)}
+              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+
+          {erreur && (
+            <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 14 }}>
+              {erreur}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={onClose} disabled={enCours}
+              style={{ flex: 1, background: "#fff", border: `1.5px solid ${C.border}`, color: C.textMuted, borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
             >
-              {moyens.map((m) => (
-                <option key={m.id} value={m.id}>{m.libelle || m.type}</option>
-              ))}
-            </select>
+              Annuler
+            </button>
+            <button
+              onClick={envoyer} disabled={enCours}
+              style={{ flex: 2, background: C.primary, border: "none", color: "#fff", borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
+            >
+              {enCours ? "Envoi…" : "Payer maintenant"}
+            </button>
           </div>
-        )}
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Montant payé</label>
-          <input
-            type="number" value={montantSaisi} onChange={(e) => setMontantSaisi(e.target.value)}
-            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Référence — facultative</label>
-          <input
-            value={reference} onChange={(e) => setReference(e.target.value)}
-            placeholder="Numéro de transaction, si vous l'avez"
-            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Note — facultative</label>
-          <input
-            value={note} onChange={(e) => setNote(e.target.value)}
-            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
-          />
-        </div>
-
-        {erreur && (
-          <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 14 }}>
-            {erreur}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={onClose} disabled={enCours}
-            style={{ flex: 1, background: "#fff", border: `1.5px solid ${C.border}`, color: C.textMuted, borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
-          >
-            Annuler
-          </button>
-          <button
-            onClick={envoyer} disabled={enCours}
-            style={{ flex: 2, background: C.primary, border: "none", color: "#fff", borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
-          >
-            {enCours ? "Envoi…" : "Envoyer"}
-          </button>
         </div>
       </div>
     </div>

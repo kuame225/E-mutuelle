@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   LogOut, UserCircle2, ArrowLeft, PowerOff, ShieldOff, ShieldCheck, CheckCircle2,
-  Users2, GraduationCap, Award, FileBarChart2, WifiOff,
+  Users2, GraduationCap, Award, FileBarChart2, WifiOff, AlertTriangle,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
@@ -997,7 +997,7 @@ function MembreCotisations({ membre }) {
   );
 
   return (
-          <div> style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
         <h2 style={{ ...titrePage, marginBottom: 0 }}>Mes cotisations</h2>
         {cotisations.length > 0 && (
           <button

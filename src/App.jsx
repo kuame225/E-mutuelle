@@ -847,7 +847,6 @@ function PageMembre({ onBack, children }) {
 }
 
 /* ---------------- Cotisations du membre ---------------- */
-/* ---------------- Cotisations du membre ---------------- */
 
 // Petit personnage stylisé, bras levés — vient humaniser la carte de
 // statut/régularité. Dessiné en SVG inline (aucune image externe à
@@ -867,7 +866,6 @@ function MascotteCelebration({ size = 72 }) {
   );
 }
 
-function MembreCotisations({ membre }) {
 function MembreCotisations({ membre }) {
   const { params } = useParametrage();
   const [cotisations, setCotisations] = useState([]);

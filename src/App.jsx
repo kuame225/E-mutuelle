@@ -862,6 +862,7 @@ function MembreCotisations({ membre }) {
   const [telechargementHistorique, setTelechargementHistorique] = useState(false);
   const [depuisCache, setDepuisCache] = useState(false);
   const [horodatageCache, setHorodatageCache] = useState(null);
+  const [regularite, setRegularite] = useState({ actuelle: 0, record: 0 });
 
   async function charger() {
     const idCache = `cotisations_${membre.id}`;
@@ -901,6 +902,7 @@ function MembreCotisations({ membre }) {
       setMoyens(resultat.moyens);
       setDeclarations(resultat.declarations);
       setWaveActif(resultat.waveActif);
+      setRegularite(resultat.regularite);
       setSelection([]);
       setDepuisCache(false);
       setLoading(false);
@@ -911,6 +913,7 @@ function MembreCotisations({ membre }) {
         setMoyens(secours.donnees.moyens);
         setDeclarations(secours.donnees.declarations);
         setWaveActif(secours.donnees.waveActif);
+        setRegularite(secours.donnees.regularite || { actuelle: 0, record: 0 });
         setDepuisCache(true);
         setHorodatageCache(secours.horodatage);
       }
@@ -994,7 +997,7 @@ function MembreCotisations({ membre }) {
   );
 
   return (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          <div> style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
         <h2 style={{ ...titrePage, marginBottom: 0 }}>Mes cotisations</h2>
         {cotisations.length > 0 && (
           <button
@@ -1251,7 +1254,6 @@ function MembreFormations({ membre }) {
   const [erreurAction, setErreurAction] = useState("");
   const [depuisCache, setDepuisCache] = useState(false);
   const [horodatageCache, setHorodatageCache] = useState(null);
-  const [regularite, setRegularite] = useState({ actuelle: 0, record: 0 });
 
   async function charger() {
     const idCache = `formations_${membre.id}`;

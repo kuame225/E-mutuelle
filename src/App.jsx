@@ -1188,7 +1188,7 @@ function MembreCotisations({ membre }) {
         </div>
       )}
 
-      {moyens.length > 0 && <MoyensPaiementApercu moyens={moyens} />}
+      {moyens.length > 0 && cotisationsImpayees.length > 0 && <MoyensPaiementApercu moyens={moyens} />}
 
       {waveErreur && (
         <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>

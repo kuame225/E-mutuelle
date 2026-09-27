@@ -24,6 +24,7 @@ export default function MembreProfil({ membre, onBack, onSignOut }) {
     nom: membre.nom,
     telephone: membre.telephone || "",
     email: membre.email || "",
+    sexe: membre.sexe || "",
   });
   const [pw, setPw] = useState({ nouveau: "", confirmer: "" });
   const [pwOuvert, setPwOuvert] = useState(false);
@@ -104,6 +105,7 @@ export default function MembreProfil({ membre, onBack, onSignOut }) {
       nom: form.nom.trim(),
       telephone: form.telephone.trim(),
       email: form.email.trim().toLowerCase() || null,
+      sexe: form.sexe || null,
     };
 
     const { error } = await supabase.from("membres").update(maj).eq("id", fiche.id);
@@ -214,6 +216,29 @@ export default function MembreProfil({ membre, onBack, onSignOut }) {
                 ? "En renseignant une adresse, vous pourrez recevoir vos reçus et notifications."
                 : null} />
 
+            {/* Genre — sert uniquement à personnaliser l'espace membre
+                (avatar de statut de cotisation) ; jamais obligatoire. */}
+            <div className="pf-champ">
+              <label className="pf-label">Genre</label>
+              <div className="pf-sexe-groupe">
+                <button
+                  type="button"
+                  className={`pf-sexe-btn${form.sexe === "F" ? " actif" : ""}`}
+                  onClick={() => setForm((f) => ({ ...f, sexe: "F" }))}
+                >
+                  Femme
+                </button>
+                <button
+                  type="button"
+                  className={`pf-sexe-btn${form.sexe === "M" ? " actif" : ""}`}
+                  onClick={() => setForm((f) => ({ ...f, sexe: "M" }))}
+                >
+                  Homme
+                </button>
+              </div>
+              <span className="pf-aide">Utilisé uniquement pour personnaliser votre espace.</span>
+            </div>
+
             {erreur && (
               <div className="pf-erreur">
                 <AlertCircle size={16} /> {erreur}
@@ -230,6 +255,7 @@ export default function MembreProfil({ membre, onBack, onSignOut }) {
                     nom: fiche.nom,
                     telephone: fiche.telephone || "",
                     email: fiche.email || "",
+                    sexe: fiche.sexe || "",
                   });
                 }}
                 disabled={enCours === "profil"}
@@ -250,6 +276,8 @@ export default function MembreProfil({ membre, onBack, onSignOut }) {
         ) : (
           <dl className="pf-infos">
             <Info Icon={User} label="Nom et prénoms" valeur={fiche.nom} />
+            <Info Icon={User} label="Genre"
+              valeur={fiche.sexe === "F" ? "Femme" : fiche.sexe === "M" ? "Homme" : "Non renseigné"} />
             <Info Icon={Phone} label="Téléphone" valeur={fiche.telephone || "—"} />
             <Info Icon={Mail} label="Adresse e-mail"
               valeur={fiche.email || "Non renseignée"}
@@ -488,6 +516,18 @@ const CSS = `
   font-family:inherit; font-size:15px; color:${C.text};
 }
 .pf-aide{ font-size:12.5px; color:${C.textSubtle}; line-height:1.5; }
+
+/* ---- Genre (bascule) ---- */
+.pf-sexe-groupe{ display:flex; gap:${S.md}px; }
+.pf-sexe-btn{
+  flex:1; padding:11px 0; border-radius:${R.md}px;
+  border:1.5px solid ${C.border}; background:${C.surface};
+  color:${C.textMuted}; font-family:inherit; font-size:14px; font-weight:600;
+  cursor:pointer; transition:border-color .16s ease, color .16s ease, background .16s ease;
+}
+.pf-sexe-btn.actif{
+  border-color:${C.primary}; color:${C.primary}; background:${PALETTE.blue50};
+}
 
 /* ---- Ligne cliquable ---- */
 .pf-ligne-btn{

@@ -996,9 +996,24 @@ function MembreCotisations({ membre }) {
     (s, c) => s + ((c.montant_du || 0) - (c.montant_paye || 0)), 0
   );
 
+  // Cotisation à mettre en avant dans la carte d'action prioritaire :
+  // la plus ancienne encore impayée (cotisationsImpayees garde l'ordre
+  // décroissant de "cotisations", donc le dernier élément est la plus
+  // ancienne échéance en souffrance).
+  const cotisationPrioritaire = cotisationsImpayees[cotisationsImpayees.length - 1] || null;
+
+  // Progression annuelle — cumul des cotisations de l'année en cours,
+  // affiché dans la carte de statut pour donner une vue d'ensemble sans
+  // que le membre ait à faire le calcul lui-même.
+  const anneeCourante = new Date().getFullYear();
+  const cotisationsAnnee = cotisations.filter((c) => c.periode?.startsWith(String(anneeCourante)));
+  const totalDuAnnee = cotisationsAnnee.reduce((s, c) => s + (c.montant_du || 0), 0);
+  const totalPayeAnnee = cotisationsAnnee.reduce((s, c) => s + (c.montant_paye || 0), 0);
+  const pourcentageAnnee = totalDuAnnee > 0 ? Math.round((totalPayeAnnee / totalDuAnnee) * 100) : 0;
+
   return (
-       <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
         <h2 style={{ ...titrePage, marginBottom: 0 }}>Mes cotisations</h2>
         {cotisations.length > 0 && (
           <button
@@ -1017,7 +1032,7 @@ function MembreCotisations({ membre }) {
         )}
       </div>
 
-      {/* ---- Statut de cotisation + régularité ---- */}
+      {/* ---- Statut de cotisation + régularité + progression annuelle ---- */}
       {cotisations.length > 0 && (
         <div style={{
           position: "relative", overflow: "hidden",
@@ -1053,6 +1068,68 @@ function MembreCotisations({ membre }) {
               <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Record personnel</div>
             </div>
           </div>
+
+          {totalDuAnnee > 0 && (
+            <div style={{ position: "relative", marginTop: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, opacity: .85, marginBottom: 6 }}>
+                <span>Cotisations {anneeCourante}</span>
+                <span>{montant(totalPayeAnnee)} / {montant(totalDuAnnee)} FCFA</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 999, background: "rgba(255,255,255,.22)", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", width: `${Math.min(pourcentageAnnee, 100)}%`,
+                  background: "#fff", borderRadius: 999, transition: "width .3s ease",
+                }} />
+              </div>
+              <div style={{ fontSize: 11.5, opacity: .78, marginTop: 4 }}>{pourcentageAnnee}% réglé</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- Action prioritaire : la cotisation la plus urgente à régler ---- */}
+      {cotisationPrioritaire && (
+        <div style={{
+          background: C.surface, border: `1.5px solid ${C.primary}`, borderRadius: R.xl,
+          padding: 18, marginBottom: 16, display: "flex", alignItems: "center",
+          justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+          boxShadow: SHADOW.sm,
+        }}>
+          <div>
+            <div style={{ fontSize: 12, color: C.textSubtle, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".02em" }}>
+              À régler
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2 }}>
+              {formatPeriode(cotisationPrioritaire.periode)}
+            </div>
+            <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>
+              {montant((cotisationPrioritaire.montant_du || 0) - (cotisationPrioritaire.montant_paye || 0))} FCFA restants
+            </div>
+          </div>
+          {waveActif ? (
+            <button
+              onClick={() => payerAvecWave(cotisationPrioritaire)}
+              disabled={waveEnCours === cotisationPrioritaire.id}
+              style={{
+                background: C.primary, border: "none", color: "#fff",
+                borderRadius: 10, padding: "12px 22px", cursor: "pointer",
+                fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+              }}
+            >
+              {waveEnCours === cotisationPrioritaire.id ? "Redirection…" : "Payer maintenant"}
+            </button>
+          ) : moyens.length > 0 && (
+            <button
+              onClick={() => setDeclarationOuverte(cotisationPrioritaire)}
+              style={{
+                background: C.primary, border: "none", color: "#fff",
+                borderRadius: 10, padding: "12px 22px", cursor: "pointer",
+                fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+              }}
+            >
+              J'ai payé
+            </button>
+          )}
         </div>
       )}
 
@@ -1147,6 +1224,16 @@ function MembreCotisations({ membre }) {
                     ? `1px solid ${C.border}` : "none",
                 }}
               >
+                {/* Frise verticale — un repère par échéance, relié à la
+                    suivante, pour lire l'historique comme une continuité
+                    plutôt qu'une liste plate. */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 12, flexShrink: 0, paddingTop: 4 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: st.fg, flexShrink: 0 }} />
+                  {i < cotisations.length - 1 && (
+                    <div style={{ width: 2, flex: 1, minHeight: 18, background: C.border, marginTop: 4 }} />
+                  )}
+                </div>
+
                 {cotisationsImpayees.length > 1 && (
                   <input
                     type="checkbox"
@@ -1206,10 +1293,6 @@ function MembreCotisations({ membre }) {
                         )
                       )}
 
-                      {/* Sans ce message, un membre dont l'organisation n'a
-                          encore configuré aucun moyen de paiement (ni Wave,
-                          ni manuel) se retrouvait face à une zone vide, sans
-                          la moindre indication de ce qu'il doit faire. */}
                       {!waveActif && moyens.length === 0 && (
                         <span style={{ fontSize: 12.5, color: C.textSubtle }}>
                           Aucun moyen de paiement configuré pour le moment — contactez le Bureau.

@@ -847,7 +847,27 @@ function PageMembre({ onBack, children }) {
 }
 
 /* ---------------- Cotisations du membre ---------------- */
+/* ---------------- Cotisations du membre ---------------- */
 
+// Petit personnage stylisé, bras levés — vient humaniser la carte de
+// statut/régularité. Dessiné en SVG inline (aucune image externe à
+// héberger), en camaïeu blanc translucide pour se fondre dans le
+// dégradé de la carte plutôt que de trancher dessus.
+function MascotteCelebration({ size = 72 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 84 84" fill="none">
+      <path d="M28 44 L14 22" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" />
+      <path d="M56 44 L70 22" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" />
+      <path d="M30 47 Q42 64 54 47" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" fill="none" />
+      <circle cx="42" cy="26" r="11" fill="rgba(255,255,255,.95)" />
+      <circle cx="38" cy="25" r="1.6" fill={PALETTE.blue800} />
+      <circle cx="46" cy="25" r="1.6" fill={PALETTE.blue800} />
+      <path d="M37 30q5 4 10 0" stroke={PALETTE.blue800} strokeWidth="2" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
+function MembreCotisations({ membre }) {
 function MembreCotisations({ membre }) {
   const { params } = useParametrage();
   const [cotisations, setCotisations] = useState([]);
@@ -1344,24 +1364,7 @@ function MembreFormations({ membre }) {
 
   async function charger() {
     const idCache = `formations_${membre.id}`;
-/* ---------------- Cotisations du membre ---------------- */)
-// Petit personnage stylisé, bras levés — vient humaniser la carte de
-// statut/régularité. Dessiné en SVG inline (aucune image externe à
-// héberger), en camaïeu blanc translucide pour se fondre dans le
-// dégradé de la carte plutôt que de trancher dessus.
-function MascotteCelebration({ size = 72 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 84 84" fill="none">
-      <path d="M28 44 L14 22" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" />
-      <path d="M56 44 L70 22" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" />
-      <path d="M30 47 Q42 64 54 47" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" fill="none" />
-      <circle cx="42" cy="26" r="11" fill="rgba(255,255,255,.95)" />
-      <circle cx="38" cy="25" r="1.6" fill={PALETTE.blue800} />
-      <circle cx="46" cy="25" r="1.6" fill={PALETTE.blue800} />
-      <path d="M37 30q5 4 10 0" stroke={PALETTE.blue800} strokeWidth="2" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
+
     const dejaEnCache = lireCache(idCache);
     if (dejaEnCache) {
       setFormations(dejaEnCache.donnees.formations);

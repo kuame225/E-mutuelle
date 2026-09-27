@@ -865,6 +865,27 @@ function MascotteCelebration({ size = 72 }) {
     </svg>
   );
 }
+const AVATARS_STATUT = {
+  F: { a_jour: "/avatars/avatar_femme_a_jour.png", non_a_jour: "/avatars/avatar_femme_non_a_jour.png" },
+  M: { a_jour: "/avatars/avatar_homme_a_jour.png", non_a_jour: "/avatars/avatar_homme_non_a_jour.png" },
+};
+
+// Avatar illustrant le statut de cotisation du membre — genre + statut
+// choisissent l'image parmi les 4 déclinaisons (public/avatars/). Tant
+// que le membre n'a pas renseigné son genre, on retombe sur le petit
+// personnage neutre en SVG plutôt que d'en deviner un.
+function AvatarStatutMembre({ sexe, aJour, hauteur = 96 }) {
+  const jeu = AVATARS_STATUT[sexe];
+  if (!jeu) return <MascotteCelebration size={60} />;
+
+  return (
+    <img
+      src={jeu[aJour ? "a_jour" : "non_a_jour"]}
+      alt=""
+      style={{ height: hauteur, width: "auto", display: "block", flexShrink: 0 }}
+    />
+  );
+}
 
 function MembreCotisations({ membre }) {
   const { params } = useParametrage();
@@ -1062,9 +1083,6 @@ function MembreCotisations({ membre }) {
             position: "absolute", width: 180, height: 180, borderRadius: "50%",
             background: "rgba(255,255,255,.07)", right: -60, top: -70,
           }} />
-                    <div style={{ position: "absolute", top: 12, right: 16, pointerEvents: "none" }}>
-            <MascotteCelebration size={60} />
-          </div>
 
           <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
             {membre.statut_cotisation === "a_jour"
@@ -1075,19 +1093,22 @@ function MembreCotisations({ membre }) {
             </span>
           </div>
 
-          <div style={{ position: "relative", display: "flex", gap: 24, marginTop: 14, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
-                {regularite.actuelle} <span style={{ fontSize: 13, fontWeight: 600, opacity: .8 }}>mois</span>
+                    <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
+                  {regularite.actuelle} <span style={{ fontSize: 13, fontWeight: 600, opacity: .8 }}>mois</span>
+                </div>
+                <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Ma régularité</div>
               </div>
-              <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Ma régularité</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
-                {regularite.record} <span style={{ fontSize: 13, fontWeight: 600, opacity: .8 }}>mois</span>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
+                  {regularite.record} <span style={{ fontSize: 13, fontWeight: 600, opacity: .8 }}>mois</span>
+                </div>
+                <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Record personnel</div>
               </div>
-              <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Record personnel</div>
             </div>
+            <AvatarStatutMembre sexe={membre.sexe} aJour={membre.statut_cotisation === "a_jour"} />
           </div>
 
           {totalDuAnnee > 0 && (

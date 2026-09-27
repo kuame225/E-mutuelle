@@ -997,6 +997,7 @@ function MembreCotisations({ membre }) {
   );
 
   return (
+       <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
         <h2 style={{ ...titrePage, marginBottom: 0 }}>Mes cotisations</h2>
         {cotisations.length > 0 && (

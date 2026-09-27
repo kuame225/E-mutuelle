@@ -50,10 +50,17 @@ export default function LoginScreen({ onAdhesion, onBack }) {
     if (!identifiant.trim()) { setError("Saisissez d'abord votre adresse e-mail."); return; }
     reset(); setLoadingLink(true);
 
-    // Aucun redirectTo précisé : comme pour les autres appels, Supabase
-    // utilise la « Site URL » configurée dans son tableau de bord plutôt
-    // que l'adresse locale du poste depuis lequel la demande est faite.
-    const { error } = await supabase.auth.resetPasswordForEmail(identifiant.trim());
+    // redirectTo précisé explicitement avec l'adresse réellement ouverte
+    // par le navigateur (window.location.origin), plutôt que de laisser
+    // Supabase retomber sur son "Site URL" — un réglage qui a fini par
+    // pointer vers un déploiement Cloudflare Pages figé dans le temps
+    // (l'URL à préfixe numérique d'un build précis, pas l'alias stable de
+    // production), gelant tout le monde sur une ancienne version. Avec
+    // redirectTo explicite, ce lien revient toujours vers le domaine
+    // depuis lequel la demande a été faite.
+    const { error } = await supabase.auth.resetPasswordForEmail(identifiant.trim(), {
+      redirectTo: window.location.origin,
+    });
 
     setLoadingLink(false);
     if (error) setError(traduireErreur(error.message));
@@ -62,10 +69,15 @@ export default function LoginScreen({ onAdhesion, onBack }) {
 
   async function handleGoogleLogin() {
     reset(); setLoadingGoogle(true);
-    // Aucun redirectTo précisé : comme pour le lien de connexion,
-    // Supabase utilise la « Site URL » configurée dans son tableau de
-    // bord — éviter de renvoyer l'adresse locale du poste de développement.
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google" });
+    // Même correctif que pour handleForgotPassword : redirectTo explicite
+    // vers l'origine courante, pour ne plus dépendre du "Site URL" Supabase
+    // (source du bug où les connexions Google renvoyaient vers une ancienne
+    // version figée de l'appli, alors que les connexions par mot de passe,
+    // sans redirection, restaient sur la version actuelle).
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
     setLoadingGoogle(false);
     if (error) setError(traduireErreur(error.message));
     // Sans erreur, le navigateur est redirigé vers Google — rien d'autre

@@ -10,6 +10,8 @@ export const PALETTE = {
   // gardant le même rôle qu'avant : des teintes pâles pour les fonds.
   blue900: "#0D1B4C", // Bleu Marine
   blue800: "#1E3A8A", // Bleu Royal
+  blue700: "#0B3D91", // bleu vif — début des dégradés (grandes surfaces)
+  blue500: "#1565C0", // fin des dégradés, assez foncé pour du texte blanc
   blue600: "#0EA5E9", // Bleu Ciel
   blue100: "#DCE9FB", // dérivé
   blue50:  "#F0F6FE", // dérivé
@@ -47,6 +49,13 @@ export const C = {
   primaryLight: PALETTE.blue600,
   primarySoft:  PALETTE.blue100,
 
+  // dégradé des grandes surfaces (en-têtes, cartes, carte de membre).
+  // Le Bleu Marine (blue900) reste réservé au texte, aux titres et à
+  // la sidebar : en grande surface il assombrit l'écran.
+  hero:      `linear-gradient(135deg, ${PALETTE.blue700} 0%, ${PALETTE.blue500} 100%)`,
+  heroStart: PALETTE.blue700,
+  heroEnd:   PALETTE.blue500,
+
   // accent — le violet de la nouvelle identité, à utiliser en touche
   // secondaire (jamais comme couleur dominante, qui reste le bleu).
   accent:     PALETTE.violet600,
@@ -73,8 +82,8 @@ export const C = {
   onPrimary:  PALETTE.white,
 
   // ---- alias de compatibilité (ancien code) ----
-  teal:      PALETTE.blue800,
-  tealDeep:  PALETTE.blue900,
+  teal:      PALETTE.blue700,
+  tealDeep:  PALETTE.blue800,
   tealLight: PALETTE.green600,
   cream:     PALETTE.grey100,
   paper:     PALETTE.white,

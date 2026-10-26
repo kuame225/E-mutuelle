@@ -7,7 +7,7 @@ import { useParametrage } from "./useParametrage";
 import { C, R, S, SHADOW } from "./theme";
 
 // À remplacer par le vrai numéro WhatsApp/téléphone de Babamoo.
-const NUMERO_SUPPORT = "+225 00 00 00 00 00";
+const NUMERO_SUPPORT = "+225 05 76 17 80 77";
 
 const FAQ = [
   {

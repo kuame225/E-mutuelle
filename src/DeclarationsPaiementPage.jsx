@@ -79,7 +79,7 @@ export default function DeclarationsPaiementPage() {
   }
 
   async function ouvrirConfirmation(d) {
-    if (d.cotisation_ids?.length) {
+     if (d.cotisation_ids?.length) {
       // Déclaration groupée — jamais via PaiementModal (bâti pour une
       // seule cotisation). On récupère juste de quoi montrer un
       // récapitulatif avant de confirmer, la répartition elle-même
@@ -89,9 +89,32 @@ export default function DeclarationsPaiementPage() {
         .from("cotisations")
         .select("id, periode, montant_du, montant_paye")
         .in("id", d.cotisation_ids);
-      setEnCours(false);
 
-      if (error) { setMessage({ type: "err", texte: error.message }); return; }
+      if (error) {
+        setEnCours(false);
+        setMessage({ type: "err", texte: error.message });
+        return;
+      }
+
+      const resteTotal = (cots || []).reduce(
+        (s, c) => s + Math.max(0, (c.montant_du || 0) - (c.montant_paye || 0)), 0
+      );
+
+      // Même situation que pour une déclaration simple : si tout le groupe
+      // est déjà soldé (réglé ailleurs entretemps), enregistrer_paiement_groupe
+      // n'aurait plus rien à répartir — on confirme directement plutôt que
+      // d'ouvrir un récapitulatif qui n'aurait plus de sens et pourrait
+      // rappeler l'RPC sur des cotisations déjà pleines.
+      if (resteTotal <= 0) {
+        const { error: majErr } = await marquerTraitee(d.id, "confirmee");
+        setEnCours(false);
+        if (majErr) { setMessage({ type: "err", texte: majErr.message }); return; }
+        notifier("Ces échéances étaient déjà réglées — déclaration confirmée.");
+        charger();
+        return;
+      }
+
+      setEnCours(false);
       setConfirmationGroupee({ declaration: d, cotisations: cots || [] });
       return;
     }
@@ -116,13 +139,29 @@ export default function DeclarationsPaiementPage() {
       .select("*")
       .eq("id", d.cotisation_id)
       .maybeSingle();
-    setEnCours(false);
 
     if (error || !cotisation) {
+      setEnCours(false);
       setMessage({ type: "err", texte: "Échéance introuvable — elle a peut-être été supprimée." });
       return;
     }
 
+    // La cotisation a pu être réglée entretemps par un autre canal (saisie
+    // directe dans Cotisations, par exemple) avant que cette déclaration ne
+    // soit traitée. PaiementModal n'aurait alors plus rien à enregistrer, et
+    // ne pourrait jamais faire progresser montant_paye pour déclencher la
+    // confirmation automatique — la déclaration resterait bloquée "en
+    // attente" indéfiniment. On la confirme donc directement, sans modal.
+    if (Number(cotisation.montant_paye) >= Number(cotisation.montant_du)) {
+      const { error: majErr } = await marquerTraitee(d.id, "confirmee");
+      setEnCours(false);
+      if (majErr) { setMessage({ type: "err", texte: majErr.message }); return; }
+      notifier("Cette échéance était déjà réglée — déclaration confirmée.");
+      charger();
+      return;
+    }
+
+    setEnCours(false);
     setConfirmationCible({ declaration: d, cotisation, membre: { nom: d.membres?.nom } });
   }
 

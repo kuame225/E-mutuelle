@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   LogOut, UserCircle2, ArrowLeft, PowerOff, ShieldOff, ShieldCheck, CheckCircle2,
-  Users2, GraduationCap, Award, FileBarChart2, WifiOff,
+  Users2, GraduationCap, Award, FileBarChart2, WifiOff, AlertTriangle,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
@@ -848,6 +848,45 @@ function PageMembre({ onBack, children }) {
 
 /* ---------------- Cotisations du membre ---------------- */
 
+// Petit personnage stylisé, bras levés — vient humaniser la carte de
+// statut/régularité. Dessiné en SVG inline (aucune image externe à
+// héberger), en camaïeu blanc translucide pour se fondre dans le
+// dégradé de la carte plutôt que de trancher dessus.
+function MascotteCelebration({ size = 72 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 84 84" fill="none">
+      <path d="M28 44 L14 22" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" />
+      <path d="M56 44 L70 22" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" />
+      <path d="M30 47 Q42 64 54 47" stroke="rgba(255,255,255,.85)" strokeWidth="6" strokeLinecap="round" fill="none" />
+      <circle cx="42" cy="26" r="11" fill="rgba(255,255,255,.95)" />
+      <circle cx="38" cy="25" r="1.6" fill={PALETTE.blue800} />
+      <circle cx="46" cy="25" r="1.6" fill={PALETTE.blue800} />
+      <path d="M37 30q5 4 10 0" stroke={PALETTE.blue800} strokeWidth="2" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+const AVATARS_STATUT = {
+  F: { a_jour: "/avatars/avatar_femme_a_jour.png", non_a_jour: "/avatars/avatar_femme_non_a_jour.png" },
+  M: { a_jour: "/avatars/avatar_homme_a_jour.png", non_a_jour: "/avatars/avatar_homme_non_a_jour.png" },
+};
+
+// Avatar illustrant le statut de cotisation du membre — genre + statut
+// choisissent l'image parmi les 4 déclinaisons (public/avatars/). Tant
+// que le membre n'a pas renseigné son genre, on retombe sur le petit
+// personnage neutre en SVG plutôt que d'en deviner un.
+function AvatarStatutMembre({ sexe, aJour, hauteur = 96 }) {
+  const jeu = AVATARS_STATUT[sexe];
+  if (!jeu) return <MascotteCelebration size={60} />;
+
+  return (
+    <img
+      src={jeu[aJour ? "a_jour" : "non_a_jour"]}
+      alt=""
+      style={{ height: hauteur, width: "auto", display: "block", flexShrink: 0 }}
+    />
+  );
+}
+
 function MembreCotisations({ membre }) {
   const { params } = useParametrage();
   const [cotisations, setCotisations] = useState([]);
@@ -862,6 +901,7 @@ function MembreCotisations({ membre }) {
   const [telechargementHistorique, setTelechargementHistorique] = useState(false);
   const [depuisCache, setDepuisCache] = useState(false);
   const [horodatageCache, setHorodatageCache] = useState(null);
+  const [regularite, setRegularite] = useState({ actuelle: 0, record: 0 });
 
   async function charger() {
     const idCache = `cotisations_${membre.id}`;
@@ -876,20 +916,24 @@ function MembreCotisations({ membre }) {
     }
 
     try {
-      const [cotRes, moyRes, declRes, waveRes] = await Promise.all([
+       const [cotRes, moyRes, declRes, waveRes, regRes] = await Promise.all([
         supabase.from("cotisations").select("*").eq("membre_id", membre.id).order("periode", { ascending: false }),
         supabase.from("moyens_paiement").select("*").eq("organisation_id", membre.organisation_id).eq("actif", true).order("ordre"),
         supabase.from("declarations_paiement").select("cotisation_id, cotisation_ids, statut").eq("membre_id", membre.id).eq("statut", "en_attente"),
         supabase.from("integrations_paiement").select("actif").eq("organisation_id", membre.organisation_id).eq("fournisseur", "wave").maybeSingle(),
+        supabase.rpc("calculer_regularite_membre", { p_membre_id: membre.id }),
       ]);
 
-      for (const r of [cotRes, moyRes, declRes, waveRes]) {
+      for (const r of [cotRes, moyRes, declRes, waveRes, regRes]) {
         if (r.error && ressembleAUneCoupureReseau(r.error)) throw r.error;
       }
+
+      const ligneRegularite = regRes.data?.[0] || { regularite_actuelle: 0, record_personnel: 0 };
 
       const resultat = {
         cotisations: cotRes.data || [], moyens: moyRes.data || [], declarations: declRes.data || [],
         waveActif: Boolean(waveRes.data?.actif),
+        regularite: { actuelle: ligneRegularite.regularite_actuelle, record: ligneRegularite.record_personnel },
       };
       sauverCache(idCache, resultat);
 
@@ -897,6 +941,7 @@ function MembreCotisations({ membre }) {
       setMoyens(resultat.moyens);
       setDeclarations(resultat.declarations);
       setWaveActif(resultat.waveActif);
+      setRegularite(resultat.regularite);
       setSelection([]);
       setDepuisCache(false);
       setLoading(false);
@@ -907,6 +952,7 @@ function MembreCotisations({ membre }) {
         setMoyens(secours.donnees.moyens);
         setDeclarations(secours.donnees.declarations);
         setWaveActif(secours.donnees.waveActif);
+        setRegularite(secours.donnees.regularite || { actuelle: 0, record: 0 });
         setDepuisCache(true);
         setHorodatageCache(secours.horodatage);
       }
@@ -989,6 +1035,21 @@ function MembreCotisations({ membre }) {
     (s, c) => s + ((c.montant_du || 0) - (c.montant_paye || 0)), 0
   );
 
+  // Cotisation à mettre en avant dans la carte d'action prioritaire :
+  // la plus ancienne encore impayée (cotisationsImpayees garde l'ordre
+  // décroissant de "cotisations", donc le dernier élément est la plus
+  // ancienne échéance en souffrance).
+  const cotisationPrioritaire = cotisationsImpayees[cotisationsImpayees.length - 1] || null;
+
+  // Progression annuelle — cumul des cotisations de l'année en cours,
+  // affiché dans la carte de statut pour donner une vue d'ensemble sans
+  // que le membre ait à faire le calcul lui-même.
+  const anneeCourante = new Date().getFullYear();
+  const cotisationsAnnee = cotisations.filter((c) => c.periode?.startsWith(String(anneeCourante)));
+  const totalDuAnnee = cotisationsAnnee.reduce((s, c) => s + (c.montant_du || 0), 0);
+  const totalPayeAnnee = cotisationsAnnee.reduce((s, c) => s + (c.montant_paye || 0), 0);
+  const pourcentageAnnee = totalDuAnnee > 0 ? Math.round((totalPayeAnnee / totalDuAnnee) * 100) : 0;
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
@@ -1010,6 +1071,110 @@ function MembreCotisations({ membre }) {
         )}
       </div>
 
+      {/* ---- Statut de cotisation + régularité + progression annuelle ---- */}
+      {cotisations.length > 0 && (
+        <div style={{
+          position: "relative", overflow: "hidden",
+          background: `linear-gradient(135deg, ${PALETTE.blue800}, ${PALETTE.blue600})`,
+          color: "#fff", borderRadius: R.xl, padding: 20, marginBottom: 16,
+          boxShadow: SHADOW.md,
+        }}>
+          <div style={{
+            position: "absolute", width: 180, height: 180, borderRadius: "50%",
+            background: "rgba(255,255,255,.07)", right: -60, top: -70,
+          }} />
+
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+            {membre.statut_cotisation === "a_jour"
+              ? <CheckCircle2 size={18} color="#A7F3C0" />
+              : <AlertTriangle size={18} color="#FDE68A" />}
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".02em", textTransform: "uppercase" }}>
+              {membre.statut_cotisation === "a_jour" ? "À jour" : "En retard"}
+            </span>
+          </div>
+
+                    <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
+                  {regularite.actuelle} <span style={{ fontSize: 13, fontWeight: 600, opacity: .8 }}>mois</span>
+                </div>
+                <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Ma régularité</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
+                  {regularite.record} <span style={{ fontSize: 13, fontWeight: 600, opacity: .8 }}>mois</span>
+                </div>
+                <div style={{ fontSize: 12, opacity: .78, marginTop: 4 }}>Record personnel</div>
+              </div>
+            </div>
+            <AvatarStatutMembre sexe={membre.sexe} aJour={membre.statut_cotisation === "a_jour"} />
+          </div>
+
+          {totalDuAnnee > 0 && (
+            <div style={{ position: "relative", marginTop: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, opacity: .85, marginBottom: 6 }}>
+                <span>Cotisations {anneeCourante}</span>
+                <span>{montant(totalPayeAnnee)} / {montant(totalDuAnnee)} FCFA</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 999, background: "rgba(255,255,255,.22)", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", width: `${Math.min(pourcentageAnnee, 100)}%`,
+                  background: "#fff", borderRadius: 999, transition: "width .3s ease",
+                }} />
+              </div>
+              <div style={{ fontSize: 11.5, opacity: .78, marginTop: 4 }}>{pourcentageAnnee}% réglé</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- Action prioritaire : la cotisation la plus urgente à régler ---- */}
+      {cotisationPrioritaire && (
+        <div style={{
+          background: C.surface, border: `1.5px solid ${C.primary}`, borderRadius: R.xl,
+          padding: 18, marginBottom: 16, display: "flex", alignItems: "center",
+          justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+          boxShadow: SHADOW.sm,
+        }}>
+          <div>
+            <div style={{ fontSize: 12, color: C.textSubtle, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".02em" }}>
+              À régler
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2 }}>
+              {formatPeriode(cotisationPrioritaire.periode)}
+            </div>
+            <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>
+              {montant((cotisationPrioritaire.montant_du || 0) - (cotisationPrioritaire.montant_paye || 0))} FCFA restants
+            </div>
+          </div>
+          {waveActif ? (
+            <button
+              onClick={() => payerAvecWave(cotisationPrioritaire)}
+              disabled={waveEnCours === cotisationPrioritaire.id}
+              style={{
+                background: C.primary, border: "none", color: "#fff",
+                borderRadius: 10, padding: "12px 22px", cursor: "pointer",
+                fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+              }}
+            >
+              {waveEnCours === cotisationPrioritaire.id ? "Redirection…" : "Payer maintenant"}
+            </button>
+          ) : moyens.length > 0 && (
+            <button
+              onClick={() => setDeclarationOuverte(cotisationPrioritaire)}
+              style={{
+                background: C.primary, border: "none", color: "#fff",
+                borderRadius: 10, padding: "12px 22px", cursor: "pointer",
+                fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+              }}
+            >
+              J'ai payé
+            </button>
+          )}
+        </div>
+      )}
+
       {depuisCache && (
         <div style={{
           display: "flex", alignItems: "center", gap: 8, background: "#FEF3C7",
@@ -1023,7 +1188,7 @@ function MembreCotisations({ membre }) {
         </div>
       )}
 
-      {moyens.length > 0 && <MoyensPaiementApercu moyens={moyens} />}
+      {moyens.length > 0 && cotisationsImpayees.length > 0 && <MoyensPaiementApercu moyens={moyens} />}
 
       {waveErreur && (
         <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>
@@ -1101,6 +1266,16 @@ function MembreCotisations({ membre }) {
                     ? `1px solid ${C.border}` : "none",
                 }}
               >
+                {/* Frise verticale — un repère par échéance, relié à la
+                    suivante, pour lire l'historique comme une continuité
+                    plutôt qu'une liste plate. */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 12, flexShrink: 0, paddingTop: 4 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: st.fg, flexShrink: 0 }} />
+                  {i < cotisations.length - 1 && (
+                    <div style={{ width: 2, flex: 1, minHeight: 18, background: C.border, marginTop: 4 }} />
+                  )}
+                </div>
+
                 {cotisationsImpayees.length > 1 && (
                   <input
                     type="checkbox"
@@ -1160,10 +1335,6 @@ function MembreCotisations({ membre }) {
                         )
                       )}
 
-                      {/* Sans ce message, un membre dont l'organisation n'a
-                          encore configuré aucun moyen de paiement (ni Wave,
-                          ni manuel) se retrouvait face à une zone vide, sans
-                          la moindre indication de ce qu'il doit faire. */}
                       {!waveActif && moyens.length === 0 && (
                         <span style={{ fontSize: 12.5, color: C.textSubtle }}>
                           Aucun moyen de paiement configuré pour le moment — contactez le Bureau.
@@ -2211,6 +2382,10 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
 
+  // Même libellés que MoyensPaiementApercu — cohérence d'affichage entre
+  // le récapitulatif "Comment payer" et cet écran de déclaration.
+  const LABELS_MOYEN = { wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money", moov_money: "Moov Money", autre: "Autre" };
+
   async function envoyer() {
     const m = parseInt(montantSaisi, 10);
     if (!m || m <= 0) { setErreur("Indiquez le montant payé."); return; }
@@ -2241,79 +2416,151 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
       style={{
         position: "fixed", inset: 0, zIndex: 200, background: "rgba(10,20,40,.5)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        overflowY: "auto",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420 }}
+        style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 420, overflow: "hidden", margin: "auto" }}
       >
-        <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>J'ai payé</h3>
-        <p style={{ fontSize: 13, color: C.textSubtle, margin: "0 0 16px" }}>
-          {groupe
-            ? `${liste.length} échéances (${liste.map((c) => formatPeriode(c.periode)).join(", ")})`
-            : formatPeriode(liste[0].periode)}
-          {" — reste dû "}{montant(restant)} FCFA
-        </p>
+        {/* ---- Bandeau ---- */}
+        <div style={{
+          position: "relative", overflow: "hidden",
+          background: `linear-gradient(135deg, ${PALETTE.blue800}, ${PALETTE.blue600})`,
+          color: "#fff", padding: "20px 22px",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
+        }}>
+          <div style={{
+            position: "absolute", width: 160, height: 160, borderRadius: "50%",
+            background: "rgba(255,255,255,.08)", right: -50, top: -60,
+          }} />
+          <div style={{ position: "relative" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.35 }}>
+              Finaliser votre paiement{" "}
+              {groupe ? `de ${liste.length} échéances` : `pour ${formatPeriode(liste[0].periode)}`}
+            </div>
+            <span style={{
+              display: "inline-flex", marginTop: 8,
+              background: "rgba(255,255,255,.18)", borderRadius: 999,
+              padding: "4px 11px", fontSize: 11.5, fontWeight: 700, letterSpacing: ".02em",
+            }}>
+              À PAYER
+            </span>
+          </div>
+          <AvatarStatutMembre sexe={membre.sexe} aJour hauteur={76} />
+        </div>
 
-        {moyens.length > 0 && (
+        <div style={{ padding: "20px 22px 22px" }}>
+          {/* ---- Récapitulatif ---- */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12,
+            padding: "13px 15px", marginBottom: 16,
+          }}>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                {groupe
+                  ? `${liste.length} échéances (${liste.map((c) => formatPeriode(c.periode)).join(", ")})`
+                  : formatPeriode(liste[0].periode)}
+              </div>
+              <div style={{ fontSize: 12, color: C.textSubtle, marginTop: 2 }}>Cotisation</div>
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>{montant(restant)} FCFA</div>
+          </div>
+
+          {/* ---- Mode de paiement ---- */}
+          {moyens.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Mode de paiement</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                {moyens.map((m) => {
+                  const actif = moyenId === m.id;
+                  const nom = m.libelle || LABELS_MOYEN[m.type] || m.type;
+                  const logoUrl = m.logo_chemin
+                    ? supabase.storage.from("qr-paiement").getPublicUrl(m.logo_chemin).data.publicUrl
+                    : null;
+
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setMoyenId(m.id)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        border: `1.5px solid ${actif ? C.primary : C.border}`,
+                        background: actif ? PALETTE.blue50 : "#fff",
+                        borderRadius: 10, padding: "9px 11px", cursor: "pointer",
+                        fontFamily: "inherit", textAlign: "left",
+                      }}
+                    >
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="" style={{ width: 26, height: 26, borderRadius: 7, objectFit: "cover", flexShrink: 0 }} />
+                      ) : (
+                        <span style={{
+                          width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                          background: actif ? C.primary : PALETTE.grey200,
+                          color: actif ? "#fff" : C.textSubtle,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 12, fontWeight: 700,
+                        }}>
+                          {(nom || "?").charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: actif ? C.primary : C.text, lineHeight: 1.25 }}>
+                        {nom}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Moyen utilisé</label>
-            <select
-              value={moyenId}
-              onChange={(e) => setMoyenId(e.target.value)}
-              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14 }}
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Montant payé</label>
+            <input
+              type="number" value={montantSaisi} onChange={(e) => setMontantSaisi(e.target.value)}
+              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Référence — facultative</label>
+            <input
+              value={reference} onChange={(e) => setReference(e.target.value)}
+              placeholder="Numéro de transaction, si vous l'avez"
+              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Note — facultative</label>
+            <input
+              value={note} onChange={(e) => setNote(e.target.value)}
+              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+
+          {erreur && (
+            <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 14 }}>
+              {erreur}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={onClose} disabled={enCours}
+              style={{ flex: 1, background: "#fff", border: `1.5px solid ${C.border}`, color: C.textMuted, borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
             >
-              {moyens.map((m) => (
-                <option key={m.id} value={m.id}>{m.libelle || m.type}</option>
-              ))}
-            </select>
+              Annuler
+            </button>
+            <button
+              onClick={envoyer} disabled={enCours}
+              style={{ flex: 2, background: C.primary, border: "none", color: "#fff", borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
+            >
+              {enCours ? "Envoi…" : "Payer maintenant"}
+            </button>
           </div>
-        )}
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Montant payé</label>
-          <input
-            type="number" value={montantSaisi} onChange={(e) => setMontantSaisi(e.target.value)}
-            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Référence — facultative</label>
-          <input
-            value={reference} onChange={(e) => setReference(e.target.value)}
-            placeholder="Numéro de transaction, si vous l'avez"
-            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Note — facultative</label>
-          <input
-            value={note} onChange={(e) => setNote(e.target.value)}
-            style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
-          />
-        </div>
-
-        {erreur && (
-          <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 14 }}>
-            {erreur}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={onClose} disabled={enCours}
-            style={{ flex: 1, background: "#fff", border: `1.5px solid ${C.border}`, color: C.textMuted, borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
-          >
-            Annuler
-          </button>
-          <button
-            onClick={envoyer} disabled={enCours}
-            style={{ flex: 2, background: C.primary, border: "none", color: "#fff", borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
-          >
-            {enCours ? "Envoi…" : "Envoyer"}
-          </button>
         </div>
       </div>
     </div>

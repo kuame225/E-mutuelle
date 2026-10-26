@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
   Plus, RefreshCw, Loader2, Search, ChevronDown, ChevronUp,
-  CheckCircle2, Clock, AlertTriangle, Wallet, TrendingUp,
+  CheckCircle2, Clock, AlertTriangle, Wallet, TrendingUp, Sparkles,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import { diffuserCommunique } from "./notifier";
 import { useParametrage } from "./useParametrage";
 import { useVocabulaire } from "./useVocabulaire";
 import { de } from "./vocabulaire";
@@ -36,6 +37,7 @@ export default function CotisationsPage() {
   const [query, setQuery] = useState("");
   const [filtre, setFiltre] = useState("tous");
   const [replies, setReplies] = useState({});
+  const [modalExc, setModalExc] = useState(false);
 
   async function charger() {
     setLoading(true);
@@ -109,12 +111,109 @@ export default function CotisationsPage() {
   });
   const periodes = Object.keys(groupes).sort().reverse();
 
-  // Totaux généraux
-  const totalDu = cotisations.reduce((s, c) => s + c.montant_du, 0);
-  const totalPaye = cotisations.reduce((s, c) => s + c.montant_paye, 0);
-  const nbRegle = cotisations.filter((c) => c.statut === "paye").length;
+  // Les cotisations exceptionnelles sont comptées à part : les mélanger au
+  // suivi mensuel fausserait le taux d'encaissement des cotisations
+  // régulières.
+  const estExc = (c) => c.type === "exceptionnelle";
+  const periodiques = cotisations.filter((c) => !estExc(c));
+  const exceptionnelles = cotisations.filter(estExc);
+
+  // Totaux généraux (cotisations régulières)
+  const totalDu = periodiques.reduce((s, c) => s + c.montant_du, 0);
+  const totalPaye = periodiques.reduce((s, c) => s + c.montant_paye, 0);
+  const nbRegle = periodiques.filter((c) => c.statut === "paye").length;
+
+  // Totaux des cotisations exceptionnelles
+  const totalDuExc = exceptionnelles.reduce((s, c) => s + c.montant_du, 0);
+  const totalPayeExc = exceptionnelles.reduce((s, c) => s + c.montant_paye, 0);
+
+  // Une campagne exceptionnelle = un identifiant de période « EXC-… »
+  const campagnes = periodes.filter((p) => groupes[p][0].type === "exceptionnelle");
+  const mensuelles = periodes.filter((p) => groupes[p][0].type !== "exceptionnelle");
 
   const basculer = (p) => setReplies((r) => ({ ...r, [p]: !r[p] }));
+
+  function rendrePeriode(periode) {
+    const lignes = groupes[periode];
+    const exc = lignes[0].type === "exceptionnelle";
+    const du = lignes.reduce((s, c) => s + c.montant_du, 0);
+    const paye = lignes.reduce((s, c) => s + c.montant_paye, 0);
+    const regles = lignes.filter((c) => c.statut === "paye").length;
+    const taux = du ? Math.round((paye / du) * 100) : 0;
+    const replie = replies[periode];
+
+    return (
+      <section key={periode} className="ct-periode">
+        <button className="ct-periode-head" onClick={() => basculer(periode)}>
+          <div className="ct-periode-left">
+            <h3 className="ct-periode-titre">
+              {exc ? lignes[0].motif || "Cotisation exceptionnelle" : formatPeriode(periode)}
+              {exc && <span className="ct-exc-tag">Exceptionnelle</span>}
+            </h3>
+            <span className="ct-periode-meta">
+              {regles}/{lignes.length} réglées · {montant(paye)} / {montant(du)} FCFA
+              {exc && lignes[0].date_limite &&
+                ` · échéance le ${new Date(lignes[0].date_limite).toLocaleDateString("fr-FR")}`}
+            </span>
+          </div>
+
+          <div className="ct-periode-right">
+            <div className="ct-gauge">
+              <div
+                className="ct-gauge-fill"
+                style={{
+                  width: `${taux}%`,
+                  background: taux >= 100 ? C.success : taux >= 50 ? C.primaryLight : C.warning,
+                }}
+              />
+            </div>
+            <span className="ct-taux">{taux}%</span>
+            {replie ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          </div>
+        </button>
+
+        {!replie && (
+          <ul className="ct-list">
+            {lignes.map((c) => {
+              const m = membres[c.membre_id];
+              const st = STATUT[c.statut] || STATUT.en_attente;
+              const reste = c.montant_du - c.montant_paye;
+              const enRetard = c.statut !== "paye"
+                && c.statut !== "exempte"
+                && new Date(c.date_limite) < new Date();
+
+              return (
+                <li key={c.id} className="ct-row">
+                  <Avatar membre={m} />
+
+                  <div className="ct-row-text">
+                    <div className="ct-row-nom">{m.nom}</div>
+                    <div className="ct-row-sub">
+                      {montant(c.montant_paye)} / {montant(c.montant_du)} FCFA
+                      {enRetard && <span className="ct-late"> · échéance dépassée</span>}
+                    </div>
+                  </div>
+
+                  <span className="ct-chip" style={{ background: st.soft, color: st.color }}>
+                    <st.Icon size={12} /> {st.label}
+                  </span>
+
+                  {c.statut !== "paye" && c.statut !== "exempte" && (
+                    <button
+                      className="ct-pay"
+                      onClick={() => setSelected({ cotisation: c, membre: m })}
+                    >
+                      Encaisser {montant(reste)} F
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    );
+  }
 
   if (loading) {
     return (

@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import {
   Plus, RefreshCw, Loader2, Search, ChevronDown, ChevronUp,
-  CheckCircle2, Clock, AlertTriangle, Wallet, TrendingUp,
+  CheckCircle2, Clock, AlertTriangle, Wallet, TrendingUp, Sparkles,
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { diffuserCommunique } from "./notifier";
 import { useParametrage } from "./useParametrage";
 import { useVocabulaire } from "./useVocabulaire";
 import { de } from "./vocabulaire";
@@ -25,17 +24,6 @@ const FILTRES = [
   { id: "paye",     label: "Réglées" },
 ];
 
-// Modes disponibles pour la saisie rapide / le mode collecte — un seul mode
-// actif à la fois pour toute la séance, pour ne pas réintroduire un choix
-// par ligne (ce serait retomber dans la friction qu'on cherche à retirer).
-const MODES_RAPIDES = [
-  { id: "cash",         label: "Cash",         Icon: Banknote },
-  { id: "orange_money", label: "Orange Money", Icon: Smartphone },
-  { id: "mtn_money",    label: "MTN Money",    Icon: Smartphone },
-  { id: "moov_money",   label: "Moov Money",   Icon: Smartphone },
-  { id: "wave",         label: "Wave",         Icon: Smartphone },
-];
-
 export default function CotisationsPage() {
   const { params } = useParametrage();
   const { mot } = useVocabulaire();
@@ -48,6 +36,9 @@ export default function CotisationsPage() {
   const [query, setQuery] = useState("");
   const [filtre, setFiltre] = useState("tous");
   const [replies, setReplies] = useState({});
+  const [exceptionnelleOuverte, setExceptionnelleOuverte] = useState(false);
+  const [annulerCible, setAnnulerCible] = useState(null); // { periode, motif, nb }
+  const [annulationEnCours, setAnnulationEnCours] = useState(false);
 
   async function charger() {
     setLoading(true);
@@ -103,104 +94,48 @@ export default function CotisationsPage() {
     charger();
   }
 
-  // --- Paiement rapide (un membre, montant complet, cash) ---
-  async function payerRapide(cotisation) {
-    setPayingIds((p) => ({ ...p, [cotisation.id]: true }));
-    setMessage(null);
-
-    const reste = cotisation.montant_du - cotisation.montant_paye;
-    const { error } = await supabase.rpc("enregistrer_paiement", {
-      p_cotisation_id: cotisation.id,
-      p_montant: reste,
-      p_mode: modePaiement,
-      p_reference: null,
+  // Cotisation exceptionnelle : une ligne par membre actif, créée côté
+  // serveur par generer_cotisation_exceptionnelle (réservée au Bureau).
+  // Retourne un message d'erreur à afficher dans la fenêtre, ou null.
+  async function creerExceptionnelle({ motif, montantParMembre, dateLimite }) {
+    const { data, error } = await supabase.rpc("generer_cotisation_exceptionnelle", {
+      p_org: params.organisation_id,
+      p_motif: motif,
+      p_montant: montantParMembre,
+      p_date_lim: dateLimite,
     });
+    if (error) return error.message;
 
-    setPayingIds((p) => {
-      const next = { ...p };
-      delete next[cotisation.id];
-      return next;
-    });
-
-    if (error) {
-      setMessage({ type: "err", texte: `Échec pour ${membres[cotisation.membre_id]?.nom || "ce membre"} : ${error.message}` });
-      return;
-    }
-
-    // Retrait de la sélection si elle y était, puis rechargement des données.
-    setSelection((s) => {
-      if (!s[cotisation.id]) return s;
-      const next = { ...s };
-      delete next[cotisation.id];
-      return next;
+    setExceptionnelleOuverte(false);
+    setMessage({
+      type: "ok",
+      texte: `« ${motif} » : ${data} ${data > 1 ? mot("cotisations").toLowerCase() : mot("cotisation").toLowerCase()} exceptionnelle${data > 1 ? "s" : ""} générée${data > 1 ? "s" : ""}. Des rappels partiront 7 jours, 1 jour et le jour de l'échéance.`,
     });
     charger();
+    return null;
   }
 
-  function toggleCollecte() {
-    setCollecteActive((v) => !v);
-    setSelection({});
-  }
-
-  function toggleSelect(id) {
-    setSelection((s) => {
-      const next = { ...s };
-      if (next[id]) delete next[id]; else next[id] = true;
-      return next;
+  // Annulation d'une exceptionnelle qui n'a reçu aucun paiement. Le serveur
+  // revérifie tout (aucun paiement, aucune déclaration liée) : le bouton
+  // n'est qu'un confort, jamais la garantie.
+  async function annulerExceptionnelle() {
+    const cible = annulerCible;
+    setAnnulationEnCours(true);
+    const { data, error } = await supabase.rpc("annuler_cotisation_exceptionnelle", {
+      p_org: params.organisation_id,
+      p_periode: cible.periode,
     });
-  }
+    setAnnulationEnCours(false);
+    setAnnulerCible(null);
 
-  function toggleSelectPeriode(lignesImpayees) {
-    const idsPeriode = lignesImpayees.map((c) => c.id);
-    const tousDejaSelectionnes = idsPeriode.length > 0 && idsPeriode.every((id) => selection[id]);
-    setSelection((s) => {
-      const next = { ...s };
-      idsPeriode.forEach((id) => {
-        if (tousDejaSelectionnes) delete next[id]; else next[id] = true;
-      });
-      return next;
-    });
-  }
-
-  // --- Confirmation groupée de la sélection ---
-  const idsSelectionnes = Object.keys(selection).filter((id) => selection[id]);
-  const cotisationsSelectionnees = cotisations.filter((c) => selection[c.id]);
-  const totalSelection = cotisationsSelectionnees.reduce(
-    (s, c) => s + (c.montant_du - c.montant_paye), 0
-  );
-
-  async function confirmerSelection() {
-    if (idsSelectionnes.length === 0) return;
-    setBulkLoading(true);
-    setMessage(null);
-
-    const resultats = await Promise.allSettled(
-      cotisationsSelectionnees.map((c) =>
-        supabase.rpc("enregistrer_paiement", {
-          p_cotisation_id: c.id,
-          p_montant: c.montant_du - c.montant_paye,
-          p_mode: modePaiement,
-          p_reference: null,
-        }).then(({ error }) => {
-          if (error) throw error;
-          return c.id;
-        })
-      )
-    );
-
-    const reussis = resultats.filter((r) => r.status === "fulfilled").length;
-    const echoues = resultats.length - reussis;
-
-    setBulkLoading(false);
-    setSelection({});
-
+    if (error) {
+      setMessage({ type: "err", texte: error.message });
+      return;
+    }
     setMessage({
-      type: echoues === 0 ? "ok" : "err",
-      texte: echoues === 0
-        ? `${reussis} paiement${reussis > 1 ? "s" : ""} confirmé${reussis > 1 ? "s" : ""}.`
-        : `${reussis} paiement${reussis > 1 ? "s" : ""} confirmé${reussis > 1 ? "s" : ""}, ${echoues} en échec — réessayez pour ceux-là.`,
+      type: "ok",
+      texte: `« ${cible.motif} » annulée : ${data} ligne${data > 1 ? "s" : ""} supprimée${data > 1 ? "s" : ""}.`,
     });
-
     charger();
   }
 
@@ -220,111 +155,19 @@ export default function CotisationsPage() {
     if (!groupes[c.periode]) groupes[c.periode] = [];
     groupes[c.periode].push(c);
   });
-  const periodes = Object.keys(groupes).sort().reverse();
+  // Les cotisations exceptionnelles (code « EXC-… ») passent en tête, puis
+  // les mois du plus récent au plus ancien.
+  const periodes = Object.keys(groupes).sort((a, b) => b.localeCompare(a));
 
-  // Les cotisations exceptionnelles sont comptées à part : les mélanger au
-  // suivi mensuel fausserait le taux d'encaissement des cotisations
-  // régulières.
-  const estExc = (c) => c.type === "exceptionnelle";
-  const periodiques = cotisations.filter((c) => !estExc(c));
-  const exceptionnelles = cotisations.filter(estExc);
-
-  // Totaux généraux (cotisations régulières)
+  // Totaux généraux : cotisations périodiques uniquement. L'exceptionnelle,
+  // facultative, a sa propre jauge dans son bandeau et ne doit pas fausser
+  // le taux d'encaissement mensuel.
+  const periodiques = cotisations.filter((c) => c.type !== "exceptionnelle");
   const totalDu = periodiques.reduce((s, c) => s + c.montant_du, 0);
   const totalPaye = periodiques.reduce((s, c) => s + c.montant_paye, 0);
   const nbRegle = periodiques.filter((c) => c.statut === "paye").length;
 
-  // Totaux des cotisations exceptionnelles
-  const totalDuExc = exceptionnelles.reduce((s, c) => s + c.montant_du, 0);
-  const totalPayeExc = exceptionnelles.reduce((s, c) => s + c.montant_paye, 0);
-
-  // Une campagne exceptionnelle = un identifiant de période « EXC-… »
-  const campagnes = periodes.filter((p) => groupes[p][0].type === "exceptionnelle");
-  const mensuelles = periodes.filter((p) => groupes[p][0].type !== "exceptionnelle");
-
   const basculer = (p) => setReplies((r) => ({ ...r, [p]: !r[p] }));
-
-  function rendrePeriode(periode) {
-    const lignes = groupes[periode];
-    const exc = lignes[0].type === "exceptionnelle";
-    const du = lignes.reduce((s, c) => s + c.montant_du, 0);
-    const paye = lignes.reduce((s, c) => s + c.montant_paye, 0);
-    const regles = lignes.filter((c) => c.statut === "paye").length;
-    const taux = du ? Math.round((paye / du) * 100) : 0;
-    const replie = replies[periode];
-
-    return (
-      <section key={periode} className="ct-periode">
-        <button className="ct-periode-head" onClick={() => basculer(periode)}>
-          <div className="ct-periode-left">
-            <h3 className="ct-periode-titre">
-              {exc ? lignes[0].motif || "Cotisation exceptionnelle" : formatPeriode(periode)}
-              {exc && <span className="ct-exc-tag">Exceptionnelle</span>}
-            </h3>
-            <span className="ct-periode-meta">
-              {regles}/{lignes.length} réglées · {montant(paye)} / {montant(du)} FCFA
-              {exc && lignes[0].date_limite &&
-                ` · échéance le ${new Date(lignes[0].date_limite).toLocaleDateString("fr-FR")}`}
-            </span>
-          </div>
-
-          <div className="ct-periode-right">
-            <div className="ct-gauge">
-              <div
-                className="ct-gauge-fill"
-                style={{
-                  width: `${taux}%`,
-                  background: taux >= 100 ? C.success : taux >= 50 ? C.primaryLight : C.warning,
-                }}
-              />
-            </div>
-            <span className="ct-taux">{taux}%</span>
-            {replie ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-          </div>
-        </button>
-
-        {!replie && (
-          <ul className="ct-list">
-            {lignes.map((c) => {
-              const m = membres[c.membre_id];
-              const st = STATUT[c.statut] || STATUT.en_attente;
-              const reste = c.montant_du - c.montant_paye;
-              const enRetard = c.statut !== "paye"
-                && c.statut !== "exempte"
-                && new Date(c.date_limite) < new Date();
-
-              return (
-                <li key={c.id} className="ct-row">
-                  <Avatar membre={m} />
-
-                  <div className="ct-row-text">
-                    <div className="ct-row-nom">{m.nom}</div>
-                    <div className="ct-row-sub">
-                      {montant(c.montant_paye)} / {montant(c.montant_du)} FCFA
-                      {enRetard && <span className="ct-late"> · échéance dépassée</span>}
-                    </div>
-                  </div>
-
-                  <span className="ct-chip" style={{ background: st.soft, color: st.color }}>
-                    <st.Icon size={12} /> {st.label}
-                  </span>
-
-                  {c.statut !== "paye" && c.statut !== "exempte" && (
-                    <button
-                      className="ct-pay"
-                      onClick={() => setSelected({ cotisation: c, membre: m })}
-                    >
-                      Encaisser {montant(reste)} F
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-    );
-  }
 
   if (loading) {
     return (
@@ -357,22 +200,18 @@ export default function CotisationsPage() {
           </span>
           <div>
             <div className="ct-sum-val">
-              {nbRegle}<em>/{cotisations.length}</em>
+              {nbRegle}<em>/{periodiques.length}</em>
             </div>
             <div className="ct-sum-lab">{mot("cotisations")} réglées</div>
           </div>
         </div>
 
         <div className="ct-actions">
-          <button
-            className={`ct-btn-collecte ${collecteActive ? "is-on" : ""}`}
-            onClick={toggleCollecte}
-            title="Mode collecte : saisie groupée pour une séance"
-          >
-            <Zap size={16} /> {collecteActive ? "Quitter la collecte" : "Mode collecte"}
-          </button>
           <button className="ct-btn-ghost" onClick={charger} title="Actualiser">
             <RefreshCw size={16} />
+          </button>
+          <button className="ct-btn-sec" onClick={() => setExceptionnelleOuverte(true)}>
+            <Sparkles size={16} /> Exceptionnelle
           </button>
           <button className="ct-btn" onClick={genererMois} disabled={generating}>
             {generating
@@ -387,23 +226,6 @@ export default function CotisationsPage() {
           {message.texte}
         </div>
       )}
-
-      {/* ---- Mode de paiement actif pour la saisie rapide ---- */}
-      <div className="ct-mode-select">
-        <span className="ct-mode-label">Mode pour la saisie rapide :</span>
-        <div className="ct-mode-pills">
-          {MODES_RAPIDES.map((m) => (
-            <button
-              key={m.id}
-              className={`ct-mode-pill ${modePaiement === m.id ? "is-on" : ""}`}
-              onClick={() => setModePaiement(m.id)}
-              title={`Les paiements "Payé" en un clic et le mode collecte utiliseront ${m.label}`}
-            >
-              <m.Icon size={13} /> {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* ---- Outils ---- */}
       <div className="ct-tools">
@@ -450,17 +272,28 @@ export default function CotisationsPage() {
           const regles = lignes.filter((c) => c.statut === "paye").length;
           const taux = du ? Math.round((paye / du) * 100) : 0;
           const replie = replies[periode];
-          const lignesImpayees = lignes.filter((c) => c.statut !== "paye" && c.statut !== "exempte");
-          const tousSelectionnes = lignesImpayees.length > 0
-            && lignesImpayees.every((c) => selection[c.id]);
+          const exceptionnelle = lignes[0]?.type === "exceptionnelle";
+
+          // Annulable seulement si AUCUNE ligne de la campagne n'a reçu de
+          // paiement — calculé sur toutes les lignes, pas sur celles que
+          // la recherche ou le filtre laissent visibles.
+          const toutesLesLignes = cotisations.filter((c) => c.periode === periode);
+          const annulable = exceptionnelle
+            && toutesLesLignes.every((c) => (c.montant_paye || 0) === 0);
 
           return (
             <section key={periode} className="ct-periode">
               <button className="ct-periode-head" onClick={() => basculer(periode)}>
                 <div className="ct-periode-left">
-                  <h3 className="ct-periode-titre">{formatPeriode(periode)}</h3>
+                  <h3 className="ct-periode-titre">
+                    {exceptionnelle ? (lignes[0].motif || "Cotisation exceptionnelle") : formatPeriode(periode)}
+                    {exceptionnelle && <span className="ct-exc-tag">Exceptionnelle</span>}
+                  </h3>
                   <span className="ct-periode-meta">
                     {regles}/{lignes.length} réglées · {montant(paye)} / {montant(du)} FCFA
+                    {exceptionnelle && lignes[0].date_limite && (
+                      <> · échéance le {new Date(lignes[0].date_limite).toLocaleDateString("fr-FR")}</>
+                    )}
                   </span>
                 </div>
 
@@ -479,83 +312,59 @@ export default function CotisationsPage() {
                 </div>
               </button>
 
-              {!replie && (
-                <>
-                  {collecteActive && lignesImpayees.length > 0 && (
-                    <div className="ct-select-all">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={tousSelectionnes}
-                          onChange={() => toggleSelectPeriode(lignesImpayees)}
-                        />
-                        Tout sélectionner ({lignesImpayees.length} à régler)
-                      </label>
-                    </div>
-                  )}
-
-                  <ul className="ct-list">
-                    {lignes.map((c) => {
-                      const m = membres[c.membre_id];
-                      const st = STATUT[c.statut] || STATUT.en_attente;
-                      const reste = c.montant_du - c.montant_paye;
-                      const enRetard = c.statut !== "paye"
-                        && c.statut !== "exempte"
-                        && new Date(c.date_limite) < new Date();
-                      const enCours = !!payingIds[c.id];
-                      const reglable = c.statut !== "paye" && c.statut !== "exempte";
-
-                      return (
-                        <li key={c.id} className="ct-row">
-                          {collecteActive && reglable && (
-                            <input
-                              type="checkbox"
-                              className="ct-row-check"
-                              checked={!!selection[c.id]}
-                              onChange={() => toggleSelect(c.id)}
-                            />
-                          )}
-
-                          <Avatar membre={m} />
-
-                          <div className="ct-row-text">
-                            <div className="ct-row-nom">{m.nom}</div>
-                            <div className="ct-row-sub">
-                              {montant(c.montant_paye)} / {montant(c.montant_du)} FCFA
-                              {enRetard && <span className="ct-late"> · échéance dépassée</span>}
-                            </div>
-                          </div>
-
-                          <span className="ct-chip" style={{ background: st.soft, color: st.color }}>
-                            <st.Icon size={12} /> {st.label}
-                          </span>
-
-                          {reglable && (
-                            <div className="ct-row-actions">
-                              <button
-                                className="ct-quickpay"
-                                disabled={enCours}
-                                onClick={() => payerRapide(c)}
-                                title={`Encaisser ${montant(reste)} FCFA — ${modeActif.label}`}
-                              >
-                                {enCours
-                                  ? <Loader2 size={14} className="ct-spin" />
-                                  : <Check size={14} />}
-                                {" "}Payé ({modeActif.label})
-                              </button>
-                              <button
-                                className="ct-pay-autre"
-                                onClick={() => setSelected({ cotisation: c, membre: m })}
-                              >
-                                Autre
-                              </button>
-                            </div>
-                          )}
-                        </li>
-                      );
+              {annulable && (
+                <div className="ct-annul-bar">
+                  <span>Aucun paiement reçu pour l'instant.</span>
+                  <button
+                    className="ct-annul-btn"
+                    onClick={() => setAnnulerCible({
+                      periode, motif: lignes[0].motif || "Cotisation exceptionnelle",
+                      nb: toutesLesLignes.length,
                     })}
-                  </ul>
-                </>
+                  >
+                    Annuler cette cotisation
+                  </button>
+                </div>
+              )}
+
+              {!replie && (
+                <ul className="ct-list">
+                  {lignes.map((c) => {
+                    const m = membres[c.membre_id];
+                    const st = STATUT[c.statut] || STATUT.en_attente;
+                    const reste = c.montant_du - c.montant_paye;
+                    const enRetard = c.statut !== "paye"
+                      && c.statut !== "exempte"
+                      && new Date(c.date_limite) < new Date();
+
+                    return (
+                      <li key={c.id} className="ct-row">
+                        <Avatar membre={m} />
+
+                        <div className="ct-row-text">
+                          <div className="ct-row-nom">{m.nom}</div>
+                          <div className="ct-row-sub">
+                            {montant(c.montant_paye)} / {montant(c.montant_du)} FCFA
+                            {enRetard && <span className="ct-late"> · échéance dépassée</span>}
+                          </div>
+                        </div>
+
+                        <span className="ct-chip" style={{ background: st.soft, color: st.color }}>
+                          <st.Icon size={12} /> {st.label}
+                        </span>
+
+                        {c.statut !== "paye" && c.statut !== "exempte" && (
+                          <button
+                            className="ct-pay"
+                            onClick={() => setSelected({ cotisation: c, membre: m })}
+                          >
+                            Encaisser {montant(reste)} F
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </section>
           );
@@ -571,23 +380,120 @@ export default function CotisationsPage() {
         />
       )}
 
-      {collecteActive && idsSelectionnes.length > 0 && (
-        <div className="ct-bulkbar">
-          <div className="ct-bulkbar-info">
-            <strong>{idsSelectionnes.length}</strong> sélectionné{idsSelectionnes.length > 1 ? "s" : ""}
-            {" · "}{montant(totalSelection)} FCFA
+      {exceptionnelleOuverte && (
+        <ModalExceptionnelle
+          onClose={() => setExceptionnelleOuverte(false)}
+          onCreer={creerExceptionnelle}
+        />
+      )}
+
+      {annulerCible && (
+        <div className="ct-overlay" onClick={() => !annulationEnCours && setAnnulerCible(null)}>
+          <div className="ct-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="ct-modal-titre">Annuler cette cotisation ?</h3>
+            <p className="ct-modal-sub">
+              « {annulerCible.motif} » sera supprimée pour les {annulerCible.nb}{" "}
+              {mot("membres").toLowerCase()} concernés. Aucun paiement n'a été
+              reçu, rien n'est perdu. Cette action est définitive.
+            </p>
+            <div className="ct-modal-actions">
+              <button
+                className="ct-btn-ghost ct-btn-annuler"
+                onClick={() => setAnnulerCible(null)}
+                disabled={annulationEnCours}
+              >
+                Garder
+              </button>
+              <button
+                className="ct-btn ct-btn-creer ct-btn-danger"
+                onClick={annulerExceptionnelle}
+                disabled={annulationEnCours}
+              >
+                {annulationEnCours
+                  ? <><Loader2 size={16} className="ct-spin" /> Annulation…</>
+                  : "Annuler la cotisation"}
+              </button>
+            </div>
           </div>
-          <button
-            className="ct-btn-bulk"
-            disabled={bulkLoading}
-            onClick={confirmerSelection}
-          >
-            {bulkLoading
-              ? <><Loader2 size={16} className="ct-spin" /> Confirmation…</>
-              : <><Check size={16} /> Confirmer les paiements ({modeActif.label})</>}
-          </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------------- Cotisation exceptionnelle ---------------- */
+
+function ModalExceptionnelle({ onClose, onCreer }) {
+  const aujourdhui = new Date().toISOString().split("T")[0];
+  const [motif, setMotif] = useState("");
+  const [montantSaisi, setMontantSaisi] = useState("");
+  const [dateLimite, setDateLimite] = useState("");
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  async function valider() {
+    const m = parseInt(montantSaisi, 10);
+    if (!motif.trim()) { setErreur("Indiquez le motif de la cotisation."); return; }
+    if (!m || m <= 0) { setErreur("Indiquez un montant supérieur à zéro."); return; }
+    if (!dateLimite || dateLimite < aujourdhui) {
+      setErreur("Choisissez une échéance à partir d'aujourd'hui.");
+      return;
+    }
+
+    setEnCours(true);
+    setErreur("");
+    const err = await onCreer({ motif: motif.trim(), montantParMembre: m, dateLimite });
+    if (err) { setErreur(err); setEnCours(false); }
+  }
+
+  return (
+    <div className="ct-overlay" onClick={onClose}>
+      <div className="ct-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="ct-modal-titre">Cotisation exceptionnelle</h3>
+        <p className="ct-modal-sub">
+          Le même montant sera demandé à tous les membres actifs. Elle est
+          facultative : elle n'affecte ni le statut « à jour », ni la
+          régularité, ni les sanctions.
+        </p>
+
+        <label className="ct-label" htmlFor="exc-motif">Motif</label>
+        <input
+          id="exc-motif" className="ct-field" value={motif}
+          onChange={(e) => setMotif(e.target.value)}
+          placeholder="Ex : Réfection du local, soutien à un membre…"
+        />
+
+        <label className="ct-label" htmlFor="exc-montant">Montant par membre (FCFA)</label>
+        <input
+          id="exc-montant" className="ct-field" type="number" min="1"
+          value={montantSaisi} onChange={(e) => setMontantSaisi(e.target.value)}
+          placeholder="Ex : 5000"
+        />
+
+        <label className="ct-label" htmlFor="exc-date">Échéance</label>
+        <input
+          id="exc-date" className="ct-field" type="date" min={aujourdhui}
+          value={dateLimite} onChange={(e) => setDateLimite(e.target.value)}
+        />
+
+        <div className="ct-modal-warn">
+          Une fois créée, elle ne peut pas être annulée depuis l'application.
+          Vérifiez le motif, le montant et l'échéance.
+        </div>
+
+        {erreur && <div className="ct-modal-err">{erreur}</div>}
+
+        <div className="ct-modal-actions">
+          <button className="ct-btn-ghost ct-btn-annuler" onClick={onClose} disabled={enCours}>
+            Annuler
+          </button>
+          <button className="ct-btn ct-btn-creer" onClick={valider} disabled={enCours}>
+            {enCours
+              ? <><Loader2 size={16} className="ct-spin" /> Création…</>
+              : "Créer pour tous les membres"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -613,7 +519,10 @@ function formatPeriode(p) {
   const mois = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
     "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
   const [annee, m] = p.split("-");
-  return `${mois[parseInt(m) - 1]} ${annee}`;
+  const index = parseInt(m, 10) - 1;
+  // Une période qui n'est pas de la forme AAAA-MM (ex. « EXC-… ») est
+  // rendue telle quelle plutôt que « undefined … ».
+  return mois[index] ? `${mois[index]} ${annee}` : p;
 }
 
 /* ---------------- Styles ---------------- */
@@ -639,7 +548,33 @@ const CSS = `
 .ct-sum-val{ font-size:19px; font-weight:700; letter-spacing:-.02em; }
 .ct-sum-val em{ font-style:normal; font-size:13px; font-weight:600; color:${C.textSubtle}; }
 .ct-sum-lab{ font-size:12.5px; color:${C.textSubtle}; margin-top:2px; }
-.ct-actions{ margin-left:auto; display:flex; gap:${S.sm}px; }
+.ct-actions{ margin-left:auto; display:flex; gap:${S.sm}px; flex-wrap:wrap; }
+.ct-btn-sec{
+  display:flex; align-items:center; gap:8px;
+  background:${C.surface}; color:${C.primary}; border:1.5px solid ${C.primary};
+  border-radius:${R.md}px; padding:11px 16px; cursor:pointer;
+  font-family:inherit; font-size:14px; font-weight:600;
+  transition:background .18s ease;
+}
+.ct-btn-sec:hover{ background:${PALETTE.blue50}; }
+.ct-annul-bar{
+  display:flex; align-items:center; justify-content:space-between; gap:${S.md}px; flex-wrap:wrap;
+  padding:10px ${S.lg}px; border-top:1px solid ${C.border}; background:${C.bg};
+  font-size:12.5px; color:${C.textSubtle};
+}
+.ct-annul-btn{
+  background:none; border:1.5px solid ${C.danger}55; color:${C.danger};
+  border-radius:${R.sm}px; padding:6px 12px; cursor:pointer;
+  font-family:inherit; font-size:12.5px; font-weight:600;
+}
+.ct-annul-btn:hover{ background:#FEE2E2; border-color:${C.danger}; }
+.ct-btn-danger{ background:${C.danger}; }
+.ct-btn-danger:hover:not(:disabled){ background:#B91C1C; }
+.ct-exc-tag{
+  display:inline-block; margin-left:8px; vertical-align:middle;
+  background:${PALETTE.blue100}; color:${C.primary};
+  padding:2px 9px; border-radius:${R.pill}px; font-size:11px; font-weight:600;
+}
 .ct-btn{
   display:flex; align-items:center; gap:8px;
   background:${C.primary}; color:#fff; border:none;
@@ -655,37 +590,12 @@ const CSS = `
   transition:color .16s ease, border-color .16s ease;
 }
 .ct-btn-ghost:hover{ color:${C.primary}; border-color:${C.primary}; }
-.ct-btn-collecte{
-  display:flex; align-items:center; gap:8px;
-  background:${C.surface}; border:1.5px solid ${C.border}; color:${C.textMuted};
-  border-radius:${R.md}px; padding:12px 16px; cursor:pointer;
-  font-family:inherit; font-size:13.5px; font-weight:600;
-  transition:all .16s ease;
-}
-.ct-btn-collecte.is-on{
-  background:${C.primary}; border-color:${C.primary}; color:#fff;
-}
 
 /* ---- Message ---- */
 .ct-msg{ border-radius:${R.md}px; padding:12px 16px; font-size:14px; }
 .ct-msg.is-ok{ background:#DCFCE7; color:${C.success}; border:1px solid ${C.success}33; }
 .ct-msg.is-info{ background:${PALETTE.blue50}; color:${C.primary}; border:1px solid ${PALETTE.blue100}; }
 .ct-msg.is-err{ background:#FEE2E2; color:${C.danger}; border:1px solid ${C.danger}33; }
-
-/* ---- Sélecteur de mode (saisie rapide) ---- */
-.ct-mode-select{ display:flex; align-items:center; gap:${S.sm}px; flex-wrap:wrap; }
-.ct-mode-label{ font-size:12.5px; font-weight:600; color:${C.textSubtle}; }
-.ct-mode-pills{ display:flex; gap:6px; flex-wrap:wrap; }
-.ct-mode-pill{
-  display:flex; align-items:center; gap:6px;
-  background:${C.surface}; border:1.5px solid ${C.border}; color:${C.textMuted};
-  border-radius:${R.pill}px; padding:6px 12px; cursor:pointer;
-  font-family:inherit; font-size:12.5px; font-weight:600;
-  transition:all .16s ease;
-}
-.ct-mode-pill.is-on{
-  background:${C.primary}; border-color:${C.primary}; color:#fff;
-}
 
 /* ---- Outils ---- */
 .ct-tools{ display:flex; gap:${S.md}px; flex-wrap:wrap; align-items:center; }
@@ -730,16 +640,6 @@ const CSS = `
 .ct-gauge-fill{ height:100%; border-radius:${R.pill}px; transition:width .5s ease; }
 .ct-taux{ font-size:13px; font-weight:700; color:${C.text}; min-width:38px; text-align:right; }
 
-/* ---- Sélection groupée ---- */
-.ct-select-all{
-  padding:${S.sm}px ${S.lg}px; border-top:1px solid ${C.border};
-  background:${C.bg};
-}
-.ct-select-all label{
-  display:flex; align-items:center; gap:8px; font-size:13px;
-  font-weight:600; color:${C.textMuted}; cursor:pointer;
-}
-
 /* ---- Lignes ---- */
 .ct-list{ list-style:none; margin:0; padding:0; border-top:1px solid ${C.border}; }
 .ct-row{
@@ -748,7 +648,6 @@ const CSS = `
   flex-wrap:wrap;
 }
 .ct-row:last-child{ border-bottom:none; }
-.ct-row-check{ flex-shrink:0; width:18px; height:18px; accent-color:${C.primary}; cursor:pointer; }
 .ct-avatar, .ct-avatar-img{
   width:38px; height:38px; border-radius:50%; flex-shrink:0;
 }
@@ -767,40 +666,45 @@ const CSS = `
   padding:5px 11px; border-radius:${R.pill}px;
   font-size:12px; font-weight:600; white-space:nowrap;
 }
-.ct-row-actions{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
-.ct-quickpay{
-  display:flex; align-items:center; gap:6px;
-  background:${C.success}; color:#fff; border:none;
+.ct-pay{
+  flex-shrink:0; background:${C.warning}; color:#fff; border:none;
   border-radius:${R.sm}px; padding:9px 14px; cursor:pointer;
-  font-family:inherit; font-size:13px; font-weight:700; white-space:nowrap;
+  font-family:inherit; font-size:13px; font-weight:600; white-space:nowrap;
   transition:background .16s ease;
 }
-.ct-quickpay:hover:not(:disabled){ background:#15803D; }
-.ct-quickpay:disabled{ opacity:.65; cursor:not-allowed; }
-.ct-pay-autre{
-  background:transparent; border:none; color:${C.textSubtle};
-  font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;
-  padding:6px 4px; text-decoration:underline;
-}
+.ct-pay:hover{ background:#DC6803; }
 
-/* ---- Barre de confirmation groupée ---- */
-.ct-bulkbar{
-  position:sticky; bottom:${S.lg}px; z-index:10;
-  display:flex; align-items:center; justify-content:space-between; gap:${S.lg}px;
-  background:${C.text}; color:#fff;
-  border-radius:${R.xl}px; padding:${S.md}px ${S.lg}px;
-  box-shadow:${SHADOW.md || SHADOW.sm};
+/* ---- Fenêtre cotisation exceptionnelle ---- */
+.ct-overlay{
+  position:fixed; inset:0; z-index:180; background:rgba(10,20,40,.5);
+  display:flex; align-items:center; justify-content:center; padding:${S.lg}px;
 }
-.ct-bulkbar-info{ font-size:13.5px; }
-.ct-btn-bulk{
-  display:flex; align-items:center; gap:8px;
-  background:${C.success}; color:#fff; border:none;
-  border-radius:${R.md}px; padding:11px 18px; cursor:pointer;
-  font-family:inherit; font-size:13.5px; font-weight:700;
-  transition:background .16s ease;
+.ct-modal{
+  width:100%; max-width:440px; max-height:92vh; overflow-y:auto;
+  background:${C.surface}; border-radius:${R.xxl}px; padding:${S.xl}px;
+  box-shadow:${SHADOW.lg};
 }
-.ct-btn-bulk:hover:not(:disabled){ background:#15803D; }
-.ct-btn-bulk:disabled{ opacity:.7; cursor:not-allowed; }
+.ct-modal-titre{ font-size:19px; font-weight:700; margin:0 0 6px; letter-spacing:-.01em; }
+.ct-modal-sub{ font-size:13.5px; color:${C.textSubtle}; margin:0 0 ${S.lg}px; line-height:1.55; }
+.ct-label{ display:block; font-size:13px; font-weight:600; color:${C.textMuted}; margin:${S.md}px 0 6px; }
+.ct-field{
+  width:100%; box-sizing:border-box; padding:12px 14px;
+  border:1.5px solid ${C.border}; border-radius:${R.md}px;
+  background:${C.surface}; font-family:inherit; font-size:15px;
+  color:${C.text}; outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+}
+.ct-field:focus{ border-color:${C.primary}; box-shadow:${SHADOW.focus}; }
+.ct-modal-warn{
+  margin-top:${S.lg}px; background:#FEF3C7; color:#92400E;
+  border-radius:${R.md}px; padding:11px 14px; font-size:13px; line-height:1.5;
+}
+.ct-modal-err{
+  margin-top:${S.md}px; background:#FEE2E2; color:${C.danger};
+  border-radius:${R.md}px; padding:11px 14px; font-size:13.5px;
+}
+.ct-modal-actions{ display:flex; gap:${S.md}px; margin-top:${S.lg}px; }
+.ct-btn-annuler{ flex:1; justify-content:center; padding:12px; font-size:14px; font-weight:600; font-family:inherit; }
+.ct-btn-creer{ flex:2; justify-content:center; }
 
 /* ---- Divers ---- */
 .ct-empty{

@@ -968,7 +968,13 @@ function MembreCotisations({ membre }) {
   async function telechargerHistorique() {
     setTelechargementHistorique(true);
     try {
-      await genererHistorique({ membre, cotisations, params });
+      // Cotisations périodiques uniquement : le document est bâti sur des
+      // périodes AAAA-MM, une cotisation exceptionnelle n'y a pas sa place.
+      await genererHistorique({
+        membre,
+        cotisations: cotisations.filter((c) => c.type !== "exceptionnelle"),
+        params,
+      });
     } catch (e) {
       setWaveErreur("Impossible de générer le document pour le moment.");
     }
@@ -1029,7 +1035,16 @@ function MembreCotisations({ membre }) {
   const declarationEnAttentePour = (cotisationId) =>
     declarations.some((d) => d.cotisation_id === cotisationId || d.cotisation_ids?.includes(cotisationId));
 
-  const cotisationsImpayees = cotisations.filter((c) => c.statut !== "paye" && !declarationEnAttentePour(c.id));
+  // Les cotisations exceptionnelles (facultatives) ont leur propre section :
+  // elles n'entrent ni dans la frise, ni dans la progression annuelle, ni
+  // dans la carte « À régler », ni dans le paiement groupé.
+  const periodiques = cotisations.filter((c) => c.type !== "exceptionnelle");
+  const exceptionnelles = cotisations.filter((c) => c.type === "exceptionnelle");
+  const exceptionnellesImpayees = exceptionnelles.filter(
+    (c) => c.statut !== "paye" && !declarationEnAttentePour(c.id)
+  );
+
+  const cotisationsImpayees = periodiques.filter((c) => c.statut !== "paye" && !declarationEnAttentePour(c.id));
   const cotisationsSelectionnees = cotisations.filter((c) => selection.includes(c.id));
   const totalSelection = cotisationsSelectionnees.reduce(
     (s, c) => s + ((c.montant_du || 0) - (c.montant_paye || 0)), 0
@@ -1045,7 +1060,7 @@ function MembreCotisations({ membre }) {
   // affiché dans la carte de statut pour donner une vue d'ensemble sans
   // que le membre ait à faire le calcul lui-même.
   const anneeCourante = new Date().getFullYear();
-  const cotisationsAnnee = cotisations.filter((c) => c.periode?.startsWith(String(anneeCourante)));
+  const cotisationsAnnee = periodiques.filter((c) => c.periode?.startsWith(String(anneeCourante)));
   const totalDuAnnee = cotisationsAnnee.reduce((s, c) => s + (c.montant_du || 0), 0);
   const totalPayeAnnee = cotisationsAnnee.reduce((s, c) => s + (c.montant_paye || 0), 0);
   const pourcentageAnnee = totalDuAnnee > 0 ? Math.round((totalPayeAnnee / totalDuAnnee) * 100) : 0;
@@ -1054,7 +1069,7 @@ function MembreCotisations({ membre }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
         <h2 style={{ ...titrePage, marginBottom: 0 }}>Mes cotisations</h2>
-        {cotisations.length > 0 && (
+        {periodiques.length > 0 && (
           <button
             onClick={telechargerHistorique}
             disabled={telechargementHistorique}
@@ -1072,7 +1087,7 @@ function MembreCotisations({ membre }) {
       </div>
 
       {/* ---- Statut de cotisation + régularité + progression annuelle ---- */}
-      {cotisations.length > 0 && (
+      {periodiques.length > 0 && (
         <div style={{
           position: "relative", overflow: "hidden",
           background: `linear-gradient(135deg, ${PALETTE.blue800}, ${PALETTE.blue600})`,
@@ -1175,6 +1190,76 @@ function MembreCotisations({ membre }) {
         </div>
       )}
 
+      {/* ---- Cotisations exceptionnelles (facultatives) ---- */}
+      {exceptionnelles.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: C.textSubtle, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".02em", marginBottom: 8 }}>
+            Cotisation exceptionnelle
+          </div>
+
+          {exceptionnelles.map((c) => {
+            const reste = (c.montant_du || 0) - (c.montant_paye || 0);
+            const payee = c.statut === "paye";
+            const enAttente = declarationEnAttentePour(c.id);
+
+            return (
+              <div
+                key={c.id}
+                style={{
+                  background: C.surface, borderRadius: R.xl, padding: 16, marginBottom: 10,
+                  border: `1.5px solid ${payee ? C.border : PALETTE.blue100}`, boxShadow: SHADOW.xs,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15.5, fontWeight: 700 }}>
+                      {c.motif || "Cotisation exceptionnelle"}
+                    </div>
+                    <div style={{ fontSize: 13, color: C.textMuted, marginTop: 3 }}>
+                      {payee ? `${montant(c.montant_du)} FCFA réglés` : `${montant(reste)} FCFA restants`}
+                      {!payee && c.date_limite && (
+                        <> · avant le {new Date(c.date_limite).toLocaleDateString("fr-FR")}</>
+                      )}
+                    </div>
+                  </div>
+                  {payee && <span style={{ ...badge, background: C.successSoft, color: C.success }}>Payé</span>}
+                  {c.statut === "partiel" && <span style={{ ...badge, background: C.warningSoft, color: C.warning }}>Partiel</span>}
+                </div>
+
+                {!payee && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                    {enAttente ? (
+                      <span style={{ fontSize: 12.5, color: C.textSubtle, alignSelf: "center" }}>
+                        Déclaration envoyée, en attente de confirmation.
+                      </span>
+                    ) : moyens.length > 0 ? (
+                      <button
+                        onClick={() => setDeclarationOuverte(c)}
+                        style={{
+                          background: C.primary, border: "none", color: "#fff",
+                          borderRadius: 10, padding: "10px 18px", cursor: "pointer",
+                          fontFamily: "inherit", fontSize: 13.5, fontWeight: 700,
+                        }}
+                      >
+                        J'ai payé
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 12.5, color: C.textSubtle }}>
+                        Aucun moyen de paiement configuré pour le moment — contactez le Bureau.
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 11.5, color: C.textSubtle, marginTop: 10 }}>
+                  Facultative : elle n'affecte pas votre statut de cotisation.
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {depuisCache && (
         <div style={{
           display: "flex", alignItems: "center", gap: 8, background: "#FEF3C7",
@@ -1188,7 +1273,9 @@ function MembreCotisations({ membre }) {
         </div>
       )}
 
-      {moyens.length > 0 && cotisationsImpayees.length > 0 && <MoyensPaiementApercu moyens={moyens} />}
+      {moyens.length > 0 && (cotisationsImpayees.length > 0 || exceptionnellesImpayees.length > 0) && (
+        <MoyensPaiementApercu moyens={moyens} />
+      )}
 
       {waveErreur && (
         <div style={{ background: C.dangerSoft, color: C.danger, borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 14 }}>
@@ -1245,9 +1332,9 @@ function MembreCotisations({ membre }) {
 
       {cotisations.length === 0 ? (
         <div style={carteVide}>Aucune cotisation pour le moment.</div>
-      ) : (
+      ) : periodiques.length > 0 && (
         <div style={carteListe}>
-          {cotisations.map((c, i) => {
+          {periodiques.map((c, i) => {
             const st = c.statut === "paye"
               ? { bg: C.successSoft, fg: C.success, label: "Payé" }
               : c.statut === "partiel"
@@ -1262,7 +1349,7 @@ function MembreCotisations({ membre }) {
                 style={{
                   display: "flex", gap: 12,
                   padding: "14px 18px",
-                  borderBottom: i < cotisations.length - 1
+                  borderBottom: i < periodiques.length - 1
                     ? `1px solid ${C.border}` : "none",
                 }}
               >
@@ -1271,7 +1358,7 @@ function MembreCotisations({ membre }) {
                     plutôt qu'une liste plate. */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 12, flexShrink: 0, paddingTop: 4 }}>
                   <div style={{ width: 10, height: 10, borderRadius: "50%", background: st.fg, flexShrink: 0 }} />
-                  {i < cotisations.length - 1 && (
+                  {i < periodiques.length - 1 && (
                     <div style={{ width: 2, flex: 1, minHeight: 18, background: C.border, marginTop: 4 }} />
                   )}
                 </div>
@@ -2437,7 +2524,7 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
           <div style={{ position: "relative" }}>
             <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.35 }}>
               Finaliser votre paiement{" "}
-              {groupe ? `de ${liste.length} échéances` : `pour ${formatPeriode(liste[0].periode)}`}
+              {groupe ? `de ${liste.length} échéances` : `pour ${libelleCotisation(liste[0])}`}
             </div>
             <span style={{
               display: "inline-flex", marginTop: 8,
@@ -2460,10 +2547,12 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700 }}>
                 {groupe
-                  ? `${liste.length} échéances (${liste.map((c) => formatPeriode(c.periode)).join(", ")})`
-                  : formatPeriode(liste[0].periode)}
+                  ? `${liste.length} échéances (${liste.map((c) => libelleCotisation(c)).join(", ")})`
+                  : libelleCotisation(liste[0])}
               </div>
-              <div style={{ fontSize: 12, color: C.textSubtle, marginTop: 2 }}>Cotisation</div>
+              <div style={{ fontSize: 12, color: C.textSubtle, marginTop: 2 }}>
+                {liste[0]?.type === "exceptionnelle" ? "Cotisation exceptionnelle" : "Cotisation"}
+              </div>
             </div>
             <div style={{ fontSize: 17, fontWeight: 700 }}>{montant(restant)} FCFA</div>
           </div>
@@ -3625,6 +3714,14 @@ function formatPeriode(periode) {
   const [annee, m] = String(periode).split("-");
   const index = parseInt(m, 10) - 1;
   return mois[index] ? `${mois[index]} ${annee}` : periode;
+}
+
+// Libellé d'une cotisation : le motif pour une exceptionnelle, le mois
+// pour une périodique.
+function libelleCotisation(c) {
+  return c.type === "exceptionnelle"
+    ? `« ${c.motif || "cotisation exceptionnelle"} »`
+    : formatPeriode(c.periode);
 }
 
 /* ---------------- Racine ---------------- */

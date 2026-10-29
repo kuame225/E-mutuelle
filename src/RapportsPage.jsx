@@ -82,9 +82,13 @@ export default function RapportsPage() {
       }
 
       const [cotRes, baremeRes] = await Promise.all([
+        // Cotisations périodiques uniquement : les périodes de ces rapports
+        // sont des mois AAAA-MM. Une cotisation exceptionnelle (code « EXC-… »)
+        // y créerait de fausses périodes, trimestres et années.
         supabase.from("cotisations")
           .select("periode, montant_du, montant_paye, statut")
-          .eq("organisation_id", params.organisation_id),
+          .eq("organisation_id", params.organisation_id)
+          .eq("type", "periodique"),
         supabase.from("bareme_prestations")
           .select("type_aide, libelle")
           .eq("organisation_id", params.organisation_id),
@@ -361,7 +365,7 @@ export default function RapportsPage() {
       const debut = `${annee}-01-01`;
       const fin = `${annee}-12-31`;
 
-      const [membresRes, operationsRes, assembleesRes, aidesRes] = await Promise.all([
+      const [membresRes, operationsRes, assembleesRes, aidesRes, exceptionnellesRes] = await Promise.all([
         supabase.from("membres")
           .select("id, statut_cotisation, date_adhesion, actif")
           .eq("organisation_id", params.organisation_id),
@@ -378,6 +382,10 @@ export default function RapportsPage() {
           .eq("organisation_id", params.organisation_id)
           .eq("statut", "payee")
           .gte("decide_le", `${debut}T00:00:00`).lte("decide_le", `${fin}T23:59:59`),
+        supabase.from("cotisations")
+          .select("periode, montant_paye")
+          .eq("organisation_id", params.organisation_id)
+          .eq("type", "exceptionnelle"),
       ]);
 
       const membresActifs = (membresRes.data || []).filter((m) => m.actif !== false);
@@ -397,7 +405,14 @@ export default function RapportsPage() {
       const totalRecettesDiverses = operations.filter((o) => o.sens === "recette").reduce((s, o) => s + (o.montant || 0), 0);
       const totalDepenses = operations.filter((o) => o.sens === "depense").reduce((s, o) => s + (o.montant || 0), 0);
       const totalAidesVersees = (aidesRes.data || []).reduce((s, a) => s + (a.montant_valide || 0), 0);
-      const totalRecettes = totalCotisations + totalRecettesDiverses;
+      // Cotisations exceptionnelles : argent réellement reçu, donc une
+      // recette de l'exercice. Rattachées à l'année de la campagne, lue
+      // dans son code (EXC-AAAAMMJJ-xxxx) — pas à la date de chaque paiement.
+      const totalExceptionnelles = (exceptionnellesRes.data || [])
+        .filter((c) => String(c.periode).slice(4, 8) === String(annee))
+        .reduce((s, c) => s + (c.montant_paye || 0), 0);
+
+      const totalRecettes = totalCotisations + totalExceptionnelles + totalRecettesDiverses;
       const solde = totalRecettes - totalDepenses - totalAidesVersees;
 
       const nombreAssemblees = (assembleesRes.data || []).length;
@@ -415,6 +430,9 @@ export default function RapportsPage() {
       y += 6;
       y = sectionAnnuelle(doc, "FINANCES", y, [
         ["Cotisations encaissees", montant(totalCotisations) + " F"],
+        ...(totalExceptionnelles > 0
+          ? [["Cotisations exceptionnelles", montant(totalExceptionnelles) + " F"]]
+          : []),
         ["Autres recettes", montant(totalRecettesDiverses) + " F"],
         ["Total des recettes", montant(totalRecettes) + " F"],
         ["Total des depenses", montant(totalDepenses) + " F"],

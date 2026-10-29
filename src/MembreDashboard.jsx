@@ -132,6 +132,7 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
       const [cotRes, tickRes, aideRes, commRes, notifRes, baremeRes] = await Promise.all([
         supabase.from("cotisations").select("*")
           .eq("membre_id", membre.id)
+          .eq("type", "periodique")
           .gte("periode", `${annee}-01`).lte("periode", `${annee}-12`)
           .order("date_limite", { ascending: true }),
         tombolaActive

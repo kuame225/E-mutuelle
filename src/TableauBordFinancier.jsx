@@ -203,9 +203,13 @@ export default function TableauBordFinancier() {
         supabase.from("membres")
           .select("id, nom, poste, statut_cotisation, actif")
           .eq("organisation_id", params.organisation_id),
+        // Cotisations périodiques uniquement : une exceptionnelle fausserait
+        // « encaissé sur attendus », le graphique par mois et le décompte
+        // des impayés des retardataires.
         supabase.from("cotisations")
           .select("periode, montant_du, montant_paye, statut, membre_id")
-          .eq("organisation_id", params.organisation_id),
+          .eq("organisation_id", params.organisation_id)
+          .eq("type", "periodique"),
         supabase.from("aides_sociales")
           .select("montant_valide, statut")
           .eq("organisation_id", params.organisation_id),

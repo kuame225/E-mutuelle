@@ -126,7 +126,7 @@ export default function PaiementModal({ cotisation, membre, onClose, onSuccess }
               <div>
                 <div style={{ ...serif, fontSize: 17, fontWeight: 600 }}>Enregistrer un paiement</div>
                 <div style={{ fontSize: 12.5, color: C.ink + "77", marginTop: 2 }}>
-                  {membre.nom} · {cotisation.type === "exceptionnelle" ? cotisation.motif : cotisation.periode}
+                  {membre.nom} · {cotisation.type === "exceptionnelle" ? (cotisation.motif || "Cotisation exceptionnelle") : cotisation.periode}
                 </div>
               </div>
               <button onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer" }}>

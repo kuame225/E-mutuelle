@@ -410,7 +410,10 @@ function FicheMembre({ membre, onBack, onUpdate }) {
       supabase.from("bareme_prestations")
         .select("type_aide, libelle, montant_membre, montant_don")
         .eq("organisation_id", params.organisation_id),
-      supabase.from("cotisations").select("montant_paye").eq("membre_id", membre.id),
+      // Cotisations périodiques uniquement : même base que la fonction SQL
+      // enregistrer_sortie_membre (50 % pour une mutation), qui ignore les
+      // cotisations exceptionnelles.
+      supabase.from("cotisations").select("montant_paye").eq("membre_id", membre.id).eq("type", "periodique"),
       supabase.from("aides_sociales").select("id")
         .eq("membre_id", membre.id).in("statut", ["validee", "payee"]),
     ]).then(([b, c, a]) => {

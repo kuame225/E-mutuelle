@@ -1228,6 +1228,20 @@ function MembreCotisations({ membre }) {
 
                 {!payee && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                    {waveActif && (
+                      <button
+                        onClick={() => payerAvecWave(c)}
+                        disabled={waveEnCours === c.id}
+                        style={{
+                          background: C.primary, border: "none", color: "#fff",
+                          borderRadius: 10, padding: "10px 18px", cursor: "pointer",
+                          fontFamily: "inherit", fontSize: 13.5, fontWeight: 700,
+                        }}
+                      >
+                        {waveEnCours === c.id ? "Redirection…" : "Payer avec Wave"}
+                      </button>
+                    )}
+
                     {enAttente ? (
                       <span style={{ fontSize: 12.5, color: C.textSubtle, alignSelf: "center" }}>
                         Déclaration envoyée, en attente de confirmation.
@@ -1236,18 +1250,20 @@ function MembreCotisations({ membre }) {
                       <button
                         onClick={() => setDeclarationOuverte(c)}
                         style={{
-                          background: C.primary, border: "none", color: "#fff",
+                          background: waveActif ? "transparent" : C.primary,
+                          border: waveActif ? `1.5px solid ${C.border}` : "none",
+                          color: waveActif ? C.text : "#fff",
                           borderRadius: 10, padding: "10px 18px", cursor: "pointer",
                           fontFamily: "inherit", fontSize: 13.5, fontWeight: 700,
                         }}
                       >
                         J'ai payé
                       </button>
-                    ) : (
+                    ) : !waveActif ? (
                       <span style={{ fontSize: 12.5, color: C.textSubtle }}>
                         Aucun moyen de paiement configuré pour le moment — contactez le Bureau.
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 )}
 

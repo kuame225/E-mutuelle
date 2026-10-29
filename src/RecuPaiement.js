@@ -86,7 +86,15 @@ export async function genererRecu({ membre, cotisation, paiement, params }) {
   doc.setTextColor(26, 26, 23);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("Periode : " + formatPeriode(cotisation.periode), 115, 92);
+  // Cotisation exceptionnelle : on affiche son motif (tronqué sur une
+  // ligne pour rester dans le cadre) au lieu du code technique EXC-…
+  if (cotisation.type === "exceptionnelle") {
+    const motif = sansAccents(cotisation.motif || "Cotisation exceptionnelle");
+    const lignes = doc.splitTextToSize("Motif : " + motif, 78);
+    doc.text(lignes.length > 1 ? lignes[0].replace(/\s*\S{0,2}$/, "") + "..." : lignes[0], 115, 92);
+  } else {
+    doc.text("Periode : " + formatPeriode(cotisation.periode), 115, 92);
+  }
   doc.text("Mode : " + formatMode(paiement.mode_paiement), 115, 100);
   doc.text("Ref : " + (paiement.reference_transaction || "—"), 115, 107);
 
@@ -111,7 +119,8 @@ export async function genererRecu({ membre, cotisation, paiement, params }) {
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   const reste = cotisation.montant_du - cotisation.montant_paye;
-  doc.text("Cotisation due : " + formaterMontant(cotisation.montant_du) + " FCFA", 20, 197);
+  const libelleDu = cotisation.type === "exceptionnelle" ? "Cotisation exceptionnelle" : "Cotisation due";
+  doc.text(libelleDu + " : " + formaterMontant(cotisation.montant_du) + " FCFA", 20, 197);
   doc.text("Total paye : " + formaterMontant(cotisation.montant_paye) + " FCFA", 20, 205);
   doc.setFont("helvetica", "bold");
   if (reste <= 0) {

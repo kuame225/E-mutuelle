@@ -7,7 +7,7 @@ import {
   FileText, ShoppingCart, Briefcase, PieChart, PiggyBank, Smartphone, ClipboardCheck, GraduationCap, Handshake, Heart, Eye, Coins, HelpCircle, HandCoins,
 } from "lucide-react";
 import {
-  useParametrage, moduleActif, LOGO_DEFAUT,
+  useParametrage, moduleActif, collecteActive, LOGO_DEFAUT,
   mesOrganisationsAdministrees, changerOrganisationActive,
 } from "./useParametrage";
 import { usePermissions } from "./usePermissions";
@@ -202,9 +202,10 @@ export default function AdminLayout({ page, onPage, onSignOut, onEspaceMembre, c
           .filter(
             (item) =>
               (!item.module || moduleActif(params, item.module)) &&
-              // Un écran de collecte de cotisations disparaît quand
-              // l'organisation n'en applique pas.
-              (!item.exigeCotisation || Number(params.montant_cotisation ?? 0) > 0) &&
+              // Un écran de collecte disparaît quand l'organisation n'applique
+              // aucune cotisation périodique et n'a pas activé les collectes
+              // exceptionnelles.
+              (!item.exigeCotisation || collecteActive(params)) &&
               peut(item.id)
           )
           .map((item) => ({ ...item, label: resoudre(item.label, mot) })),

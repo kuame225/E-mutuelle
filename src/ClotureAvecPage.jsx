@@ -138,9 +138,13 @@ function ModalNouveauCycle({ organisationId, cyclesExistants, onCancel, onCree }
     setErr("");
 
     const [{ data: paiements }, { data: membresListe }] = await Promise.all([
+      // Épargne du cycle = cotisations périodiques uniquement : une
+      // cotisation exceptionnelle (collecte de solidarité) n'est pas de
+      // l'épargne et ne doit pas entrer dans la base du partage.
       supabase
         .from("paiements")
-        .select("montant, cotisations(membre_id)")
+        .select("montant, cotisations!inner(membre_id, type)")
+        .eq("cotisations.type", "periodique")
         .gte("created_at", dateDebut)
         .lte("created_at", `${dateFin}T23:59:59`),
       supabase.from("membres").select("id, nom").eq("organisation_id", organisationId),

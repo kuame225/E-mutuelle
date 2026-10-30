@@ -123,9 +123,17 @@ export default function TableauBordFinancier() {
     // reçus (dons, opérations de recette) moins ce qui sort — appuis
     // décaissés et dépenses de fonctionnement.
     if (aBloc(BLOCS.TRESORERIE) && Number(params.montant_cotisation ?? 0) <= 0) {
-      const { data: operations } = await supabase.from("operations_diverses")
-        .select("sens, montant")
-        .eq("organisation_id", params.organisation_id);
+      const [{ data: operations }, { data: collectes }] = await Promise.all([
+        supabase.from("operations_diverses")
+          .select("sens, montant")
+          .eq("organisation_id", params.organisation_id),
+        supabase.from("cotisations")
+          .select("montant_paye")
+          .eq("organisation_id", params.organisation_id)
+          .eq("type", "exceptionnelle"),
+      ]);
+      const totalCollectes = (collectes || [])
+        .reduce((s, c) => s + Number(c.montant_paye || 0), 0);
 
       const liste = operations || [];
       const recettes = liste.filter((o) => o.sens === "recette")
@@ -137,8 +145,9 @@ export default function TableauBordFinancier() {
       const appuisDecaisses = resultat.agr?.totalAccorde || 0;
       const appuisRembourses = resultat.agr?.totalRembourse || 0;
 
-      const entrees = recettes + totalDons + appuisRembourses;
+      const entrees = recettes + totalDons + appuisRembourses + totalCollectes;
       resultat.tresorerieOng = {
+        collectes: totalCollectes,
         entrees,
         solde: entrees - depenses - appuisDecaisses,
       };
@@ -199,7 +208,7 @@ export default function TableauBordFinancier() {
 
   async function chargerCotisations() {
     try {
-      const [membresRes, cotisRes, aidesRes, ticketsRes] = await Promise.all([
+      const [membresRes, cotisRes, aidesRes, ticketsRes, exceptRes] = await Promise.all([
         supabase.from("membres")
           .select("id, nom, poste, statut_cotisation, actif")
           .eq("organisation_id", params.organisation_id),
@@ -216,6 +225,14 @@ export default function TableauBordFinancier() {
         supabase.from("tombola_tickets")
           .select("type_ticket")
           .eq("organisation_id", params.organisation_id),
+        // Sommes réellement reçues au titre des cotisations exceptionnelles :
+        // hors des indicateurs de recouvrement (facultatives), mais bien dans
+        // la trésorerie — sans elles, une aide versée grâce à une collecte
+        // ferait apparaître un solde négatif.
+        supabase.from("cotisations")
+          .select("montant_paye")
+          .eq("organisation_id", params.organisation_id)
+          .eq("type", "exceptionnelle"),
       ]);
 
       const membres = membresRes.data || [];
@@ -231,6 +248,8 @@ export default function TableauBordFinancier() {
       const taux = actifs.length ? Math.round((aJour / actifs.length) * 100) : 0;
 
       const totalPaye = cotisations.reduce((s, c) => s + c.montant_paye, 0);
+      const totalExceptionnelles = (exceptRes.data || [])
+        .reduce((s, c) => s + Number(c.montant_paye || 0), 0);
       const totalDu = cotisations.reduce((s, c) => s + c.montant_du, 0);
       const totalAides = aides
         .filter((a) => a.statut === "payee" && a.montant_valide)
@@ -271,8 +290,8 @@ export default function TableauBordFinancier() {
 
       setStats({
         totalMembres: actifs.length, aJour, partiel, enRetard, nouveaux, taux,
-        totalPaye, totalDu, totalAides, cagnotte,
-        solde: totalPaye - totalAides,
+        totalPaye, totalDu, totalAides, cagnotte, totalExceptionnelles,
+        solde: totalPaye + totalExceptionnelles - totalAides,
         evolution, repartition, retardataires,
         aidesEnCours: aides.filter((a) => ["en_attente", "en_examen"].includes(a.statut)).length,
       });
@@ -343,13 +362,17 @@ export default function TableauBordFinancier() {
               hintSolde: "Entrées \u2212 appuis décaissés \u2212 dépenses",
               labelEncaisse: "Fonds reçus",
               totalPaye: statsBlocs.tresorerieOng.entrees,
-              hintEncaisse: "Dons et opérations de recette",
+              hintEncaisse: statsBlocs.tresorerieOng.collectes > 0
+                ? "Dons, recettes et cotisations exceptionnelles"
+                : "Dons et opérations de recette",
             }} />
           ) : stats ? (
             <BlocTresorerie stats={{
               solde: stats.solde,
               totalPaye: stats.totalPaye,
-              hintSolde: "Cotisations \u2212 aides versées",
+              hintSolde: stats.totalExceptionnelles > 0
+                ? `Cotisations (dont ${montant(stats.totalExceptionnelles)} F exceptionnelles) \u2212 aides versées`
+                : "Cotisations \u2212 aides versées",
               hintEncaisse: `sur ${montant(stats.totalDu)} F attendus`,
             }} />
           ) : null

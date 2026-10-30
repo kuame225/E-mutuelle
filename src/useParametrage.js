@@ -86,6 +86,11 @@ export const MODULES = [
     label: "Services offerts",
     aide: "Catalogue de services, partagé ou réservé au Bureau.",
   },
+  {
+    id: "module_collectes",
+    label: "Cotisations exceptionnelles",
+    aide: "Collectes ponctuelles à montant fixe (événement heureux ou malheureux), même sans cotisation périodique. Inutile si une cotisation mensuelle est déjà appliquée : elles sont alors disponibles d'office.",
+  },
 ];
 
 // Valeurs de repli, utilisées tant qu'aucun paramétrage n'a été enregistré.
@@ -148,6 +153,9 @@ export const PARAMS_DEFAUT = {
   module_projets: false,
   module_agr: false,
   module_services: false,
+  // Collectes exceptionnelles : sans effet tant qu'une cotisation périodique
+  // est appliquée (elles sont alors toujours disponibles) — voir collecteActive().
+  module_collectes: false,
   // Valeur nominale d'une part sociale : pas de défaut chiffré arbitraire —
   // tant qu'elle n'est pas définie par le Bureau, l'écran l'affiche comme
   // non définie plutôt que de suggérer un montant inventé.
@@ -462,6 +470,15 @@ export function moduleActif(params, id) {
     return PARAMS_DEFAUT[id] === true;
   }
   return valeur === true;
+}
+
+// Les écrans de collecte (cotisations, moyens de paiement, paiements
+// déclarés, suivi Wave) servent dès qu'une cotisation périodique est
+// appliquée, ou que l'organisation a activé les collectes exceptionnelles
+// — une association d'entraide, par exemple, qui ne prélève rien chaque
+// mois mais lance une collecte à chaque événement.
+export function collecteActive(params) {
+  return Number(params?.montant_cotisation ?? 0) > 0 || moduleActif(params, "module_collectes");
 }
 
 // Les colonnes vides en base ne doivent pas écraser les valeurs de repli.

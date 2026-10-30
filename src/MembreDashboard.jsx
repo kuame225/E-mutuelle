@@ -10,7 +10,7 @@ import {
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import CarteMembreModal from "./CarteMembreModal";
 import {
-  useParametrage, moduleActif, construireMatricule, LOGO_DEFAUT,
+  useParametrage, moduleActif, collecteActive, construireMatricule, LOGO_DEFAUT,
   mesOrganisationsMembre, changerOrganisationActive,
 } from "./useParametrage";
 import { usePermissions } from "./usePermissions";
@@ -297,8 +297,9 @@ export default function MembreDashboard({ membre, onPage, onSignOut }) {
 
   const raccourcis = raccourcisPourType(mot)
     .filter((r) => !r.module || moduleActif(params, r.module))
-    // Sans cotisation configurée, la tuile mènerait à un écran vide.
-    .filter((r) => r.id !== "cotisations" || Number(params.montant_cotisation ?? 0) > 0)
+    // Sans cotisation périodique ni collectes exceptionnelles, la tuile
+    // mènerait à un écran vide.
+    .filter((r) => r.id !== "cotisations" || collecteActive(params))
     // Une tuile liée à une permission n'apparaît que si la personne l'a.
     .filter((r) => !r.permission || peut(r.permission));
 

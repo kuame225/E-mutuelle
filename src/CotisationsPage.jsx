@@ -9,6 +9,7 @@ import { useVocabulaire } from "./useVocabulaire";
 import { de } from "./vocabulaire";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 import PaiementModal from "./PaiementModal";
+import { diffuserCommunique } from "./notifier";
 
 const STATUT = {
   paye:       { label: "Payé",       color: C.success,   soft: "#DCFCE7", Icon: CheckCircle2 },
@@ -97,7 +98,7 @@ export default function CotisationsPage() {
   // Cotisation exceptionnelle : une ligne par membre actif, créée côté
   // serveur par generer_cotisation_exceptionnelle (réservée au Bureau).
   // Retourne un message d'erreur à afficher dans la fenêtre, ou null.
-  async function creerExceptionnelle({ motif, montantParMembre, dateLimite }) {
+  async function creerExceptionnelle({ motif, montantParMembre, dateLimite, prevenir }) {
     const { data, error } = await supabase.rpc("generer_cotisation_exceptionnelle", {
       p_org: params.organisation_id,
       p_motif: motif,
@@ -105,6 +106,18 @@ export default function CotisationsPage() {
       p_date_lim: dateLimite,
     });
     if (error) return error.message;
+
+    // Annonce immédiate aux membres actifs (sinon le premier signe serait
+    // le rappel envoyé 7 jours avant l'échéance). Sans attente et sans
+    // jamais bloquer : diffuserCommunique gère ses propres échecs.
+    if (prevenir) {
+      diffuserCommunique({
+        cible: "tous",
+        organisationId: params.organisation_id,
+        titre: "Cotisation exceptionnelle",
+        message: `« ${motif} » : ${montant(montantParMembre)} FCFA par membre, à régler avant le ${new Date(dateLimite).toLocaleDateString("fr-FR")}. Facultative.`,
+      });
+    }
 
     setExceptionnelleOuverte(false);
     setMessage({
@@ -213,11 +226,15 @@ export default function CotisationsPage() {
           <button className="ct-btn-sec" onClick={() => setExceptionnelleOuverte(true)}>
             <Sparkles size={16} /> Exceptionnelle
           </button>
-          <button className="ct-btn" onClick={genererMois} disabled={generating}>
-            {generating
-              ? <><Loader2 size={16} className="ct-spin" /> Génération…</>
-              : <><Plus size={16} /> Générer le mois</>}
-          </button>
+          {/* Sans cotisation périodique (montant à 0), il n'y a pas de mois
+              à générer : seules les collectes exceptionnelles s'appliquent. */}
+          {Number(params.montant_cotisation ?? 0) > 0 && (
+            <button className="ct-btn" onClick={genererMois} disabled={generating}>
+              {generating
+                ? <><Loader2 size={16} className="ct-spin" /> Génération…</>
+                : <><Plus size={16} /> Générer le mois</>}
+            </button>
+          )}
         </div>
       </section>
 
@@ -260,7 +277,9 @@ export default function CotisationsPage() {
           </div>
           <div className="ct-empty-sub">
             {cotisations.length === 0
-              ? `Cliquez sur « Générer le mois » pour créer les ${mot("cotisations").toLowerCase()} de ${montant(params.montant_cotisation)} FCFA.`
+              ? (Number(params.montant_cotisation ?? 0) > 0
+                ? `Cliquez sur « Générer le mois » pour créer les ${mot("cotisations").toLowerCase()} de ${montant(params.montant_cotisation)} FCFA.`
+                : "Aucune cotisation périodique n'est appliquée. Lancez une cotisation exceptionnelle pour collecter auprès de vos membres.")
               : "Essayez un autre nom ou changez de filtre."}
           </div>
         </div>
@@ -428,6 +447,7 @@ function ModalExceptionnelle({ onClose, onCreer }) {
   const [motif, setMotif] = useState("");
   const [montantSaisi, setMontantSaisi] = useState("");
   const [dateLimite, setDateLimite] = useState("");
+  const [prevenir, setPrevenir] = useState(true);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -442,7 +462,7 @@ function ModalExceptionnelle({ onClose, onCreer }) {
 
     setEnCours(true);
     setErreur("");
-    const err = await onCreer({ motif: motif.trim(), montantParMembre: m, dateLimite });
+    const err = await onCreer({ motif: motif.trim(), montantParMembre: m, dateLimite, prevenir });
     if (err) { setErreur(err); setEnCours(false); }
   }
 
@@ -476,9 +496,18 @@ function ModalExceptionnelle({ onClose, onCreer }) {
           value={dateLimite} onChange={(e) => setDateLimite(e.target.value)}
         />
 
+        <label className="ct-check">
+          <input
+            type="checkbox" checked={prevenir}
+            onChange={(e) => setPrevenir(e.target.checked)}
+          />
+          <span>Prévenir les membres par notification dès maintenant</span>
+        </label>
+
         <div className="ct-modal-warn">
-          Une fois créée, elle ne peut pas être annulée depuis l'application.
-          Vérifiez le motif, le montant et l'échéance.
+          Elle peut être annulée tant qu'aucun paiement n'a été reçu. Dès
+          qu'un membre a payé, elle ne peut plus l'être : vérifiez le motif,
+          le montant et l'échéance.
         </div>
 
         {erreur && <div className="ct-modal-err">{erreur}</div>}
@@ -694,6 +723,11 @@ const CSS = `
   color:${C.text}; outline:none; transition:border-color .15s ease, box-shadow .15s ease;
 }
 .ct-field:focus{ border-color:${C.primary}; box-shadow:${SHADOW.focus}; }
+.ct-check{
+  display:flex; align-items:center; gap:10px; margin-top:${S.lg}px;
+  font-size:13.5px; color:${C.textMuted}; cursor:pointer;
+}
+.ct-check input{ width:17px; height:17px; accent-color:${C.primary}; flex-shrink:0; }
 .ct-modal-warn{
   margin-top:${S.lg}px; background:#FEF3C7; color:#92400E;
   border-radius:${R.md}px; padding:11px 14px; font-size:13px; line-height:1.5;

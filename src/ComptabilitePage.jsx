@@ -35,7 +35,7 @@ export default function ComptabilitePage() {
       // cotisation liée, avec !inner pour que le filtre s'applique bien
       // (sinon .eq() sur une relation imbriquée sans !inner est ignoré).
       supabase.from("paiements")
-        .select("*, cotisations!inner(periode, membres(nom), organisation_id)")
+        .select("*, cotisations!inner(periode, type, motif, membres(nom), organisation_id)")
         .eq("statut_transaction", "confirme")
         .eq("cotisations.organisation_id", params.organisation_id)
         .order("created_at", { ascending: false }),
@@ -75,12 +75,16 @@ export default function ComptabilitePage() {
     (baremeRes.data || []).forEach((b) => { libellesAide[b.type_aide] = b.libelle; });
 
     // Entrées : cotisations encaissées
+    // Une cotisation exceptionnelle a pour « période » un code technique
+    // (EXC-…) : on affiche son motif à la place.
     const cotisations = (paieRes.data || []).map((p) => ({
       id: "p" + p.id,
       sens: "entree",
       nature: "cotisation",
-      libelle: `Cotisation — ${p.cotisations?.membres?.nom || "—"}`,
-      detail: p.cotisations?.periode ? formatPeriode(p.cotisations.periode) : "—",
+      libelle: `${p.cotisations?.type === "exceptionnelle" ? "Cotisation exceptionnelle" : "Cotisation"} — ${p.cotisations?.membres?.nom || "—"}`,
+      detail: p.cotisations?.type === "exceptionnelle"
+        ? (p.cotisations.motif || "—")
+        : (p.cotisations?.periode ? formatPeriode(p.cotisations.periode) : "—"),
       montant: p.montant,
       mode: p.mode_paiement,
       date: p.created_at,

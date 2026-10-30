@@ -105,3 +105,45 @@ export async function activerNotificationsExploitant(userId) {
 
   return { ok: true };
 }
+// Abonnement des administrateurs d'organisation (Bureau, validateurs
+// d'adhésion) : indexé par user_id, pas par organisation. Un même
+// administrateur peut diriger plusieurs organisations, et rien ne
+// garantit qu'il possède une fiche membre — son appareil n'est donc
+// rattaché à aucune organisation en particulier.
+export async function activerNotificationsAdmin(userId) {
+  if (!pushDisponible()) {
+    return { ok: false, motif: "non_supporte" };
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    return { ok: false, motif: "refuse" };
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+
+  let abonnement = await registration.pushManager.getSubscription();
+  if (!abonnement) {
+    abonnement = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64EnTableau(VAPID_PUBLIC_KEY),
+    });
+  }
+
+  const brut = abonnement.toJSON();
+
+  const { error } = await supabase.from("push_abonnements_admin").upsert(
+    {
+      user_id: userId,
+      endpoint: brut.endpoint,
+      p256dh: brut.keys.p256dh,
+      auth: brut.keys.auth,
+      appareil: navigator.userAgent.slice(0, 200),
+    },
+    { onConflict: "endpoint" }
+  );
+
+  if (error) return { ok: false, motif: "enregistrement", detail: error.message };
+
+  return { ok: true };
+}

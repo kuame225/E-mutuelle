@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { useParametrage } from "./useParametrage";
+import { useAuth } from "./AuthContext";
+import { pushDisponible, pushAutorise, pushRefuse, activerNotificationsAdmin } from "./push";
 import { C, R, S, SHADOW, PALETTE } from "./theme";
 
 const ONGLETS = [
@@ -15,6 +17,10 @@ const ONGLETS = [
 
 export default function AdhesionsPanel() {
   const { params } = useParametrage();
+  const { session } = useAuth();
+  const [pushEtat, setPushEtat] = useState(
+    pushDisponible() ? (pushAutorise() ? "actif" : pushRefuse() ? "refuse" : "a_activer") : "indisponible"
+  );
   const [demandes, setDemandes] = useState([]);
   const [onglet, setOnglet] = useState("en_attente");
   const [loading, setLoading] = useState(true);
@@ -22,8 +28,10 @@ export default function AdhesionsPanel() {
   const [message, setMessage] = useState(null);
   const [rejet, setRejet] = useState(null);
 
-  async function charger() {
-    setLoading(true);
+  // `silencieux` : rafraîchissement déclenché en direct — on met la liste à
+  // jour sans refaire apparaître l'écran de chargement.
+  async function charger(silencieux = false) {
+    if (!silencieux) setLoading(true);
     const { data, error } = await supabase
       .from("adhesions")
       .select("*")
@@ -37,7 +45,41 @@ export default function AdhesionsPanel() {
   useEffect(() => {
     if (!params.organisation_id) return;
     charger();
+
+    // Mise à jour en direct : une nouvelle demande apparaît sans recharger
+    // la page. Nécessite Realtime activé sur la table `adhesions`.
+    const canal = supabase
+      .channel(`adhesions-${params.organisation_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "adhesions",
+          filter: `organisation_id=eq.${params.organisation_id}`,
+        },
+        () => charger(true)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
   }, [params.organisation_id]);
+
+  // Si l'autorisation de notifier est déjà accordée sur cet appareil (par
+  // exemple depuis l'espace membre), aucune bannière ne s'affiche : on
+  // enregistre alors l'appareil en silence, sans rien demander.
+  useEffect(() => {
+    if (pushEtat === "actif" && session?.user?.id) {
+      activerNotificationsAdmin(session.user.id).catch(() => {});
+    }
+  }, [pushEtat, session?.user?.id]);
+
+  async function activerPush() {
+    const r = await activerNotificationsAdmin(session.user.id);
+    setPushEtat(r.ok ? "actif" : r.motif === "refuse" ? "refuse" : "indisponible");
+  }
 
   async function valider(demande) {
     setBusy(demande.id);
@@ -109,6 +151,25 @@ export default function AdhesionsPanel() {
   return (
     <div className="ad-wrap">
       <style>{CSS}</style>
+
+      {/* ---- Activation des notifications ---- */}
+      {pushEtat === "a_activer" && (
+        <div className="ad-msg is-ok" style={{ background: PALETTE.blue50, color: C.primary, border: `1px solid ${C.primary}33`, alignItems: "center" }}>
+          <span>Activez les notifications pour être alerté dès qu'une nouvelle demande d'adhésion arrive.</span>
+          <button
+            onClick={activerPush}
+            style={{ marginLeft: "auto", background: C.primary, color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontWeight: 600, cursor: "pointer", opacity: 1 }}
+          >
+            Activer
+          </button>
+        </div>
+      )}
+      {pushEtat === "refuse" && (
+        <div className="ad-msg is-ok" style={{ background: "#FEF3C7", color: "#B45309", border: "1px solid #B4530933" }}>
+          <AlertTriangle size={17} />
+          <span>Les notifications sont bloquées sur cet appareil : autorisez-les dans les réglages du navigateur pour être alerté des nouvelles demandes.</span>
+        </div>
+      )}
 
       {/* ---- Onglets ---- */}
       <nav className="ad-tabs">

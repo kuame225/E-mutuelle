@@ -2,12 +2,13 @@ import React, { useEffect, useState } from "react";
 import {
   LogOut, UserCircle2, ArrowLeft, PowerOff, ShieldOff, ShieldCheck, CheckCircle2,
   Users2, GraduationCap, Award, FileBarChart2, WifiOff, AlertTriangle,
+  Smartphone, Wallet, Copy, Check, ExternalLink,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
 import { sauverCache, lireCache, ressembleAUneCoupureReseau } from "./offlineCache";
 import { notifierMembre } from "./notifier";
-import { C, R, S, SHADOW, PALETTE } from "./theme";
+import { C, R, S, SHADOW, PALETTE, mono } from "./theme";
 
 import WelcomeScreen from "./WelcomeScreen";
 import LandingPage from "./LandingPage";
@@ -1192,7 +1193,7 @@ function MembreCotisations({ membre }) {
 
       {/* ---- Cotisations exceptionnelles (facultatives) ---- */}
       {exceptionnelles.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, fontFamily: POLICE_MEMBRE }}>
           <div style={{ fontSize: 12, color: C.textSubtle, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".02em", marginBottom: 8 }}>
             Cotisation exceptionnelle
           </div>
@@ -2406,62 +2407,190 @@ function ModalDeclarerPaiementMembre({ membre, produit, moyens, onClose, onDone 
   );
 }
 
-function MoyensPaiementApercu({ moyens }) {
-  const LABELS = { wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money", moov_money: "Moov Money", autre: "Autre" };
+/* ---------------- Moyens de paiement (espace membre) ---------------- */
+
+const POLICE_MEMBRE = "'Inter', system-ui, sans-serif";
+
+const LIBELLES_MOYEN = {
+  wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money",
+  moov_money: "Moov Money", autre: "Autre moyen",
+};
+
+// Une teinte douce et une icône par type : un repère visuel, jamais un logo
+// de marque. Un logo téléversé par le Bureau remplace toujours cette pastille.
+const STYLES_MOYEN = {
+  wave:         { Icon: Smartphone, teinte: PALETTE.blue600,   genre: "Paiement mobile" },
+  orange_money: { Icon: Smartphone, teinte: PALETTE.orange600, genre: "Mobile Money" },
+  mtn_money:    { Icon: Smartphone, teinte: "#B7791F",         genre: "Mobile Money" },
+  moov_money:   { Icon: Smartphone, teinte: PALETTE.violet600, genre: "Mobile Money" },
+  autre:        { Icon: Wallet,     teinte: PALETTE.grey500,   genre: "Autre moyen" },
+};
+
+const CHAMP_MEMBRE = {
+  width: "100%", padding: "12px 14px", borderRadius: R.md,
+  border: `1.5px solid ${C.border}`, background: "#fff", color: C.text,
+  fontFamily: POLICE_MEMBRE, fontSize: 14, boxSizing: "border-box",
+};
+
+function infosMoyen(m) {
+  const style = STYLES_MOYEN[m.type] || STYLES_MOYEN.autre;
+  const nom = m.libelle || LIBELLES_MOYEN[m.type] || m.type || "Moyen de paiement";
+  const logoUrl = m.logo_chemin
+    ? supabase.storage.from("qr-paiement").getPublicUrl(m.logo_chemin).data.publicUrl
+    : null;
+  return { ...style, nom, logoUrl };
+}
+
+function PastilleMoyen({ moyen, taille = 42 }) {
+  const { Icon, teinte, nom, logoUrl } = infosMoyen(moyen);
+
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl} alt={nom}
+        style={{
+          width: taille, height: taille, borderRadius: 12, objectFit: "cover",
+          flexShrink: 0, border: `1px solid ${C.border}`, background: "#fff",
+        }}
+      />
+    );
+  }
+
   return (
-    <div style={{ ...carteVide, textAlign: "left", padding: "14px 18px", marginBottom: 14 }}>
-      <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 10 }}>Comment payer</div>
+    <span
+      aria-hidden="true"
+      style={{
+        width: taille, height: taille, borderRadius: 12, flexShrink: 0,
+        background: teinte + "1A", color: teinte,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      <Icon size={Math.round(taille * 0.48)} strokeWidth={2} />
+    </span>
+  );
+}
+
+function BoutonCopier({ valeur }) {
+  const [copie, setCopie] = useState(false);
+
+  async function copier(e) {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(String(valeur));
+      setCopie(true);
+      setTimeout(() => setCopie(false), 1800);
+    } catch {
+      // Presse-papiers indisponible : le numéro reste affiché et sélectionnable.
+    }
+  }
+
+  return (
+    <button
+      type="button" onClick={copier} aria-label="Copier le numéro"
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0,
+        border: `1px solid ${copie ? C.success + "55" : C.border}`,
+        background: copie ? C.successSoft : "#fff",
+        color: copie ? C.success : C.textMuted,
+        borderRadius: R.pill, padding: "5px 11px", cursor: "pointer",
+        fontFamily: POLICE_MEMBRE, fontSize: 12, fontWeight: 600,
+      }}
+    >
+      {copie ? <Check size={13} /> : <Copy size={13} />}
+      {copie ? "Copié" : "Copier"}
+    </button>
+  );
+}
+
+// Numéro, instructions et lien d'un moyen de paiement — partagé par la carte
+// « Comment payer » et la fenêtre de déclaration.
+function DetailsMoyen({ moyen, fond = C.bg }) {
+  return (
+    <>
+      {moyen.numero && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          marginTop: 8, background: fond, borderRadius: R.md, padding: "8px 8px 8px 12px",
+        }}>
+          <span style={{
+            ...mono, fontSize: 15, fontWeight: 600, color: C.text,
+            letterSpacing: ".02em", wordBreak: "break-all",
+          }}>
+            {moyen.numero}
+          </span>
+          <BoutonCopier valeur={moyen.numero} />
+        </div>
+      )}
+
+      {moyen.instructions && (
+        <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 8, lineHeight: 1.55 }}>
+          {moyen.instructions}
+        </div>
+      )}
+
+      {moyen.lien && (
+        <a
+          href={moyen.lien} target="_blank" rel="noreferrer"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10,
+            fontSize: 12.5, fontWeight: 600, color: C.primary, textDecoration: "none",
+            background: PALETTE.blue50, borderRadius: R.pill, padding: "6px 13px",
+          }}
+        >
+          <ExternalLink size={13} /> Ouvrir le lien de paiement
+        </a>
+      )}
+
+      {!moyen.numero && !moyen.instructions && !moyen.lien && (
+        <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 6 }}>
+          Demandez les modalités de paiement au Bureau.
+        </div>
+      )}
+    </>
+  );
+}
+
+function MoyensPaiementApercu({ moyens }) {
+  return (
+    <section style={{
+      background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.xl,
+      boxShadow: SHADOW.xs, overflow: "hidden", marginBottom: 14,
+      fontFamily: POLICE_MEMBRE, textAlign: "left",
+    }}>
+      <div style={{ padding: "16px 18px 14px" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Comment payer</div>
+        <div style={{ fontSize: 12.5, color: C.textSubtle, marginTop: 3, lineHeight: 1.5 }}>
+          Payez avec l'un des moyens ci-dessous, puis touchez « J'ai payé » pour prévenir le Bureau.
+        </div>
+      </div>
+
       {moyens.map((m) => {
-        const logoUrl = m.logo_chemin
-          ? supabase.storage.from("qr-paiement").getPublicUrl(m.logo_chemin).data.publicUrl
-          : null;
-        const nom = m.libelle || LABELS[m.type] || m.type;
-
+        const { nom, genre } = infosMoyen(m);
         return (
-          <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
-            {m.lien ? (
-              <a href={m.lien} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
-                {logoUrl ? (
-                  <img
-                    src={logoUrl} alt={nom}
-                    style={{ width: 34, height: 34, borderRadius: 8, objectFit: "cover", cursor: "pointer", border: `1px solid ${C.border}` }}
-                  />
-                ) : (
-                  <div style={{
-                    width: 34, height: 34, borderRadius: 8, cursor: "pointer",
-                    background: C.primaryLight + "22", color: C.primary,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontWeight: 700, fontSize: 13,
-                  }}>
-                    {(nom || "?").charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </a>
-            ) : logoUrl ? (
-              <img
-                src={logoUrl} alt={nom}
-                style={{ width: 34, height: 34, borderRadius: 8, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.border}` }}
-              />
-            ) : (
-              <div style={{
-                width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                background: C.primaryLight + "22", color: C.primary,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontWeight: 700, fontSize: 13,
-              }}>
-                {(nom || "?").charAt(0).toUpperCase()}
+          <div
+            key={m.id}
+            style={{
+              display: "flex", alignItems: "flex-start", gap: 13,
+              padding: "14px 18px", borderTop: `1px solid ${C.border}`,
+            }}
+          >
+            <PastilleMoyen moyen={m} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 14.5, fontWeight: 700, color: C.text }}>{nom}</span>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, color: C.textSubtle,
+                  background: C.bg, borderRadius: R.pill, padding: "2px 9px",
+                }}>
+                  {genre}
+                </span>
               </div>
-            )}
-
-            <div style={{ flex: 1, fontSize: 13, color: C.textMuted }}>
-              <strong style={{ color: C.text }}>{nom}</strong>
-              {m.numero && <div style={{ marginTop: 2 }}>{m.numero}</div>}
-              {m.instructions && <div style={{ fontSize: 12.5, marginTop: 2 }}>{m.instructions}</div>}
+              <DetailsMoyen moyen={m} />
             </div>
           </div>
         );
       })}
-    </div>
+    </section>
   );
 }
 
@@ -2484,10 +2613,6 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
   const [note, setNote] = useState("");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
-
-  // Même libellés que MoyensPaiementApercu — cohérence d'affichage entre
-  // le récapitulatif "Comment payer" et cet écran de déclaration.
-  const LABELS_MOYEN = { wave: "Wave", orange_money: "Orange Money", mtn_money: "MTN Money", moov_money: "Moov Money", autre: "Autre" };
 
   async function envoyer() {
     const m = parseInt(montantSaisi, 10);
@@ -2524,7 +2649,7 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 420, overflow: "hidden", margin: "auto" }}
+        style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 420, overflow: "hidden", margin: "auto", fontFamily: POLICE_MEMBRE }}
       >
         {/* ---- Bandeau ---- */}
         <div style={{
@@ -2560,7 +2685,7 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
             background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12,
             padding: "13px 15px", marginBottom: 16,
           }}>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700 }}>
                 {groupe
                   ? `${liste.length} échéances (${liste.map((c) => libelleCotisation(c)).join(", ")})`
@@ -2570,63 +2695,86 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
                 {liste[0]?.type === "exceptionnelle" ? "Cotisation exceptionnelle" : "Cotisation"}
               </div>
             </div>
-            <div style={{ fontSize: 17, fontWeight: 700 }}>{montant(restant)} FCFA</div>
+            <div style={{ fontSize: 17, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0, marginLeft: 12 }}>{montant(restant)} FCFA</div>
           </div>
 
           {/* ---- Mode de paiement ---- */}
-          {moyens.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Mode de paiement</label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
-                {moyens.map((m) => {
-                  const actif = moyenId === m.id;
-                  const nom = m.libelle || LABELS_MOYEN[m.type] || m.type;
-                  const logoUrl = m.logo_chemin
-                    ? supabase.storage.from("qr-paiement").getPublicUrl(m.logo_chemin).data.publicUrl
-                    : null;
-
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setMoyenId(m.id)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 8,
-                        border: `1.5px solid ${actif ? C.primary : C.border}`,
-                        background: actif ? PALETTE.blue50 : "#fff",
-                        borderRadius: 10, padding: "9px 11px", cursor: "pointer",
-                        fontFamily: "inherit", textAlign: "left",
-                      }}
-                    >
-                      {logoUrl ? (
-                        <img src={logoUrl} alt="" style={{ width: 26, height: 26, borderRadius: 7, objectFit: "cover", flexShrink: 0 }} />
-                      ) : (
-                        <span style={{
-                          width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-                          background: actif ? C.primary : PALETTE.grey200,
-                          color: actif ? "#fff" : C.textSubtle,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 12, fontWeight: 700,
-                        }}>
-                          {(nom || "?").charAt(0).toUpperCase()}
+          {moyens.length > 0 && (() => {
+            const choisi = moyens.find((m) => m.id === moyenId) || moyens[0];
+            return (
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Moyen de paiement utilisé</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                  {moyens.map((m) => {
+                    const actif = choisi.id === m.id;
+                    const { nom, genre } = infosMoyen(m);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setMoyenId(m.id)}
+                        aria-pressed={actif}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 12, width: "100%",
+                          border: `1.5px solid ${actif ? C.primary : C.border}`,
+                          background: actif ? PALETTE.blue50 : "#fff",
+                          borderRadius: R.md, padding: "11px 13px", cursor: "pointer",
+                          fontFamily: "inherit", textAlign: "left",
+                        }}
+                      >
+                        <PastilleMoyen moyen={m} taille={38} />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: actif ? C.primary : C.text }}>
+                            {nom}
+                          </span>
+                          <span style={{ display: "block", fontSize: 12, color: C.textSubtle, marginTop: 1 }}>
+                            {m.numero || genre}
+                          </span>
                         </span>
-                      )}
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: actif ? C.primary : C.text, lineHeight: 1.25 }}>
-                        {nom}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                            border: `2px solid ${actif ? C.primary : PALETTE.grey300}`,
+                            background: actif ? C.primary : "#fff",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          {actif && <Check size={12} color="#fff" strokeWidth={3} />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Comment régler avec le moyen choisi : numéro, consignes, lien */}
+                <div style={{ marginTop: 10, background: C.bg, borderRadius: R.md, padding: "4px 14px 12px" }}>
+                  {choisi.numero && (
+                    <div style={{ fontSize: 12, color: C.textSubtle, marginTop: 10 }}>
+                      Envoyez {montant(restant)} FCFA au
+                    </div>
+                  )}
+                  <DetailsMoyen moyen={choisi} fond="#fff" />
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Montant payé</label>
-            <input
-              type="number" value={montantSaisi} onChange={(e) => setMontantSaisi(e.target.value)}
-              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
-            />
+            <div style={{ position: "relative", marginTop: 6 }}>
+              <input
+                type="number" inputMode="numeric" value={montantSaisi}
+                onChange={(e) => setMontantSaisi(e.target.value)}
+                style={{ ...CHAMP_MEMBRE, paddingRight: 64, fontSize: 16, fontWeight: 700 }}
+              />
+              <span style={{
+                position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
+                fontSize: 12.5, fontWeight: 600, color: C.textSubtle, pointerEvents: "none",
+              }}>
+                FCFA
+              </span>
+            </div>
           </div>
 
           <div style={{ marginBottom: 12 }}>
@@ -2634,7 +2782,7 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
             <input
               value={reference} onChange={(e) => setReference(e.target.value)}
               placeholder="Numéro de transaction, si vous l'avez"
-              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+              style={{ ...CHAMP_MEMBRE, marginTop: 6 }}
             />
           </div>
 
@@ -2642,7 +2790,7 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
             <label style={{ fontSize: 12.5, fontWeight: 600, color: C.textMuted }}>Note — facultative</label>
             <input
               value={note} onChange={(e) => setNote(e.target.value)}
-              style={{ width: "100%", marginTop: 6, padding: 10, borderRadius: 8, border: `1.5px solid ${C.border}`, fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" }}
+              style={{ ...CHAMP_MEMBRE, marginTop: 6 }}
             />
           </div>
 
@@ -2651,6 +2799,10 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
               {erreur}
             </div>
           )}
+
+          <div style={{ fontSize: 12, color: C.textSubtle, lineHeight: 1.5, marginBottom: 12 }}>
+            Votre déclaration est transmise au Bureau, qui la confirme après vérification.
+          </div>
 
           <div style={{ display: "flex", gap: 10 }}>
             <button
@@ -2663,7 +2815,7 @@ function DeclarationPaiementModal({ cotisation, cotisations, membre, moyens, onC
               onClick={envoyer} disabled={enCours}
               style={{ flex: 2, background: C.primary, border: "none", color: "#fff", borderRadius: 10, padding: "12px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}
             >
-              {enCours ? "Envoi…" : "Payer maintenant"}
+              {enCours ? "Envoi…" : "Envoyer ma déclaration"}
             </button>
           </div>
         </div>
